@@ -1,0 +1,77 @@
+# -----------------------------------------------------------------------------
+# PrestaShop 8.x – модул (standalone repo)
+# Не е копие на core .gitignore: там се игнорират modules/*; тук версионирате модула.
+# -----------------------------------------------------------------------------
+
+# Composer
+/vendor/
+composer.phar
+
+# NPM / Yarn (ако има front-end build)
+/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Кеш и временни файлове
+*.cache
+.sass-cache/
+.cache/
+
+# Модул: банков/локален кеш (генерира се на сървъра)
+/keys/params_*
+/keys/calc_*
+/keys/coeff/coeff_*
+
+# PHPUnit (локални настройки; ползвайте phpunit.xml.dist в repo)
+/phpunit.xml
+
+# PHPUnit / тестове
+.phpunit.result.cache
+/coverage/
+clover.xml
+phpunit.xml.bak
+
+# PHP-CS-Fixer, PHPStan, Psalm (локален кеш)
+.php-cs-fixer.cache
+.phpstan.result.cache
+psalm.xml
+
+# IDE и редактори
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# VS Code: разкоментирайте ако не искате споделени настройки в repo
+# .vscode/
+
+# ОС
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Тайни и локална конфигурация
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Логове
+*.log
+
+# Архиви / пакети за ръчно качване
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Опционално: генерирани assets (ако имате build step към /dist или /public/build)
+# /dist/
+# /public/build/
