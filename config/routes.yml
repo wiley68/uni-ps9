@@ -1,0 +1,17 @@
+unipayment_configuration_form:
+  path: /unipayment/configuration_form
+  methods: [GET, POST]
+  defaults:
+    _controller: 'PrestaShop\Module\Unipayment\Controller\UnipaymentConfigurationController::index'
+
+unipayment_kop_mapping_save:
+  path: /unipayment/kop/save
+  methods: [POST]
+  defaults:
+    _controller: 'PrestaShop\Module\Unipayment\Controller\UnipaymentConfigurationController::saveKopMapping'
+
+unipayment_kop_mapping_refresh:
+  path: /unipayment/kop/refresh
+  methods: [POST]
+  defaults:
+    _controller: 'PrestaShop\Module\Unipayment\Controller\UnipaymentConfigurationController::refreshKopMapping'

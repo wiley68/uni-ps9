@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file original="admin780iwdzubpwmpftq22u" source-language="bg-BG" target-language="bg-BG" datatype="plaintext">
+    <body>
+      <trans-unit id="e8a9c6bd44a919137de38e7925b9727b">
+        <source>UniCredit Credit purchases</source>
+        <target>УниКредит покупки на кредит</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="f8a058713ad97ef5020e6c5b5bfeec21">
+        <source>Enables your customers to purchase goods on installments with UniCredit.</source>
+        <target>Позволява на вашите клиенти да купуват стоки на вноски с УниКредит.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="bb8956c67b82c7444a80c6b2433dd8b4">
+        <source>Are you sure you want to uninstall this module?</source>
+        <target>Сигурни ли сте, че искате да деинсталирате този модул?</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="e9b08a4e03e6df8c7b1754f98debd926">
+        <source>Configuration route is not available yet. Please clear cache and try again.</source>
+        <target>Маршрутът за конфигурация все още не е наличен. Моля, изчистете кеша и опитайте отново.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="8dd2f915acf4ec98006d11c9a4b0945b">
+        <source>Settings updated successfully.</source>
+        <target>Настройките са актуализирани успешно.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="700773e20bb52bd9d3524714787a9671">
+        <source>Could not save KOP mappings.</source>
+        <target>Не можаха да се запазят КОП съпоставянията.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="9b9877d2ed376d4832ee06fdc421b5b6">
+        <source>Could not refresh KOP mapping.</source>
+        <target>Не можа да се опресни КОП мапинга.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="acb8c8e7e63e7a74bcd30fbe48e913d7">
+        <source>KOP mapping was updated, but the bank parameters cache could not be refreshed. Check UNIPAYMENT_UNICID and network connectivity.</source>
+        <target>КОП съпоставянето беше актуализирано, но кешът с банковите параметри не можа да бъде обновен. Проверете UNIPAYMENT_UNICID и мрежовата свързаност.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="780f5f9ad65af4f1b2a8832d24a66891">
+        <source>Invalid category on line %d.</source>
+        <target>Невалидна категория на ред %d.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="1f9d3639c14c373d9ee8bc723f73cdd0">
+        <source>Standard KOP (category %d)</source>
+        <target>Стандартен КОП (категория %d)</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="39f9a98b3cf3f9a8514111786578b523">
+        <source>Promo KOP (category %d)</source>
+        <target>Промо КОП (категория %d)</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="7fcb99ec081a07ebe28b7f56c0944da9">
+        <source>%field% is too long (maximum %max% characters).</source>
+        <target>%field% is too long (maximum %max% characters).</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="2e4ea526ed87252f791efbe38b94c983">
+        <source>%field% contains control characters that are not allowed.</source>
+        <target>%field% contains control characters that are not allowed.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="d2c6160ed2f37abf0b5f81ac5b4f96a5">
+        <source>UniCredit purchases on credit</source>
+        <target>УниКредит покупки на кредит</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="9f3eb9275d10d5f7a180895900150a63">
+        <source>Allows your customers to buy goods on installment with UniCredit.</source>
+        <target>Позволява на вашите клиенти да купуват стоки на изплащане с УниКредит.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="192d4a384d664817b35fe10e9d2b20e5">
+        <source>Unique store identification code</source>
+        <target>Уникален идентификационен код на магазина</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="b1966c1b52b5fa4c1dcc1c83671a8a62">
+        <source>Your store unique identification code in the UniCredit system.</source>
+        <target>Уникалният идентификационен код на вашия магазин в системата на УниКредит.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="a1409c16bab30b7b725efde81dc88bcc">
+        <source>Show promotional widget</source>
+        <target>Показване на промоционален уиджет</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="fb44ef50f3006915fb96b7e075a0d1d2">
+        <source>Enable or disable the promotional widget on the store home page.</source>
+        <target>Активирайте или деактивирайте промоционалния уиджет на началната страница на магазина.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="e969361a96b31aca45a90cd775b80ee8">
+        <source>Direct buy on installment</source>
+        <target>Директна покупка на изплащане</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="6ea4d50cc516a4f67bb5f58f7001e4d4">
+        <source>If enabled, clicking the calculator on the product page adds the product to the cart and sends the customer to checkout with UniCredit pre-selected as payment method.</source>
+        <target>Ако е активирано, щракването върху калкулатора на страницата на продукта добавя продукта в количката и изпраща клиента към плащане с предварително избран УниКредит като метод на плащане.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="ec3028a12402ab7f43962a6f3a667b6e">
+        <source>Debug mode</source>
+        <target>Режим на отстраняване на грешки</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="d2e3492e316f91650e63f3a895be2a3a">
+        <source>Enable this option to turn on debug mode.</source>
+        <target>Активирайте тази опция, за да включите режима за отстраняване на грешки.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="fe2c2d632bcf8f29e840237297a56a4e">
+        <source>Spacing above the button</source>
+        <target>Разстояние над бутона</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="c96a06cf560adcb69d2d2777cb689b77">
+        <source>Extra space above the button, in pixels.</source>
+        <target>Допълнително пространство над бутона, в пиксели.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="81fbf04e8d703df74b904a1568348ebc">
+        <source>UniCredit configuration</source>
+        <target>Конфигурация на УниКредит</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="c9cc8cce247e49bae79f15173ce97354">
+        <source>Save</source>
+        <target>Запазване</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="81287e97f75aa34b187b8181fc2851f4">
+        <source>Category to KOP mapping</source>
+        <target>Съпоставяне на категорията с КОП</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="72449652318ae80417949d050ca4ee24">
+        <source>Edit standard and promo KOP for each category, then save your changes.</source>
+        <target>Редактирайте стандартния и промоционалния КОП за всяка категория, след което запазете промените.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="f9edc7482d3eff492319e6c033e9cf55">
+        <source>Category ID</source>
+        <target>Идентификационен номер на категорията</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="bb34a159a88035cce7ef1607e7907f8f">
+        <source>Category name</source>
+        <target>Име на категорията</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="61f14732568b323cf0514560ca496ade">
+        <source>Standard KOP</source>
+        <target>Стандартен КОП</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="afff2e6c9a62354d4bd2f893d1983d0b">
+        <source>Promo KOP</source>
+        <target>Промо КОП</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="118dc2e000b49b3156145a7b26b79e8c">
+        <source>Manually refresh parameter cache</source>
+        <target>Ръчно обновяване на кеша на параметрите</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="c50c4eae25c30677f932672a2b99734d">
+        <source>Save KOP mappings</source>
+        <target>Запазване на КОП съпоставяния</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="daf6fea7efb7b3103a5b69bd7f4e6678">
+        <source>Invalid category.</source>
+        <target>Невалидна категория.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="0d48a349a6c77bc5f469798bd8769494">
+        <source>Standard KOP (%cat%) is too long (max %max% characters).</source>
+        <target>Standard KOP (%cat%) is too long (max %max% characters).</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="f46230084bbe9159c43e6475ff3fccf9">
+        <source>Standard KOP (%cat%) contains control characters.</source>
+        <target>Стандартният КОП (%cat%) съдържа контролни символи.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="4f5d961e9d3576cecb6afa56666ce039">
+        <source>Promo KOP (%cat%) is too long (max %max% characters).</source>
+        <target>Promo KOP (%cat%) is too long (max %max% characters).</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="3eeda95103bcdfd199bfadbf78efa2b7">
+        <source>Promo KOP (%cat%) contains control characters.</source>
+        <target>Промо КОП (%cat%) съдържа контролни символи.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="e5aec9c936d6a21f2588a65ffc826716">
+        <source>KOP mappings saved successfully.</source>
+        <target>КОП съпоставянията са запазени успешно.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="03911f196725322a5f1cb32ec1abc76f">
+        <source>A problem occurred while saving.</source>
+        <target>Възникна проблем при запазването.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="188a8f36d5cb42a2791d9c50698f5493">
+        <source>A problem occurred while refreshing the cache.</source>
+        <target>Възникна проблем при обновяването на кеша.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="569a5f281c10191d0106461e448de36b">
+        <source>KOP mapping and bank parameters have been refreshed.</source>
+        <target>Мапинга на КОП и параметрите на банката са обновени.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="e7d3e05bcd0517f316b939e37156183a">
+        <source>%n% coefficient cache file(s) older than today were removed from keys/coeff/.</source>
+        <target>%n% coefficient cache file(s) older than today were removed from keys/coeff/.</target>
+        <note>Line: </note>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>

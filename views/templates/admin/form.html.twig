@@ -1,0 +1,235 @@
+{% extends '@PrestaShop/Admin/layout.html.twig' %}
+
+{% form_theme unipaymentConfigurationForm '@PrestaShop/Admin/TwigTemplateForm/prestashop_ui_kit.html.twig' %}
+
+{% block content %}
+    {{ form_start(unipaymentConfigurationForm) }}
+    <div class="card">
+        <h3 class="card-header">
+            <i class="material-icons">settings</i> {{ 'UniCredit configuration'|trans({}, 'Modules.Unipayment.Admin') }}
+        </h3>
+        <div class="card-body">
+            <div class="form-wrapper">
+                {{ form_widget(unipaymentConfigurationForm) }}
+            </div>
+        </div>
+        <div class="card-footer">
+            <div class="d-flex justify-content-end">
+                <button class="btn btn-primary float-right" id="save-button">
+                    {{ 'Save'|trans({}, 'Modules.Unipayment.Admin') }}
+                </button>
+            </div>
+        </div>
+    </div>
+    {{ form_end(unipaymentConfigurationForm) }}
+
+    <div class="card mt-3">
+        <h3 class="card-header">
+            <i class="material-icons">category</i> {{ 'Category to KOP mapping'|trans({}, 'Modules.Unipayment.Admin') }}
+        </h3>
+        <div class="card-body">
+            <p class="mb-3">
+                {{ 'Edit standard and promo KOP for each category, then save your changes.'|trans({}, 'Modules.Unipayment.Admin') }}
+            </p>
+            <div class="table-responsive">
+                <table class="table table-striped" id="uni-kop-table">
+                    <thead>
+                        <tr>
+                            <th>{{ 'Category ID'|trans({}, 'Modules.Unipayment.Admin') }}</th>
+                            <th>{{ 'Category name'|trans({}, 'Modules.Unipayment.Admin') }}</th>
+                            <th>{{ 'Standard KOP'|trans({}, 'Modules.Unipayment.Admin') }}</th>
+                            <th>{{ 'Promo KOP'|trans({}, 'Modules.Unipayment.Admin') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in kopMappings %}
+                            <tr data-category-id="{{ row.category_id|e('html_attr') }}">
+                                <td>{{ row.category_id }}</td>
+                                <td>{{ row.name }}</td>
+                                <td>
+                                    <input
+                                        type="text"
+                                        class="form-control uni-kop"
+                                        value="{{ row.kop|default('')|e('html_attr') }}"
+                                    >
+                                </td>
+                                <td>
+                                    <input
+                                        type="text"
+                                        class="form-control uni-promo"
+                                        value="{{ row.promo|default('')|e('html_attr') }}"
+                                    >
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-secondary mr-2" id="uni-refresh-kop">
+                    {{ 'Manually refresh parameter cache'|trans({}, 'Modules.Unipayment.Admin') }}
+                </button>
+                <button type="button" class="btn btn-primary" id="uni-save-kop">
+                    {{ 'Save KOP mappings'|trans({}, 'Modules.Unipayment.Admin') }}
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {% set uniKopAdminJsData = {
+        invalidCategory: 'Invalid category.'|trans({}, 'Modules.Unipayment.Admin'),
+        kopTooLong: 'Standard KOP (%cat%) is too long (max %max% characters).'|trans({}, 'Modules.Unipayment.Admin'),
+        kopControlChars: 'Standard KOP (%cat%) contains control characters.'|trans({}, 'Modules.Unipayment.Admin'),
+        promoTooLong: 'Promo KOP (%cat%) is too long (max %max% characters).'|trans({}, 'Modules.Unipayment.Admin'),
+        promoControlChars: 'Promo KOP (%cat%) contains control characters.'|trans({}, 'Modules.Unipayment.Admin'),
+        saveSuccess: 'KOP mappings saved successfully.'|trans({}, 'Modules.Unipayment.Admin'),
+        saveProblem: 'A problem occurred while saving.'|trans({}, 'Modules.Unipayment.Admin'),
+        refreshProblem: 'A problem occurred while refreshing the cache.'|trans({}, 'Modules.Unipayment.Admin'),
+        refreshSuccess: 'KOP mapping and bank parameters have been refreshed.'|trans({}, 'Modules.Unipayment.Admin'),
+        coeffPurgedNote: '%n% coefficient cache file(s) older than today were removed from keys/coeff/.'|trans({}, 'Modules.Unipayment.Admin'),
+    } %}
+    <script type="application/json" id="uni-kop-admin-i18n">{{ uniKopAdminJsData|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_QUOT') b-or constant('JSON_HEX_AMP'))|raw }}</script>
+    <script>
+        (function () {
+            const saveBtn = document.getElementById('uni-save-kop');
+            const refreshBtn = document.getElementById('uni-refresh-kop');
+            const table = document.getElementById('uni-kop-table');
+            const saveUrl = "{{ kopSaveUrl|e('js') }}";
+            const refreshUrl = "{{ kopRefreshUrl|e('js') }}";
+            const maxKopLength = 64;
+            const controlCharsPattern = /[\u0000-\u001F\u007F]/;
+            const i18nEl = document.getElementById('uni-kop-admin-i18n');
+            let T = {};
+            try {
+                T = i18nEl && i18nEl.textContent ? JSON.parse(i18nEl.textContent.trim()) : {};
+            } catch (e) {
+                T = {};
+            }
+
+            function t(key, params) {
+                let s = T[key] || key;
+                if (params) {
+                    Object.keys(params).forEach(function (k) {
+                        s = s.split(k).join(String(params[k]));
+                    });
+                }
+                return s;
+            }
+
+            if (!saveBtn || !refreshBtn || !table) {
+                return;
+            }
+
+            saveBtn.addEventListener('click', async function () {
+                const rows = Array.from(table.querySelectorAll('tbody tr')).map(function (tr) {
+                    return {
+                        category_id: parseInt(tr.dataset.categoryId || '0', 10),
+                        kop: tr.querySelector('.uni-kop')?.value || '',
+                        promo: tr.querySelector('.uni-promo')?.value || '',
+                    };
+                });
+
+                const validationErrors = [];
+                rows.forEach(function (row) {
+                    const categoryLabel = 'cat. ' + row.category_id;
+                    const kop = String(row.kop || '').trim();
+                    const promo = String(row.promo || '').trim();
+
+                    if (row.category_id <= 0) {
+                        validationErrors.push(T.invalidCategory);
+                        return;
+                    }
+
+                    if (kop.length > maxKopLength) {
+                        validationErrors.push(t('kopTooLong', { '%cat%': categoryLabel, '%max%': maxKopLength }));
+                    } else if (kop !== '' && controlCharsPattern.test(kop)) {
+                        validationErrors.push(t('kopControlChars', { '%cat%': categoryLabel }));
+                    }
+
+                    if (promo.length > maxKopLength) {
+                        validationErrors.push(t('promoTooLong', { '%cat%': categoryLabel, '%max%': maxKopLength }));
+                    } else if (promo !== '' && controlCharsPattern.test(promo)) {
+                        validationErrors.push(t('promoControlChars', { '%cat%': categoryLabel }));
+                    }
+                });
+
+                if (validationErrors.length > 0) {
+                    window.alert(validationErrors.join('\n'));
+                    return;
+                }
+
+                const response = await fetch(saveUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uni_categories_kop: rows }),
+                    credentials: 'same-origin',
+                });
+
+                if (response.ok) {
+                    window.alert(T.saveSuccess);
+                    return;
+                }
+
+                let message = T.saveProblem;
+                try {
+                    const payload = await response.json();
+                    if (payload && Array.isArray(payload.errors) && payload.errors.length > 0) {
+                        message = payload.errors.join('\n');
+                    }
+                } catch (e) {
+                }
+                window.alert(message);
+            });
+
+            refreshBtn.addEventListener('click', async function () {
+                const response = await fetch(refreshUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh: true }),
+                    credentials: 'same-origin',
+                });
+
+                let message = T.refreshProblem;
+                let payload = null;
+                try {
+                    payload = await response.json();
+                } catch (e) {
+                }
+                let coeffNote = '';
+                if (payload && typeof payload.coeff_purged === 'number' && payload.coeff_purged > 0) {
+                    coeffNote = '\n' + t('coeffPurgedNote', { '%n%': payload.coeff_purged });
+                }
+                if (payload && payload.result === 'success') {
+                    message = T.refreshSuccess + coeffNote;
+                    window.alert(message);
+                    window.location.reload();
+                    return;
+                }
+                if (payload && payload.result === 'partial' && Array.isArray(payload.errors)) {
+                    message = payload.errors.join('\n') + coeffNote;
+                    window.alert(message);
+                    window.location.reload();
+                    return;
+                }
+                if (payload && Array.isArray(payload.errors) && payload.errors.length > 0) {
+                    message = payload.errors.join('\n') + coeffNote;
+                } else {
+                    message = message + coeffNote;
+                }
+
+                if (response.ok) {
+                    window.alert(message);
+                    window.location.reload();
+                    return;
+                }
+
+                window.alert(message);
+            });
+        })();
+    </script>
+{% endblock %}

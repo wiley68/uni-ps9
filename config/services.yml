@@ -1,0 +1,42 @@
+services:
+  _defaults:
+    public: true
+
+  # UniPayment controller
+  prestashop.module.unipayment.controller.unipayment_configuration:
+    class: 'PrestaShop\Module\Unipayment\Controller\UnipaymentConfigurationController'
+    public: true
+
+  prestashop.module.unipayment.service.kop_mapping:
+    class: 'PrestaShop\Module\Unipayment\Service\KopMappingService'
+    arguments:
+      - "@translator"
+    public: true
+
+  # ProductAdditionalInfoBlockService се инстанцира в UniPayment с __DIR__ (пътят на модула).
+
+  # UniCredit configuration form
+  prestashop.module.unipayment.form.type.unipayment_configuration:
+    class: 'PrestaShop\Module\Unipayment\Form\UnipaymentConfigurationType'
+    parent: "form.type.translatable.aware"
+    public: true
+    tags:
+      - { name: form.type }
+
+  prestashop.module.unipayment.form.unipayment_configuration_data_configuration:
+    class: PrestaShop\Module\Unipayment\Form\UnipaymentConfigurationDataConfiguration
+    arguments: ["@prestashop.adapter.legacy.configuration"]
+
+  prestashop.module.unipayment.form.unipayment_configuration_form_data_provider:
+    class: 'PrestaShop\Module\Unipayment\Form\UnipaymentConfigurationFormDataProvider'
+    arguments:
+      - "@prestashop.module.unipayment.form.unipayment_configuration_data_configuration"
+
+  prestashop.module.unipayment.unipayment_configuration_form_handler:
+    class: 'PrestaShop\PrestaShop\Core\Form\Handler'
+    arguments:
+      - "@form.factory"
+      - "@prestashop.core.hook.dispatcher"
+      - "@prestashop.module.unipayment.form.unipayment_configuration_form_data_provider"
+      - 'PrestaShop\Module\Unipayment\Form\UnipaymentConfigurationType'
+      - "UnipaymentConfiguration"

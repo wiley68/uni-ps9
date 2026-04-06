@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+    <name>unipayment</name>
+    <displayName><![CDATA[УниКредит покупки на Кредит]]></displayName>
+    <version><![CDATA[1.4.0]]></version>
+    <description><![CDATA[Дава възможност на Вашите клиенти да закупуват стока на изплащане с УНИ Кредит]]></description>
+    <author><![CDATA[Ilko Ivanov]]></author>
+    <tab><![CDATA[payments_gateways]]></tab>
+    <confirmUninstall><![CDATA[Сигурни ли сте, че желаете да го деинсталирате?]]></confirmUninstall>
+    <is_configurable>1</is_configurable>
+    <need_instance>1</need_instance>
+    <limited_countries></limited_countries>
+</module>
