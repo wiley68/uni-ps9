@@ -3,7 +3,7 @@
 /**
  * Copyright since 2024 Ilko Ivanov
  *
- * UniPayment – UNICredit (PrestaShop 8).
+ * UniPayment – UNICredit (PrestaShop 9.x).
  *
  * @author    Ilko Ivanov
  * @copyright Ilko Ivanov
@@ -54,7 +54,7 @@ class UniPayment extends PaymentModule
 
         $this->ps_versions_compliancy = [
             'min' => '9.0.0',
-            'max' => _PS_VERSION_,
+            'max' => '9.999.999',
         ];
 
         $this->bootstrap = true;

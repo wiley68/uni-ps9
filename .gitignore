@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# PrestaShop 8.x – модул (standalone repo)
+# PrestaShop 9.x – модул (standalone repo)
 # Не е копие на core .gitignore: там се игнорират modules/*; тук версионирате модула.
 # -----------------------------------------------------------------------------
 
@@ -19,10 +19,14 @@ pnpm-debug.log*
 .sass-cache/
 .cache/
 
-# Модул: банков/локален кеш (генерира се на сървъра)
+# Модул keys/: JSON кеш от getparameters / getcalculation / getCoeff — създава се при работа, не се комитва.
 /keys/params_*
 /keys/calc_*
 /keys/coeff/coeff_*
+# Останали runtime файлове в keys/ (kop.json, *.pem, uni_debug.json, …); не /keys/coeff/* — покрито от реда по-горе.
+# Запазваме само защитения index.php (PrestaShop конвенция).
+/keys/*
+!/keys/index.php
 
 # PHPUnit (локални настройки; ползвайте phpunit.xml.dist в repo)
 /phpunit.xml
@@ -37,6 +41,10 @@ phpunit.xml.bak
 .php-cs-fixer.cache
 .phpstan.result.cache
 psalm.xml
+
+# IDE: PHP stubs само за локален анализ (не са част от модула в продукция)
+prestashop-stubs.php
+intelephense-extra-stubs.php
 
 # IDE и редактори
 .idea/
