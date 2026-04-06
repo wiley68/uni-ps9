@@ -14,6 +14,7 @@ namespace PrestaShop\Module\Unipayment\Form;
 
 use PrestaShop\PrestaShop\Core\Configuration\DataConfigurationInterface;
 use Configuration;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Четене/запис на UNIPAYMENT_* в таблицата {@see Configuration} (PrestaShop DataConfiguration).
@@ -22,6 +23,10 @@ use Configuration;
  */
 final class UnipaymentConfigurationDataConfiguration implements DataConfigurationInterface
 {
+    public function __construct(
+        private readonly TranslatorInterface $translator,
+    ) {
+    }
     public const UNIPAYMENT_STATUS = 'UNIPAYMENT_STATUS';
     public const UNIPAYMENT_UNICID = 'UNIPAYMENT_UNICID';
     public const UNIPAYMENT_REKLAMA = 'UNIPAYMENT_REKLAMA';
@@ -54,24 +59,24 @@ final class UnipaymentConfigurationDataConfiguration implements DataConfiguratio
      */
     public function updateConfiguration(array $configuration): array
     {
-        $errors = [];
-
-        if ($this->validateConfiguration($configuration)) {
-            $gap = $configuration['UNIPAYMENT_GAP'] ?? 0;
-            if ($gap === '' || $gap === null) {
-                $gap = 0;
-            }
-
-            Configuration::updateValue(static::UNIPAYMENT_STATUS, $configuration['UNIPAYMENT_STATUS']);
-            Configuration::updateValue(static::UNIPAYMENT_UNICID, $configuration['UNIPAYMENT_UNICID']);
-            Configuration::updateValue(static::UNIPAYMENT_REKLAMA, $configuration['UNIPAYMENT_REKLAMA']);
-            Configuration::updateValue(static::UNIPAYMENT_CART, $configuration['UNIPAYMENT_CART']);
-            Configuration::updateValue(static::UNIPAYMENT_DEBUG, $configuration['UNIPAYMENT_DEBUG']);
-            Configuration::updateValue(static::UNIPAYMENT_GAP, (float) $gap);
+        $errors = $this->collectConfigurationErrors($configuration);
+        if ($errors !== []) {
+            return $errors;
         }
 
-        /* Errors are returned here. */
-        return $errors;
+        $gap = $configuration['UNIPAYMENT_GAP'] ?? 0;
+        if ($gap === '' || $gap === null) {
+            $gap = 0;
+        }
+
+        Configuration::updateValue(static::UNIPAYMENT_STATUS, $configuration['UNIPAYMENT_STATUS']);
+        Configuration::updateValue(static::UNIPAYMENT_UNICID, trim((string) $configuration['UNIPAYMENT_UNICID']));
+        Configuration::updateValue(static::UNIPAYMENT_REKLAMA, $configuration['UNIPAYMENT_REKLAMA']);
+        Configuration::updateValue(static::UNIPAYMENT_CART, $configuration['UNIPAYMENT_CART']);
+        Configuration::updateValue(static::UNIPAYMENT_DEBUG, $configuration['UNIPAYMENT_DEBUG']);
+        Configuration::updateValue(static::UNIPAYMENT_GAP, (float) $gap);
+
+        return [];
     }
 
     /**
@@ -81,7 +86,23 @@ final class UnipaymentConfigurationDataConfiguration implements DataConfiguratio
      */
     public function validateConfiguration(array $configuration): bool
     {
-        return
-            isset($configuration['UNIPAYMENT_STATUS']);
+        return $this->collectConfigurationErrors($configuration) === [];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function collectConfigurationErrors(array $configuration): array
+    {
+        $errors = [];
+        if (!isset($configuration['UNIPAYMENT_STATUS'])) {
+            $errors[] = $this->translator->trans('The form data is incomplete.', [], 'Modules.Unipayment.Admin');
+        }
+        $unicid = isset($configuration['UNIPAYMENT_UNICID']) ? trim((string) $configuration['UNIPAYMENT_UNICID']) : '';
+        if ($unicid === '') {
+            $errors[] = $this->translator->trans('Unique store identification code is required.', [], 'Modules.Unipayment.Admin');
+        }
+
+        return $errors;
     }
 }

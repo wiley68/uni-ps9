@@ -15,44 +15,51 @@ namespace PrestaShop\Module\Unipayment\Controller;
 use Module;
 use PrestaShop\Module\Unipayment\Service\KopMappingService;
 use PrestaShop\Module\Unipayment\Service\UniCreditGetCoeffService;
-use PrestaShopBundle\Controller\Admin\FrameworkBundleAdminController;
+use PrestaShop\PrestaShop\Core\Form\Handler;
+use PrestaShopBundle\Controller\Admin\PrestaShopAdminController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Back-office: Symfony форма за настройки + AJAX за KOP мапинга и refresh от банката.
+ *
+ * PrestaShop 9: {@see PrestaShopAdminController} вместо остарелия FrameworkBundleAdminController.
  */
-class UnipaymentConfigurationController extends FrameworkBundleAdminController
+class UnipaymentConfigurationController extends PrestaShopAdminController
 {
+    public function __construct(
+        private readonly Handler $unipaymentConfigurationFormHandler,
+        private readonly KopMappingService $kopMappingService,
+    ) {
+    }
+
     /**
      * Главна страница на конфигурацията (форма + таблица KOP).
      */
     public function index(Request $request): Response
     {
-        $textFormDataHandler = $this->get('prestashop.module.unipayment.unipayment_configuration_form_handler');
-
-        $textForm = $textFormDataHandler->getForm();
+        $textForm = $this->unipaymentConfigurationFormHandler->getForm();
         $textForm->handleRequest($request);
 
         if ($textForm->isSubmitted() && $textForm->isValid()) {
-            $errors = $textFormDataHandler->save($textForm->getData());
+            $errors = $this->unipaymentConfigurationFormHandler->save($textForm->getData());
 
             if (empty($errors)) {
                 $this->addFlash(
                     'success',
-                    $this->trans('Settings updated successfully.', 'Modules.Unipayment.Admin', [])
+                    $this->trans('Settings updated successfully.', [], 'Modules.Unipayment.Admin')
                 );
 
                 return $this->redirectToRoute('unipayment_configuration_form');
             }
 
-            $this->flashErrors($errors);
+            $this->flashPlainErrors($errors);
         }
 
         return $this->render('@Modules/unipayment/views/templates/admin/form.html.twig', [
             'unipaymentConfigurationForm' => $textForm->createView(),
-            'kopMappings' => $this->getKopMappingService()->getMappings(),
+            'kopMappings' => $this->kopMappingService->getMappings(),
             'kopSaveUrl' => $this->generateUrl('unipayment_kop_mapping_save'),
             'kopRefreshUrl' => $this->generateUrl('unipayment_kop_mapping_refresh'),
         ]);
@@ -68,7 +75,7 @@ class UnipaymentConfigurationController extends FrameworkBundleAdminController
             ? $payload['uni_categories_kop']
             : [];
 
-        $validationErrors = $this->getKopMappingService()->validateMappings($rows);
+        $validationErrors = $this->kopMappingService->validateMappings($rows);
         if (!empty($validationErrors)) {
             return new JsonResponse([
                 'result' => 'error',
@@ -76,12 +83,12 @@ class UnipaymentConfigurationController extends FrameworkBundleAdminController
             ], 422);
         }
 
-        $isSaved = $this->getKopMappingService()->saveMappings($rows);
+        $isSaved = $this->kopMappingService->saveMappings($rows);
 
         return new JsonResponse([
             'result' => $isSaved ? 'success' : 'error',
             'errors' => $isSaved ? [] : [
-                $this->trans('Could not save KOP mappings.', 'Modules.Unipayment.Admin', []),
+                $this->trans('Could not save KOP mappings.', [], 'Modules.Unipayment.Admin'),
             ],
         ], $isSaved ? 200 : 500);
     }
@@ -93,7 +100,7 @@ class UnipaymentConfigurationController extends FrameworkBundleAdminController
     {
         $coeffPurged = $this->purgeUniCoeffCacheOlderThanToday();
 
-        $kopOk = $this->getKopMappingService()->refreshMappings();
+        $kopOk = $this->kopMappingService->refreshMappings();
         if (!$kopOk) {
             return new JsonResponse([
                 'result' => 'error',
@@ -101,7 +108,7 @@ class UnipaymentConfigurationController extends FrameworkBundleAdminController
                 'params_refreshed' => false,
                 'coeff_purged' => $coeffPurged,
                 'errors' => [
-                    $this->trans('Could not refresh KOP mapping.', 'Modules.Unipayment.Admin', []),
+                    $this->trans('Could not refresh KOP mapping.', [], 'Modules.Unipayment.Admin'),
                 ],
             ], 500);
         }
@@ -121,8 +128,8 @@ class UnipaymentConfigurationController extends FrameworkBundleAdminController
                 'errors' => [
                     $this->trans(
                         'KOP mapping was updated, but the bank parameters cache could not be refreshed. Check UNIPAYMENT_UNICID and network connectivity.',
-                        'Modules.Unipayment.Admin',
-                        []
+                        [],
+                        'Modules.Unipayment.Admin'
                     ),
                 ],
             ], 200);
@@ -149,13 +156,15 @@ class UnipaymentConfigurationController extends FrameworkBundleAdminController
         return (new UniCreditGetCoeffService($root))->purgeCoeffCacheFilesOlderThanToday();
     }
 
-    /** Услуга от контейнера: {@see KopMappingService}. */
-    private function getKopMappingService(): KopMappingService
+    /**
+     * Съобщения за грешки от {@see Handler::save()} (низове от валидация на конфигурацията).
+     *
+     * @param array<int, string> $errorMessages
+     */
+    private function flashPlainErrors(array $errorMessages): void
     {
-        /** @var KopMappingService $service */
-        $service = $this->get('prestashop.module.unipayment.service.kop_mapping');
-
-        return $service;
+        foreach ($errorMessages as $error) {
+            $this->addFlash('error', $error);
+        }
     }
 }
-

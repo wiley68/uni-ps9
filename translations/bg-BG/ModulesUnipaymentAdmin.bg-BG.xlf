@@ -27,6 +27,16 @@
         <target>Настройките са актуализирани успешно.</target>
         <note>Line: </note>
       </trans-unit>
+      <trans-unit id="e0e1e8a7ac2cbb015f253c3d55ef8c2c">
+        <source>The form data is incomplete.</source>
+        <target>Данните от формата са непълни.</target>
+        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="f7d04c32ac037336854b89592432c0ab">
+        <source>Unique store identification code is required.</source>
+        <target>Уникалният код за идентификация на магазина е задължителен.</target>
+        <note>Line: </note>
+      </trans-unit>
       <trans-unit id="700773e20bb52bd9d3524714787a9671">
         <source>Could not save KOP mappings.</source>
         <target>Не можаха да се запазят КОП съпоставянията.</target>

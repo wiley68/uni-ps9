@@ -2,10 +2,16 @@ services:
   _defaults:
     public: true
 
-  # UniPayment controller (service id + tag: иначе няма container за FrameworkBundleAdminController)
+  # UniPayment controller: PrestaShop ModuleControllerRegisterPass добавя autoconfigure само за наследници на
+  # FrameworkBundleAdminController; при PrestaShopAdminController трябва изрично autoconfigure (+ tag), иначе няма container.
   prestashop.module.unipayment.controller.unipayment_configuration:
     class: 'PrestaShop\Module\Unipayment\Controller\UnipaymentConfigurationController'
     public: true
+    autowire: true
+    autoconfigure: true
+    arguments:
+      $unipaymentConfigurationFormHandler: '@prestashop.module.unipayment.unipayment_configuration_form_handler'
+      $kopMappingService: '@prestashop.module.unipayment.service.kop_mapping'
     tags: ['controller.service_arguments']
 
   prestashop.module.unipayment.service.kop_mapping:
@@ -26,7 +32,8 @@ services:
 
   prestashop.module.unipayment.form.unipayment_configuration_data_configuration:
     class: PrestaShop\Module\Unipayment\Form\UnipaymentConfigurationDataConfiguration
-    arguments: ["@prestashop.adapter.legacy.configuration"]
+    arguments:
+      - '@translator'
 
   prestashop.module.unipayment.form.unipayment_configuration_form_data_provider:
     class: 'PrestaShop\Module\Unipayment\Form\UnipaymentConfigurationFormDataProvider'
