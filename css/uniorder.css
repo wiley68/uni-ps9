@@ -1,27 +1,38 @@
-.uni_title {
+.unipayment-checkout-scope {
+    font-family: "Roboto Condensed", sans-serif;
+    box-sizing: border-box;
+}
+
+.unipayment-checkout-scope *,
+.unipayment-checkout-scope *::before,
+.unipayment-checkout-scope *::after {
+    box-sizing: inherit;
+}
+
+.unipayment-checkout-scope .uni_title {
     background: #f5f5f5 !important;
     padding: 8px 15px 8px 15px !important;
     color: #d20210 !important;
     font-size: 14px !important;
 }
-.uni_table {
+.unipayment-checkout-scope .uni_table {
     width: 100% !important;
     font-size: 14px !important;
     padding: 0px !important;
     margin: 0px !important;
 }
-.uni_row_title {
+.unipayment-checkout-scope .uni_row_title {
     font-size: 14px !important;
     width: 60% !important;
     padding: 2px !important;
     background: transparent !important;
 }
-.uni_row_input {
+.unipayment-checkout-scope .uni_row_input {
     width: 40% !important;
     padding: 2px !important;
     background: transparent !important;
 }
-.uni_input {
+.unipayment-checkout-scope .uni_input {
     font-size: 14px !important;
     width: 100% !important;
     border: 1px solid #696969 !important;
@@ -29,10 +40,10 @@
     margin: 0px !important;
     max-height: 22px !important;
 }
-.passive {
+.unipayment-checkout-scope .passive {
     background: #f5f5f5 !important;
 }
-.uni_btn_pre {
+.unipayment-checkout-scope .uni_btn_pre {
     cursor: pointer !important;
     text-align: center !important;
     border: 1px solid #708090 !important;
@@ -40,13 +51,21 @@
     color: white;
     width: 100px !important;
 }
-.uni_hr {
+.unipayment-checkout-scope .uni_hr {
     border-top: 0px solid white !important;
     border-right: 0px solid white !important;
     border-bottom: 1px solid #dcdcdc !important;
     border-left: 0px solid white !important;
 }
-.uni_text_cc {
+.unipayment-checkout-scope .uni_text_cc {
     text-align: right !important;
     font-size: 11px !important;
+}
+
+.unipayment-checkout-scope .unipayment-checkout-terms-row {
+    display: flex;
+}
+
+.unipayment-checkout-scope .unipayment-checkout-terms-link {
+    color: #993300;
 }

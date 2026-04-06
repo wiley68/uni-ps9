@@ -7,39 +7,43 @@
     * @Owner: Avalon Ltd
     * @Version: 1.0.0
 *}
-<input type="hidden" name="uni_liveurl" id="uni_liveurl" value="{$uni_liveurl}" />
-<input type="hidden" name="uni_unicid" id="uni_unicid" value="{$uni_unicid}" />
-<input type="hidden" name="link_to_calculateuni" id="link_to_calculateuni" value="{$link_to_calculateuni}" />
-<input type="hidden" name="link_to_session" id="link_to_session" value="{$link_to_session}" />
-<input type="hidden" name="uni_promo" id="uni_promo" value="{$uni_promo}" />
-<input type="hidden" name="uni_promo_data" id="uni_promo_data" value="{$uni_promo_data}" />
-<input type="hidden" name="uni_promo_meseci_znak" id="uni_promo_meseci_znak" value="{$uni_promo_meseci_znak}" />
-<input type="hidden" name="uni_promo_meseci" id="uni_promo_meseci" value="{$uni_promo_meseci}" />
-<input type="hidden" name="uni_promo_price" id="uni_promo_price" value="{$uni_promo_price}" />
-<input type="hidden" name="uni_product_cat_id" id="uni_product_cat_id" value="{$uni_product_cat_id}" />
+<input type="hidden" name="uni_liveurl" id="uni_liveurl" value="{$uni_liveurl|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_unicid" id="uni_unicid" value="{$uni_unicid|escape:'html':'UTF-8'}" />
+<input type="hidden" name="link_to_calculateuni" id="link_to_calculateuni"
+    value="{$link_to_calculateuni|escape:'html':'UTF-8'}" />
+<input type="hidden" name="link_to_session" id="link_to_session" value="{$link_to_session|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_promo" id="uni_promo" value="{$uni_promo|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_promo_data" id="uni_promo_data" value="{$uni_promo_data|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_promo_meseci_znak" id="uni_promo_meseci_znak"
+    value="{$uni_promo_meseci_znak|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_promo_meseci" id="uni_promo_meseci" value="{$uni_promo_meseci|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_promo_price" id="uni_promo_price" value="{$uni_promo_price|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_product_cat_id" id="uni_product_cat_id"
+    value="{$uni_product_cat_id|escape:'html':'UTF-8'}" />
 <input type="hidden" name="uni_product_category_ids" id="uni_product_category_ids"
     value="{$uni_product_category_ids|escape:'html':'UTF-8'}" />
-<input type="hidden" name="uni_service" id="uni_service" value="{$uni_service}" />
-<input type="hidden" name="uni_user" id="uni_user" value="{$uni_user}" />
-<input type="hidden" name="uni_password" id="uni_password" value="{$uni_password}" />
-<input type="hidden" name="uni_sertificat" id="uni_sertificat" value="{$uni_sertificat}" />
-<input type="hidden" name="uni_real_ip" id="uni_real_ip" value="{$uni_real_ip}" />
-<input type="hidden" name="uni_proces2" id="uni_proces2" value="{$uni_proces2}" />
-<input type="hidden" name="uni_proces1" id="uni_proces1" value="{$uni_proces1}" />
-<input type="hidden" name="uni_check" id="uni_check" value="{$uni_check}" />
-<input type="hidden" name="uni_fname_get" id="uni_fname_get" value="{$uni_fname_get}" />
-<input type="hidden" name="uni_lname_get" id="uni_lname_get" value="{$uni_lname_get}" />
-<input type="hidden" name="uni_egn_get" id="uni_egn_get" value="{$uni_egn_get}" />
-<input type="hidden" name="uni_phone_get" id="uni_phone_get" value="{$uni_phone_get}" />
-<input type="hidden" name="uni_email_get" id="uni_email_get" value="{$uni_email_get}" />
-<input type="hidden" name="uni_shema_current" id="uni_shema_current" value="{$uni_shema_current}" />
-<input type="hidden" name="uni_eur" id="uni_eur" value="{$uni_eur}" />
+<input type="hidden" name="uni_service" id="uni_service" value="{$uni_service|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_user" id="uni_user" value="{$uni_user|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_password" id="uni_password" value="{$uni_password|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_sertificat" id="uni_sertificat" value="{$uni_sertificat|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_real_ip" id="uni_real_ip" value="{$uni_real_ip|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_proces2" id="uni_proces2" value="{$uni_proces2|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_proces1" id="uni_proces1" value="{$uni_proces1|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_check" id="uni_check" value="{$uni_check|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_fname_get" id="uni_fname_get" value="{$uni_fname_get|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_lname_get" id="uni_lname_get" value="{$uni_lname_get|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_egn_get" id="uni_egn_get" value="{$uni_egn_get|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_phone_get" id="uni_phone_get" value="{$uni_phone_get|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_email_get" id="uni_email_get" value="{$uni_email_get|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_shema_current" id="uni_shema_current"
+    value="{$uni_shema_current|escape:'html':'UTF-8'}" />
+<input type="hidden" name="uni_eur" id="uni_eur" value="{$uni_eur|escape:'html':'UTF-8'}" />
 {if isset($uni_checkout_js_strings)}
     <script type="text/javascript">
         window.unipaymentCheckoutStrings = {$uni_checkout_js_strings nofilter};
     </script>
 {/if}
-<div id="uni-checkout-container">
+<div id="uni-checkout-container" class="unipayment-checkout-scope">
     {if $uni_proces1 eq 1}
         <div class="uni_title">
             {l s='You can select the loan term, your preferred monthly installment, and optionally an initial down payment. Then confirm your choice. You will be redirected to UniCredit to complete your credit purchase.' d='Modules.Unipayment.Shop'}
@@ -182,7 +186,8 @@
                     {l s='First name' d='Modules.Unipayment.Shop'}
                 </td>
                 <td class="uni_row_input">
-                    <input id="uni_fname" name="uni_fname" required type="text" class="uni_input" value="{$uni_firstname}">
+                    <input id="uni_fname" name="uni_fname" required type="text" class="uni_input"
+                        value="{$uni_firstname|escape:'html':'UTF-8'}">
                 </td>
             </tr>
             <tr>
@@ -190,7 +195,8 @@
                     {l s='Last name' d='Modules.Unipayment.Shop'}
                 </td>
                 <td class="uni_row_input">
-                    <input id="uni_lname" name="uni_lname" required type="text" class="uni_input" value="{$uni_lastname}">
+                    <input id="uni_lname" name="uni_lname" required type="text" class="uni_input"
+                        value="{$uni_lastname|escape:'html':'UTF-8'}">
                 </td>
             </tr>
             <tr>
@@ -206,7 +212,8 @@
                     {l s='Phone' d='Modules.Unipayment.Shop'}
                 </td>
                 <td class="uni_row_input">
-                    <input id="uni_phone" name="uni_phone" required type="text" class="uni_input" value="{$uni_phone}">
+                    <input id="uni_phone" name="uni_phone" required type="text" class="uni_input"
+                        value="{$uni_phone|escape:'html':'UTF-8'}">
                 </td>
             </tr>
             <tr>
@@ -222,7 +229,8 @@
                     {l s='E-mail' d='Modules.Unipayment.Shop'}
                 </td>
                 <td class="uni_row_input">
-                    <input id="uni_email" name="uni_email" required type="text" class="uni_input" value="{$uni_email}">
+                    <input id="uni_email" name="uni_email" required type="text" class="uni_input"
+                        value="{$uni_email|escape:'html':'UTF-8'}">
                 </td>
             </tr>
             <tr>
@@ -235,11 +243,11 @@
             </tr>
             <tr>
                 <td colspan="2">
-                    <div style="display:flex;">
+                    <div class="unipayment-checkout-terms-row">
                         <input type="checkbox" name="uni_uslovia" value="uni_uslovia" id="uni_uslovia" />
-                        <a href="{$uni_uslovia}" style="color: #993300;"
-                            title="{l s='UniCredit general terms for leasing.' d='Modules.Unipayment.Shop'}"
-                            target="_blank">
+                        <a href="{$uni_uslovia|escape:'html':'UTF-8'}" class="unipayment-checkout-terms-link"
+                            title="{l s='UniCredit general terms for leasing.' d='Modules.Unipayment.Shop'}" target="_blank"
+                            rel="noopener noreferrer">
                             &nbsp;{l s='I have read and agree to the UniCredit terms and conditions' d='Modules.Unipayment.Shop'}
                         </a>
                     </div>

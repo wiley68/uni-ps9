@@ -1,4 +1,7 @@
 function calculateUni(_uni_meseci) {
+    if (!$("#link_to_calculateuni").length || !$("#link_to_session").length) {
+        return;
+    }
     $("body").css("pointer-events", function (index) {
         return "none";
     });
@@ -27,6 +30,12 @@ function calculateUni(_uni_meseci) {
             uni_eur: $("#uni_eur").val(),
         },
         success: function (json) {
+            if (!json || !json.result) {
+                $("body").css("pointer-events", function (index) {
+                    return "";
+                });
+                return;
+            }
             $("#uni_mesecna").val(json.result.uni_mesecna);
             if (json.result.uni_mesecna_second == 0) {
                 document.getElementById("uni_mesecna_second").value =
@@ -115,16 +124,19 @@ function calculateUni(_uni_meseci) {
     });
 }
 $(document).ready(function (e) {
+    if (!$("#uni_shema_current").length) {
+        return;
+    }
     if (parseInt($("#uni_proces2").val()) > 0) {
         var _ucs =
             typeof window.unipaymentCheckoutStrings === "object" &&
-                window.unipaymentCheckoutStrings !== null
+            window.unipaymentCheckoutStrings !== null
                 ? window.unipaymentCheckoutStrings
                 : {};
         function _ucMsg(k, fallback) {
             return _ucs[k] || fallback;
         }
-        if (parseInt($("#uni_check").val()) == 1) {
+        if (parseInt($("#uni_check").val(), 10) == 1) {
             alert(
                 _ucMsg(
                     "mustAgreeTerms",
@@ -132,23 +144,17 @@ $(document).ready(function (e) {
                 ),
             );
         }
-        if (parseInt($("#uni_fname_get").val()) == 1) {
+        if (parseInt($("#uni_fname_get").val(), 10) == 1) {
             alert(
-                _ucMsg(
-                    "fillFirstName",
-                    "Please fill in the First name field.",
-                ),
+                _ucMsg("fillFirstName", "Please fill in the First name field."),
             );
         }
-        if (parseInt($("#uni_lname_get").val()) == 1) {
+        if (parseInt($("#uni_lname_get").val(), 10) == 1) {
             alert(
-                _ucMsg(
-                    "fillLastName",
-                    "Please fill in the Last name field.",
-                ),
+                _ucMsg("fillLastName", "Please fill in the Last name field."),
             );
         }
-        if (parseInt($("#uni_egn_get").val()) == 1) {
+        if (parseInt($("#uni_egn_get").val(), 10) == 1) {
             alert(
                 _ucMsg(
                     "fillPersonalId",
@@ -156,15 +162,11 @@ $(document).ready(function (e) {
                 ),
             );
         }
-        if (parseInt($("#uni_phone_get").val()) == 1) {
-            alert(
-                _ucMsg("fillPhone", "Please fill in the Phone field."),
-            );
+        if (parseInt($("#uni_phone_get").val(), 10) == 1) {
+            alert(_ucMsg("fillPhone", "Please fill in the Phone field."));
         }
-        if (parseInt($("#uni_email_get").val()) == 1) {
-            alert(
-                _ucMsg("fillEmail", "Please fill in the E-mail field."),
-            );
+        if (parseInt($("#uni_email_get").val(), 10) == 1) {
+            alert(_ucMsg("fillEmail", "Please fill in the E-mail field."));
         }
     }
     calculateUni($("#uni_shema_current").val());

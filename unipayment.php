@@ -355,7 +355,8 @@ class UniPayment extends PaymentModule
      */
     public function hookPaymentOptions(array $params): array
     {
-        if (!$this->active || !$this->checkCurrency($params['cart'])) {
+        $cartParam = $params['cart'] ?? null;
+        if (!$this->active || !$cartParam instanceof Cart || !$this->checkCurrency($cartParam)) {
             return [];
         }
 
@@ -378,7 +379,7 @@ class UniPayment extends PaymentModule
         }
 
         /** @var Cart $cart */
-        $cart = $params['cart'];
+        $cart = $cartParam;
         if (!Validate::isLoadedObject($cart) || $cart->nbProducts() <= 0) {
             return [];
         }
@@ -1223,6 +1224,29 @@ class UniPayment extends PaymentModule
         if (!$this->active) {
             return '';
         }
+        $controller = $this->context->controller ?? null;
+        if ($controller !== null) {
+            $paymentReturnCssPath = __DIR__ . '/css/payment_return.css';
+            $paymentReturnJsPath = __DIR__ . '/js/payment_return.js';
+            $controller->registerStylesheet(
+                'unipayment-payment-return',
+                'modules/' . $this->name . '/css/payment_return.css',
+                [
+                    'media' => 'all',
+                    'priority' => 200,
+                    'version' => (string) @filemtime($paymentReturnCssPath),
+                ]
+            );
+            $controller->registerJavascript(
+                'unipayment-payment-return-js',
+                'modules/' . $this->name . '/js/payment_return.js',
+                [
+                    'position' => 'bottom',
+                    'priority' => 200,
+                    'version' => (string) @filemtime($paymentReturnJsPath),
+                ]
+            );
+        }
 
         $smarty = $this->context->smarty;
         $link = $this->context->link;
@@ -1238,7 +1262,7 @@ class UniPayment extends PaymentModule
             'result_html' => '',
             'uni_process2_display' => false,
             'uni_process1_redirect' => false,
-            'uni_redirect_json' => 'null',
+            'uni_redirect_url' => '',
             'link' => $link,
         ];
 
@@ -1329,10 +1353,7 @@ class UniPayment extends PaymentModule
             'result_html' => $resultHtml,
             'uni_process2_display' => $process2On && $resultHtml !== '',
             'uni_process1_redirect' => $process1On && $redirectUrl !== '',
-            'uni_redirect_json' => json_encode(
-                $redirectUrl,
-                JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE
-            ),
+            'uni_redirect_url' => $redirectUrl,
             'link' => $link,
         ]);
 
