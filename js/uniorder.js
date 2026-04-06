@@ -1,7 +1,64 @@
+var unipaymentCalcBusy = false;
+var unipaymentQueuedMonths = null;
+var unipaymentCheckoutStrings = {};
+
+function isUnipaymentPaymentSelected() {
+    var selected = document.querySelector(
+        'input[name="payment-option"][data-module-name="unipayment"]:checked',
+    );
+    return !!selected || !!document.getElementById("uni_shema_current");
+}
+
+function setCheckoutSubmitBlocked(blocked) {
+    var $targets = $(
+        "#payment-confirmation button, " +
+            "#payment-confirmation button[type='submit'], " +
+            "#payment-confirmation input[type='submit']",
+    );
+    $targets.prop("disabled", blocked);
+    if (blocked) {
+        $targets.attr("aria-disabled", "true");
+    } else {
+        $targets.removeAttr("aria-disabled");
+    }
+}
+
+function setCalcBusyState(busy) {
+    unipaymentCalcBusy = busy;
+    if (busy && isUnipaymentPaymentSelected()) {
+        setCheckoutSubmitBlocked(true);
+        return;
+    }
+    setCheckoutSubmitBlocked(false);
+}
+
+function finalizeCalculateUni(currentMonths) {
+    $("body").css("pointer-events", function (index) {
+        return "";
+    });
+    setCalcBusyState(false);
+
+    if (
+        unipaymentQueuedMonths !== null &&
+        String(unipaymentQueuedMonths) !== String(currentMonths)
+    ) {
+        var queued = unipaymentQueuedMonths;
+        unipaymentQueuedMonths = null;
+        calculateUni(queued);
+        return;
+    }
+    unipaymentQueuedMonths = null;
+}
+
 function calculateUni(_uni_meseci) {
     if (!$("#link_to_calculateuni").length || !$("#link_to_session").length) {
         return;
     }
+    if (unipaymentCalcBusy) {
+        unipaymentQueuedMonths = _uni_meseci;
+        return;
+    }
+    setCalcBusyState(true);
     $("body").css("pointer-events", function (index) {
         return "none";
     });
@@ -31,9 +88,7 @@ function calculateUni(_uni_meseci) {
         },
         success: function (json) {
             if (!json || !json.result) {
-                $("body").css("pointer-events", function (index) {
-                    return "";
-                });
+                finalizeCalculateUni(_uni_meseci);
                 return;
             }
             $("#uni_mesecna").val(json.result.uni_mesecna);
@@ -102,24 +157,15 @@ function calculateUni(_uni_meseci) {
                     uni_proces2: $("#uni_proces2").val(),
                 },
                 success: function (jsonData) {
-                    //start mouse click
-                    $("body").css("pointer-events", function (index) {
-                        return "";
-                    });
+                    finalizeCalculateUni(_uni_meseci);
                 },
                 error: function (response) {
-                    //start mouse click
-                    $("body").css("pointer-events", function (index) {
-                        return "";
-                    });
+                    finalizeCalculateUni(_uni_meseci);
                 },
             });
         },
         error: function (response) {
-            //start mouse click
-            $("body").css("pointer-events", function (index) {
-                return "";
-            });
+            finalizeCalculateUni(_uni_meseci);
         },
     });
 }
@@ -133,6 +179,7 @@ $(document).ready(function (e) {
             window.unipaymentCheckoutStrings !== null
                 ? window.unipaymentCheckoutStrings
                 : {};
+        unipaymentCheckoutStrings = _ucs;
         function _ucMsg(k, fallback) {
             return _ucs[k] || fallback;
         }
@@ -186,5 +233,36 @@ $(document).ready(function (e) {
     });
     $("#uni_parva_button").click(function () {
         calculateUni($("#uni_pogasitelni_vnoski").val());
+    });
+
+    $(document).on("change", 'input[name="payment-option"]', function () {
+        setCalcBusyState(unipaymentCalcBusy);
+    });
+
+    $(document).on(
+        "click",
+        "#payment-confirmation button, #payment-confirmation input[type='submit']",
+        function (event) {
+            if (!unipaymentCalcBusy || !isUnipaymentPaymentSelected()) {
+                return;
+            }
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            alert(
+                unipaymentCheckoutStrings.waitRecalculation ||
+                    "Please wait, installment values are being updated.",
+            );
+        },
+    );
+
+    $(document).on("submit", "form", function (event) {
+        if (!unipaymentCalcBusy || !isUnipaymentPaymentSelected()) {
+            return;
+        }
+        if (!$(this).closest("#payment-confirmation").length) {
+            return;
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
     });
 });

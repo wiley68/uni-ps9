@@ -539,6 +539,7 @@ class UniPayment extends PaymentModule
                 'fillPersonalId' => $this->trans('Please fill in the Personal ID field.', [], 'Modules.Unipayment.Shop'),
                 'fillPhone' => $this->trans('Please fill in the Phone field.', [], 'Modules.Unipayment.Shop'),
                 'fillEmail' => $this->trans('Please fill in the E-mail field.', [], 'Modules.Unipayment.Shop'),
+                'waitRecalculation' => $this->trans('Please wait, installment values are being updated.', [], 'Modules.Unipayment.Shop'),
             ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP),
         ]);
 
