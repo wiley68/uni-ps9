@@ -50,7 +50,7 @@ class UniPayment extends PaymentModule
         $this->tab = 'payments_gateways';
         $this->version = '1.4.0';
         $this->author = 'Ilko Ivanov';
-        $this->need_instance = 1;
+        $this->need_instance = 0;
 
         $this->ps_versions_compliancy = [
             'min' => '9.0.0',
@@ -232,10 +232,7 @@ class UniPayment extends PaymentModule
                 ]
             );
         }
-        $frontSelf = isset($this->context->controller->php_self)
-            ? (string) $this->context->controller->php_self
-            : '';
-        if (in_array($frontSelf, ['order', 'checkout'], true)) {
+        if ($this->isFrontCheckoutOrderPage()) {
             $this->context->controller->registerStylesheet(
                 'unipayment-order-page',
                 'modules/' . $this->name . '/css/uniorder.css',
@@ -643,6 +640,32 @@ class UniPayment extends PaymentModule
         return rtrim($this->context->link->getBaseLink((int) $this->context->shop->id, true), '/');
     }
 
+    /**
+     * Абсолютен HTTPS URL към файл под корена на модула (подпапка на магазина вече е в {@see getBaseLink()}).
+     */
+    private function getModuleSslAssetUrl(string $relativePathFromModuleRoot): string
+    {
+        return $this->getShopSslBaseUrl() . '/modules/' . $this->name . '/' . ltrim($relativePathFromModuleRoot, '/');
+    }
+
+    /**
+     * Страница за поръчка / checkout: php_self + page_name (PS 9 {@see OrderControllerCore} задава page_name = checkout).
+     */
+    private function isFrontCheckoutOrderPage(): bool
+    {
+        $controller = $this->context->controller ?? null;
+        if (!$controller instanceof FrontController) {
+            return false;
+        }
+        $phpSelf = isset($controller->php_self) ? (string) $controller->php_self : '';
+        if (in_array($phpSelf, ['order', 'checkout'], true)) {
+            return true;
+        }
+
+        // OrderController (PS 9): getPageName() връща checkout при page_name = checkout (многостъпков checkout).
+        return (string) call_user_func([$controller, 'getPageName']) === 'checkout';
+    }
+
     /** Lazy singleton за продуктовия/cart калкулаторен блок. */
     private function getProductAdditionalInfoBlockService(): ProductAdditionalInfoBlockService
     {
@@ -785,10 +808,9 @@ class UniPayment extends PaymentModule
             } else {
                 $deviceis = 'pc';
             }
-            $sslBase = $this->getShopSslBaseUrl();
-            $uni_logo = $sslBase . '/modules/unipayment/css/uni_logo.jpg';
             $uni_backurl = isset($paramsuni['uni_backurl']) ? (string) $paramsuni['uni_backurl'] : '';
-            $uni_picture = $sslBase . '/modules/unipayment/css/unim.png';
+            $uni_logo = $this->getModuleSslAssetUrl('css/uni_logo.jpg');
+            $uni_picture = $this->getModuleSslAssetUrl('css/unim.png');
             $uni_container_txt1 = isset($paramsuni['uni_container_txt1']) ? (string) $paramsuni['uni_container_txt1'] : '';
             $uni_container_txt2 = isset($paramsuni['uni_container_txt2']) ? (string) $paramsuni['uni_container_txt2'] : '';
             $uni_container_status = isset($paramsuni['uni_container_status']) ? (string) $paramsuni['uni_container_status'] : 'No';
@@ -991,10 +1013,8 @@ class UniPayment extends PaymentModule
 
     /**
      * @see Module::isUsingNewTranslationSystem()
-     *
-     * @return bool
      */
-    public function isUsingNewTranslationSystem()
+    public function isUsingNewTranslationSystem(): bool
     {
         return true;
     }
@@ -1004,7 +1024,7 @@ class UniPayment extends PaymentModule
      *
      * @return string празен низ след успешен redirect; иначе съобщение за грешка
      */
-    public function getContent()
+    public function getContent(): string
     {
         $this->migrateLegacyConfigurationKeysIfNeeded();
         $this->ensureRequiredHooksAreRegistered();
