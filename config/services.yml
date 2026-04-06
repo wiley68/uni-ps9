@@ -2,10 +2,11 @@ services:
   _defaults:
     public: true
 
-  # UniPayment controller
+  # UniPayment controller (service id + tag: иначе няма container за FrameworkBundleAdminController)
   prestashop.module.unipayment.controller.unipayment_configuration:
     class: 'PrestaShop\Module\Unipayment\Controller\UnipaymentConfigurationController'
     public: true
+    tags: ['controller.service_arguments']
 
   prestashop.module.unipayment.service.kop_mapping:
     class: 'PrestaShop\Module\Unipayment\Service\KopMappingService'
