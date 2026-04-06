@@ -172,6 +172,7 @@ class UniPayment extends PaymentModule
     public function hookActionFrontControllerSetMedia(array $params): void
     {
         if ('product' === $this->context->controller->php_self) {
+            $this->registerRobotoCondensedFonts();
             $this->context->controller->registerStylesheet(
                 'unipayment-product-page',
                 'modules/' . $this->name . '/css/unipayment_product.css',
@@ -193,6 +194,7 @@ class UniPayment extends PaymentModule
             );
         }
         if ('cart' === $this->context->controller->php_self) {
+            $this->registerRobotoCondensedFonts();
             $this->context->controller->registerStylesheet(
                 'unipayment-cart-page',
                 'modules/' . $this->name . '/css/unipayment_cart.css',
@@ -635,6 +637,23 @@ class UniPayment extends PaymentModule
     /**
      * Базов URL на магазина с HTTPS (ресурси на модула, без mixed content).
      */
+    /**
+     * Локални @font-face за Roboto Condensed — отделен линк + filemtime за кеш busting (без @import в други CSS).
+     */
+    private function registerRobotoCondensedFonts(): void
+    {
+        $path = __DIR__ . '/css/roboto-condensed-font-face.css';
+        $this->context->controller->registerStylesheet(
+            'unipayment-roboto-condensed-fonts',
+            'modules/' . $this->name . '/css/roboto-condensed-font-face.css',
+            [
+                'media' => 'all',
+                'priority' => 190,
+                'version' => (string) @filemtime($path),
+            ]
+        );
+    }
+
     private function getShopSslBaseUrl(): string
     {
         return rtrim($this->context->link->getBaseLink((int) $this->context->shop->id, true), '/');

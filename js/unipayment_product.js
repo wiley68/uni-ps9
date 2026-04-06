@@ -52,9 +52,7 @@ function unipaymentGetProductPageQuantity() {
     const qtyEl = document.querySelector(
         "#quantity_wanted, input[name='qty'], input[name=qty]",
     );
-    return qtyEl
-        ? parseFloat(String(qtyEl.value).replace(",", ".")) || 1
-        : 1;
+    return qtyEl ? parseFloat(String(qtyEl.value).replace(",", ".")) || 1 : 1;
 }
 
 /**
@@ -95,9 +93,15 @@ function unipaymentGetSelectedProductAttributeId() {
             const data = JSON.parse(details.dataset.product);
             if (
                 data &&
-                Object.prototype.hasOwnProperty.call(data, "id_product_attribute")
+                Object.prototype.hasOwnProperty.call(
+                    data,
+                    "id_product_attribute",
+                )
             ) {
-                const fromJson = parseInt(String(data.id_product_attribute), 10);
+                const fromJson = parseInt(
+                    String(data.id_product_attribute),
+                    10,
+                );
                 if (!Number.isNaN(fromJson)) {
                     return fromJson;
                 }
@@ -118,7 +122,9 @@ function unipaymentGetSelectedProductAttributeId() {
 function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
     opts = opts || {};
     const hidePopupOnSuccess = opts.hidePopupOnSuccess === true;
-    const urlEl = document.getElementById("uni_prepare_installmentcheckout_url");
+    const urlEl = document.getElementById(
+        "uni_prepare_installmentcheckout_url",
+    );
     const tokenEl = document.getElementById("uni_csrf_token");
     const productEl = document.getElementById("product_id");
     if (!urlEl || !tokenEl || !productEl) {
@@ -154,7 +160,7 @@ function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
             }
             const _str =
                 typeof window.uniPaymentShopStrings === "object" &&
-                    window.uniPaymentShopStrings !== null
+                window.uniPaymentShopStrings !== null
                     ? window.uniPaymentShopStrings
                     : {};
             const msg =
@@ -166,12 +172,12 @@ function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
         .fail(function () {
             const _str =
                 typeof window.uniPaymentShopStrings === "object" &&
-                    window.uniPaymentShopStrings !== null
+                window.uniPaymentShopStrings !== null
                     ? window.uniPaymentShopStrings
                     : {};
             window.alert(
                 _str.storeError ||
-                "An error occurred while contacting the store.",
+                    "An error occurred while contacting the store.",
             );
         })
         .always(function () {
@@ -251,10 +257,7 @@ function unipaymentComputeProductTotalPriceForCalculator() {
  * @returns {boolean}
  */
 function unipaymentApplyTotalPriceToPopupDom(uni_priceall) {
-    const uni_eur = parseInt(
-        document.getElementById("uni_eur").value,
-        10,
-    );
+    const uni_eur = parseInt(document.getElementById("uni_eur").value, 10);
     const uni_priceHidden = document.getElementById("uni_price");
     const uni_price_int = document.getElementById("uni_price_int");
     const uni_price_dec = document.getElementById("uni_price_dec");
@@ -343,6 +346,9 @@ function uniChangeContainer() {
     var uni_label_container = document.getElementsByClassName(
         "uni-label-container",
     )[0];
+    if (!uni_label_container) {
+        return;
+    }
     if (uni_label_container.style.visibility == "visible") {
         uni_label_container.style.visibility = "hidden";
         uni_label_container.style.opacity = 0;
@@ -574,7 +580,10 @@ $(document).ready(function (e) {
                     }
                     uni_glp_int.textContent = uni_glp.toFixed(2);
                     uni_gpr_int.textContent = uni_gpr.toFixed(2);
-                    unipaymentUpdateProductButtonLabels(uni_vnoski, uni_mesecna);
+                    unipaymentUpdateProductButtonLabels(
+                        uni_vnoski,
+                        uni_mesecna,
+                    );
                 }
             },
         });
@@ -589,7 +598,10 @@ $(document).ready(function (e) {
         const uni_cart = parseInt(uni_cartEl.value, 10);
         if (uni_cart == 1) {
             const total = unipaymentComputeProductTotalPriceForCalculator();
-            if (!Number.isNaN(total) && unipaymentApplyTotalPriceToPopupDom(total)) {
+            if (
+                !Number.isNaN(total) &&
+                unipaymentApplyTotalPriceToPopupDom(total)
+            ) {
                 uni_pogasitelni_vnoski_input_change();
             }
             return;

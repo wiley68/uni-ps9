@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&display=swap');
+/* Roboto Condensed: регистрира се в unipayment.php — unipayment-roboto-condensed-fonts. */
 
 * {
     padding: 0;
@@ -6,7 +6,7 @@
 }
 
 .uni_zaglavie {
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 16px !important;
     font-weight: 400 !important;
 }
@@ -24,7 +24,7 @@
 .uni_button {
     height: 70px !important;
     width: 270px !important;
-    background: url('uni_head_new.png') !important;
+    background: url("uni_head_new.png") !important;
     background-repeat: no-repeat !important;
     background-position: center !important;
     cursor: pointer !important;
@@ -37,7 +37,7 @@
 .uni_button:hover {
     background-repeat: no-repeat !important;
     background-position: center !important;
-    background: url('uni_head_new_hover.png') !important;
+    background: url("uni_head_new_hover.png") !important;
 }
 
 .uni_button:hover :nth-child(n) {
@@ -64,19 +64,19 @@
 
 .uni_button_txt1 {
     color: white !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 16px !important;
     font-weight: 400 !important;
-    text-shadow: 1px 1px #C70A00 !important;
+    text-shadow: 1px 1px #c70a00 !important;
     text-align: center !important;
 }
 
 .uni_button_txt2 {
     color: white !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 16px !important;
     font-weight: 400 !important;
-    text-shadow: 1px 1px #C70A00 !important;
+    text-shadow: 1px 1px #c70a00 !important;
     text-align: center !important;
 }
 
@@ -88,7 +88,7 @@
 .uni_button_without {
     height: 70px !important;
     width: 270px !important;
-    background: url('uni_head_new_hover.png') !important;
+    background: url("uni_head_new_hover.png") !important;
     background-repeat: no-repeat !important;
     background-position: center !important;
     cursor: pointer !important;
@@ -122,7 +122,9 @@
     margin: auto !important;
     padding: 0 !important;
     max-width: 50% !important;
-    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19) !important;
+    box-shadow:
+        0 4px 8px 0 rgba(0, 0, 0, 0.2),
+        0 6px 20px 0 rgba(0, 0, 0, 0.19) !important;
 }
 
 .modalpaymentm_content_uni {
@@ -131,7 +133,9 @@
     margin: auto !important;
     padding: 0 !important;
     width: 100% !important;
-    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19) !important;
+    box-shadow:
+        0 4px 8px 0 rgba(0, 0, 0, 0.2),
+        0 6px 20px 0 rgba(0, 0, 0, 0.19) !important;
 }
 
 .uni_body {
@@ -155,7 +159,7 @@
     width: 100%;
     padding: 8px 15px 5px 15px !important;
     color: #000000 !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 22px !important;
     font-weight: 400 !important;
     text-align: left !important;
@@ -165,7 +169,7 @@
     width: 100%;
     padding: 8px 15px 5px 15px !important;
     color: #000000 !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 16px !important;
     font-weight: 400 !important;
     text-align: left !important;
@@ -175,7 +179,7 @@
     width: 100%;
     padding: 8px 15px 5px 15px !important;
     color: #000000 !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 16px !important;
     font-weight: 300 !important;
     text-align: left !important;
@@ -194,7 +198,7 @@
     width: 100% !important;
     padding: 8px 15px 5px 15px !important;
     color: #000000 !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 14px !important;
     font-weight: 300 !important;
     text-align: left !important;
@@ -215,7 +219,7 @@
     align-self: flex-end !important;
     padding: 8px 25px 5px 15px !important;
     color: #000000 !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 16px !important;
     font-weight: 300 !important;
     text-align: left !important;
@@ -227,7 +231,7 @@
     align-self: flex-end !important;
     padding: 8px 10px 5px 10px !important;
     color: #000000 !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 14px !important;
     font-weight: 300 !important;
     text-align: left !important;
@@ -304,7 +308,7 @@
     text-wrap: nowrap !important;
     flex-grow: 1 !important;
     color: black !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 18px !important;
     font-weight: 400 !important;
 }
@@ -312,27 +316,27 @@
 .unim_gpr_column {
     flex-grow: 1 !important;
     color: black !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 16px !important;
     font-weight: 400 !important;
 }
 
 .uni_gpr_column_right {
     color: black !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 20px !important;
     font-weight: 400 !important;
 }
 
 .unim_gpr_column_right {
     color: black !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 16px !important;
     font-weight: 400 !important;
 }
 
 .uni_red {
-    color: #ED1C24 !important;
+    color: #ed1c24 !important;
 }
 
 .uni_sub {
@@ -340,10 +344,10 @@
 }
 
 select.uni_txt_right {
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 20px !important;
     font-weight: 400 !important;
-    color: #ED1C24 !important;
+    color: #ed1c24 !important;
     border-left: 0px none white !important;
     border-top: 0px none white !important;
     border-right: 0px none white !important;
@@ -358,10 +362,10 @@ select.uni_txt_right:focus {
 }
 
 select.unim_txt_right {
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 16px !important;
     font-weight: 400 !important;
-    color: #ED1C24 !important;
+    color: #ed1c24 !important;
     border-left: 0px none white !important;
     border-top: 0px none white !important;
     border-right: 0px none white !important;
@@ -377,7 +381,7 @@ select.unim_txt_right:focus {
 
 /** uni grp container */
 .uni_panel_help_text {
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 14px !important;
     font-weight: 300 !important;
     color: black !important;
@@ -385,7 +389,7 @@ select.unim_txt_right:focus {
 }
 
 .unim_panel_help_text {
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 12px !important;
     font-weight: 300 !important;
     color: black !important;
@@ -404,8 +408,8 @@ select.unim_txt_right:focus {
     cursor: pointer !important;
     text-align: center !important;
     background: #a1a1aa !important;
-    color: #ED1C24 !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    color: #ed1c24 !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 20px !important;
     font-weight: 400 !important;
     padding: 0px !important;
@@ -419,8 +423,8 @@ select.unim_txt_right:focus {
     cursor: pointer !important;
     text-align: center !important;
     background: #a1a1aa !important;
-    color: #ED1C24 !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    color: #ed1c24 !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 14px !important;
     font-weight: 400 !important;
     padding: 0px !important;
@@ -502,7 +506,7 @@ select.unim_txt_right:focus {
     text-align: center !important;
     background: #a1a1aa !important;
     color: white !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 20px !important;
     font-weight: 400 !important;
     padding: 0px !important;
@@ -515,7 +519,7 @@ select.unim_txt_right:focus {
     text-align: center !important;
     background: #a1a1aa !important;
     color: white !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 14px !important;
     font-weight: 400 !important;
     padding: 0px !important;
@@ -562,7 +566,7 @@ select.unim_txt_right:focus {
 /** checkout */
 .uni_table {
     width: 100% !important;
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 14px !important;
     font-weight: 400 !important;
     color: black !important;
@@ -583,7 +587,7 @@ select.unim_txt_right:focus {
 }
 
 .uni_input {
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 14px !important;
     font-weight: 400 !important;
     width: 100% !important;
@@ -594,11 +598,11 @@ select.unim_txt_right:focus {
 }
 
 .passive {
-    background: #F5F5F5 !important;
+    background: #f5f5f5 !important;
 }
 
 .uni_row {
-    font-family: 'Roboto Condensed', sans-serif !important;
+    font-family: "Roboto Condensed", sans-serif !important;
     font-size: 14px !important;
     font-weight: 300 !important;
     padding: 2px !important;
@@ -609,7 +613,7 @@ select.unim_txt_right:focus {
     cursor: pointer !important;
     text-align: center !important;
     border: 1px solid #708090 !important;
-    background: #D20210 !important;
+    background: #d20210 !important;
     color: white;
     width: 100px !important;
 }
@@ -617,7 +621,7 @@ select.unim_txt_right:focus {
 .uni_hr {
     border-top: 0px solid white !important;
     border-right: 0px solid white !important;
-    border-bottom: 1px solid #DCDCDC !important;
+    border-bottom: 1px solid #dcdcdc !important;
     border-left: 0px solid white !important;
 }
 
@@ -644,11 +648,11 @@ select.unim_txt_right:focus {
     display: table-cell !important;
     vertical-align: top !important;
     padding-left: 5px !important;
-    border: 1px solid #D20210 !important;
+    border: 1px solid #d20210 !important;
     border-radius: 3px !important;
 }
 
-.uni-label-text>img {
+.uni-label-text > img {
     max-width: 400px !important;
     max-height: 140px !important;
 }
@@ -658,11 +662,11 @@ select.unim_txt_right:focus {
 }
 
 .uni-label-text-a a {
-    color: #D20210 !important;
+    color: #d20210 !important;
 }
 
 .uni-label-text-a a:hover {
-    color: #D20210 !important;
+    color: #d20210 !important;
     text-decoration: underline !important;
 }
 
@@ -681,10 +685,10 @@ select.unim_txt_right:focus {
     top: calc(100% / 3 - 30px) !important;
     left: 0px !important;
     background-color: #ffffff !important;
-    border-top: 1px solid #D20210 !important;
-    border-right: 1px solid #D20210 !important;
-    border-bottom: 1px solid #D20210 !important;
-    color: #FFF !important;
+    border-top: 1px solid #d20210 !important;
+    border-right: 1px solid #d20210 !important;
+    border-bottom: 1px solid #d20210 !important;
+    color: #fff !important;
     border-top-right-radius: 8px !important;
     border-bottom-right-radius: 8px !important;
     text-align: center !important;
