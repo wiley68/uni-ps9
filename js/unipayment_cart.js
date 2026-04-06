@@ -39,12 +39,18 @@ function unipaymentUpdateCartButtonLabels(uniVnoski, uniMesecna) {
 
 function unipaymentRelinkCartPopup() {
     const $all = $("#uni-cart-popup-container");
-    if ($all.length === 0) { return; }
+    if ($all.length === 0) {
+        return;
+    }
     const $host = $(".cart-grid, #wrapper, #content-wrapper, body").first();
     let $keep = $all.last();
     if ($host.length) {
-        const $inside = $all.filter(function () { return $.contains($host[0], this); });
-        if ($inside.length) { $keep = $inside.last(); }
+        const $inside = $all.filter(function () {
+            return $.contains($host[0], this);
+        });
+        if ($inside.length) {
+            $keep = $inside.last();
+        }
     }
     $all.not($keep).remove();
     $keep.prependTo("body");
@@ -52,21 +58,23 @@ function unipaymentRelinkCartPopup() {
 
 function unipaymentGetPopupInstallmentsMonthsCart() {
     const el = document.getElementById("uni_pogasitelni_vnoski_input");
-    if (!el) { return 0; }
+    if (!el) {
+        return 0;
+    }
     const v = parseInt(String(el.value), 10);
     return Number.isNaN(v) ? 0 : v;
 }
 
 function uniCartPogasitelniInputChange() {
-    const uni_get_product_link = document.getElementById(
-        "uni_get_product_link",
-    ).value;
-    const uni_vnoski = parseFloat(
-        document.getElementById("uni_pogasitelni_vnoski_input").value,
-    );
-    const uni_price = parseFloat(
-        document.getElementById("uni_price").value,
-    );
+    const uniGetProductLinkEl = document.getElementById("uni_get_product_link");
+    const uniVnoskiEl = document.getElementById("uni_pogasitelni_vnoski_input");
+    const uniPriceEl = document.getElementById("uni_price");
+    if (!uniGetProductLinkEl || !uniVnoskiEl || !uniPriceEl) {
+        return;
+    }
+    const uni_get_product_link = uniGetProductLinkEl.value;
+    const uni_vnoski = parseFloat(uniVnoskiEl.value);
+    const uni_price = parseFloat(uniPriceEl.value);
     const uni_param_kimb_3 = parseFloat(
         document.getElementById("uni_param_kimb_3").value,
     );
@@ -133,96 +141,84 @@ function uniCartPogasitelniInputChange() {
                         uni_mesecna = parseFloat(json.uni_mesecna_3);
                         uni_gpr = parseFloat(json.uni_gpr_3);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_3")
-                                .value,
+                            document.getElementById("uni_param_glp_3").value,
                         );
                         break;
                     case 4:
                         uni_mesecna = parseFloat(json.uni_mesecna_4);
                         uni_gpr = parseFloat(json.uni_gpr_4);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_4")
-                                .value,
+                            document.getElementById("uni_param_glp_4").value,
                         );
                         break;
                     case 5:
                         uni_mesecna = parseFloat(json.uni_mesecna_5);
                         uni_gpr = parseFloat(json.uni_gpr_5);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_5")
-                                .value,
+                            document.getElementById("uni_param_glp_5").value,
                         );
                         break;
                     case 6:
                         uni_mesecna = parseFloat(json.uni_mesecna_6);
                         uni_gpr = parseFloat(json.uni_gpr_6);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_6")
-                                .value,
+                            document.getElementById("uni_param_glp_6").value,
                         );
                         break;
                     case 9:
                         uni_mesecna = parseFloat(json.uni_mesecna_9);
                         uni_gpr = parseFloat(json.uni_gpr_9);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_9")
-                                .value,
+                            document.getElementById("uni_param_glp_9").value,
                         );
                         break;
                     case 10:
                         uni_mesecna = parseFloat(json.uni_mesecna_10);
                         uni_gpr = parseFloat(json.uni_gpr_10);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_10")
-                                .value,
+                            document.getElementById("uni_param_glp_10").value,
                         );
                         break;
                     case 12:
                         uni_mesecna = parseFloat(json.uni_mesecna_12);
                         uni_gpr = parseFloat(json.uni_gpr_12);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_12")
-                                .value,
+                            document.getElementById("uni_param_glp_12").value,
                         );
                         break;
                     case 18:
                         uni_mesecna = parseFloat(json.uni_mesecna_18);
                         uni_gpr = parseFloat(json.uni_gpr_18);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_18")
-                                .value,
+                            document.getElementById("uni_param_glp_18").value,
                         );
                         break;
                     case 24:
                         uni_mesecna = parseFloat(json.uni_mesecna_24);
                         uni_gpr = parseFloat(json.uni_gpr_24);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_24")
-                                .value,
+                            document.getElementById("uni_param_glp_24").value,
                         );
                         break;
                     case 30:
                         uni_mesecna = parseFloat(json.uni_mesecna_30);
                         uni_gpr = parseFloat(json.uni_gpr_30);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_30")
-                                .value,
+                            document.getElementById("uni_param_glp_30").value,
                         );
                         break;
                     case 36:
                         uni_mesecna = parseFloat(json.uni_mesecna_36);
                         uni_gpr = parseFloat(json.uni_gpr_36);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_36")
-                                .value,
+                            document.getElementById("uni_param_glp_36").value,
                         );
                         break;
                     default:
                         uni_mesecna = parseFloat(json.uni_mesecna_3);
                         uni_gpr = parseFloat(json.uni_gpr_3);
                         uni_glp = parseFloat(
-                            document.getElementById("uni_param_glp_3")
-                                .value,
+                            document.getElementById("uni_param_glp_3").value,
                         );
                 }
                 const uni_vnoska_int =

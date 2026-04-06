@@ -1,8 +1,13 @@
 /* Roboto Condensed: регистрира се в unipayment.php — unipayment-roboto-condensed-fonts. */
+.unipayment-cart-scope {
+    font-family: "Roboto Condensed", sans-serif;
+    box-sizing: border-box;
+}
 
-* {
-    padding: 0;
-    margin: 0;
+.unipayment-cart-scope *,
+.unipayment-cart-scope *::before,
+.unipayment-cart-scope *::after {
+    box-sizing: inherit;
 }
 
 .uni_zaglavie {
