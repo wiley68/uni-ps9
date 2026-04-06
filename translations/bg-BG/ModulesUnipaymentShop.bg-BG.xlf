@@ -1,391 +1,322 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
-  <file original="admin780iwdzubpwmpftq22u" source-language="bg-BG" target-language="bg-BG" datatype="plaintext">
+  <file original="ModulesUnipaymentShop.xlf" source-language="bg-BG" target-language="bg-BG" datatype="plaintext">
     <body>
-      <trans-unit id="122d9cd162ea7e01fca237a8c5085bd6">
-        <source>You must agree to the UniCredit terms and conditions.</source>
-        <target>Трябва да се съгласите с общите условия на UniCredit.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="545a44a36864f4ef8077ffffb9f9a2f6">
-        <source>Please fill in the First name field.</source>
-        <target>Моля, попълнете полето „Име“.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="d50f052434229d7d319d493e08d26336">
-        <source>Please fill in the Last name field.</source>
-        <target>Моля, попълнете полето „Фамилия“.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="ee0771b6c022ddb44c2f0632ca99382e">
-        <source>Please fill in the Personal ID field.</source>
-        <target>Моля, попълнете полето „Личен идентификатор“.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="1153b1625c350c0bc6d128538c71d325">
-        <source>Please fill in the Phone field.</source>
-        <target>Моля, попълнете полето „Телефон“.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="13bd9e1d294be5e1250636590438cc1a">
-        <source>Please fill in the E-mail field.</source>
-        <target>Моля, попълнете полето за имейл.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="d2c6160ed2f37abf0b5f81ac5b4f96a5">
-        <source>UniCredit purchases on credit</source>
-        <target>UniCredit purchases on credit</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="266c8a8ac004fbce21ec12022db83224">
-        <source>Number of months *</source>
-        <target>Брой месеци *</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="f6af0d04c777b8f0e4c99927856361f5">
-        <source>Number of months for repayment *</source>
-        <target>Брой месеци за погасяване *</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="6b4e72e7cf9c59d33fdb4e72a164baad">
-        <source>Installment payment</source>
-        <target>Installment payment</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="1341a4a4e0bd247c42033d59319c522f">
-        <source>Monthly installment amount</source>
-        <target>Размер на погасителна вноска</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="1f1d23c3991fad7b4a91abe3c5fe455e">
-        <source>Could not add to cart. Please try again.</source>
-        <target>Не можа да се добави в количката. Моля, опитайте отново.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="15049fd2bbb5ac2d4f554e336327a39a">
-        <source>An error occurred while contacting the store.</source>
-        <target>Възникна грешка при свързването с магазина.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="cb01dd6535ae490a9d522fc276ea79b4">
-        <source>Could not redirect to checkout. Please try again.</source>
-        <target>Не можах да пренасоча към касата. Моля, опитайте отново.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="6a93fd3856e209ebfd942f1199976fce">
-        <source>You will be redirected to UniCredit.</source>
-        <target>Ще бъдете пренасочени към УниКредит.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="66dff4bc6149738292b7b2737e7e2e8c">
-        <source>Invalid security token.</source>
-        <target>Невалиден токен за сигурност.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="b55da596142f65e95ea387a65816bb60">
-        <source>Cart error.</source>
-        <target>Грешка в количката.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="c9cb95751d19325b9b6d89536e0067cf">
-        <source>Invalid product or quantity.</source>
-        <target>Невалиден продукт или количество.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="6bf85657361b5db1eda4d240c939a1ae">
-        <source>Product not available.</source>
-        <target>Продуктът не е наличен.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="12e10ea135bca77c48bc84605cf032bf">
-        <source>Minimum quantity not reached.</source>
-        <target>Минималното количество не е достигнато.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="1780943536b02882e2bee798bc2224fe">
-        <source>Could not add to cart.</source>
-        <target>Не можа да се добави в количката.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="e2b7dec8fa4b498156dfee6e4c84b156">
-        <source>This payment method is not available.</source>
-        <target>Този метод на плащане не е наличен.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="1167e46c7a94af11bd9bef3805ef4e73">
-        <source>Your order has been completed.</source>
-        <target>Вашата поръчка е изпълнена.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="d4bb9f15f5e466aa663133336dc1dbc6">
-        <source>There was a problem with your order. If you believe this is incorrect, you can contact</source>
-        <target>Възникна проблем с поръчката ви. Ако смятате, че това е неправилно, можете да се свържете с</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="71ca125434f4e20f89158d822879a071">
-        <source>our support team</source>
-        <target>нашият екип за поддръжка</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="1efcce687bbe7eed4a4e8a223d3cf81c">
-        <source>UniCredit</source>
-        <target>UniCredit</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="6893758a3ee04d5ff14f2b4e860f3a28">
-        <source>We could not redirect you to the UniCredit system. Please try again or contact us.</source>
-        <target>We could not redirect you to the UniCredit system. Please try again or contact us.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="6645b2e6e1934b8f2a116c6ec04ca568">
-        <source>You can select the loan term, your preferred monthly installment, and optionally an initial down payment. Then confirm your choice. You will be redirected to UniCredit to complete your credit purchase.</source>
-        <target>Можете да изберете 'Срок за кредита', предпочитаната от Вас 'Месечна вноска', както и при желание 'Първоначална вноска'. След което да потвърдите избора си. Ще бъдете прехвърлени към страницата на UniCredit за довършване на покупката си на кредит.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="28c21714b40a4522a192d15da23203fc">
-        <source>You can select the loan term, your preferred monthly installment, and optionally an initial down payment. Enter the required personal data and accept the terms of use. Then you can confirm your choice. A UniCredit representative will contact you to complete the process.</source>
-        <target>You can select the loan term, your preferred monthly installment, and optionally an initial down payment. Enter the required personal data and accept the terms of use. Then you can confirm your choice. A UniCredit representative will contact you to complete the process.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="f55c227f23898592d6c25eeef103e058">
-        <source>Product price /%s/</source>
-        <target>Цена на продукта /%s/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="e15d66676fd92524b27102294ced2d0f">
-        <source>Product price /%s/(%s)/</source>
-        <target>Цена на продукта /%s/(%s)/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="4922673d4daafe7112c7557fbc30076c">
-        <source>Loan term (months)</source>
-        <target>Срок на заема (месеци)</target>
-        <note>Line: </note>
-      </trans-unit>
       <trans-unit id="eb5314edf3b6fa21af6b10bb96db27e5">
         <source>%d months</source>
         <target>%d месеца</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="365d8fd244d4b9ff1b8d1e6c13ab46b6">
-        <source>Check this box if you want to use the initial down payment field.</source>
-        <target>Отбележете това квадратче, ако искате да използвате полето за първоначално авансово плащане.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="b8561e0eed649eb78c5caae9c04c5ccf">
-        <source>Initial payment to the merchant /%s/</source>
-        <target>Първоначално плащане към търговеца /%s/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="df502bd93fe766033816b11bf6866fdb">
-        <source>Recalculate</source>
-        <target>Преизчисляване</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="321de7353c7b8a4170f5c3d8a00f917f">
-        <source>Total loan amount /%s/</source>
-        <target>Обща сума на заема /%s/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="0e09ee93c463f82b63a2389b1de75ee1">
-        <source>Total loan amount /%s/(%s)/</source>
-        <target>Обща сума на заема /%s/(%s)/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="3e73cf78a01045aa177f0478acd2d3fe">
-        <source>Monthly installment /%s/</source>
-        <target>Месечна вноска /%s/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="b1d3b5b0b05f2e6fcc781f5f7a8c774b">
-        <source>Monthly installment /%s/(%s)/</source>
-        <target>Месечна вноска /%s/(%s)/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="296ab4f57e55fcf58e4a6459615be626">
-        <source>Total amount payable /%s/</source>
-        <target>Обща дължима сума /%s/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="65476c8bafc51a4b61e8edeb0035535b">
-        <source>Total amount payable /%s/(%s)/</source>
-        <target>Обща дължима сума /%s/(%s)/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="a6d3d6c3d7eee1450c1aae302c8ca588">
-        <source>GLP /%/</source>
-        <target>ГЛП /%/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="44b63229686d426cac8563eff1acd526">
-        <source>APR /%/</source>
-        <target>ГПР /%/</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="20db0bfeecd8fe60533206a2b5e9891a">
-        <source>First name</source>
-        <target>Собствено име</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="8d3f5eff9c40ee315d452392bed5309b">
-        <source>Last name</source>
-        <target>Фамилия</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="ff9eb96fe587449f815149a7716b7376">
-        <source>Personal ID</source>
-        <target>ЕГН</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="bcc254b55c4a1babdf1dcb82c207506b">
-        <source>Phone</source>
-        <target>Телефон</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="c204050f08c0bdbc3968e5bc3bcb909c">
-        <source>Additional phone</source>
-        <target>Допълнителен телефон</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="1e884e3078d9978e216a027ecd57fb34">
-        <source>E-mail</source>
-        <target>E-mail</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="0be8406951cdfda82f00f79328cf4efc">
-        <source>Comment</source>
-        <target>Коментар</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="e842e1dc1844feb73845c92a43694b89">
-        <source>UniCredit general terms for leasing.</source>
-        <target>Общи условия за лизинг на УниКредит.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="19fc15a987ba5ed10f052b78705c398f">
-        <source>I have read and agree to the UniCredit terms and conditions</source>
-        <target>Прочетох и съм съгласен с общите условия на УниКредит</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="5e3b40f08789f7301586ea2eff2bee8e">
-        <source>INSTALLMENTS</source>
-        <target>ВНОСКИ</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="e36bfee33cd1bf81de0daf97248c36a1">
-        <source>UniCredit loan calculator %s</source>
-        <target>Кредитен Калкулатор на УниКредит %s</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="66cb39bbacd9914f0c84c49f16d8682b">
-        <source>Only a few clicks to the desired purchase from 150 BGN to 50 000 BGN:</source>
-        <target>Само с няколко кликвания до желаната покупка от 150 лв. до 50 000 лв.:</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="c24150ed7d5eed6e683070c6ad67a08f">
-        <source>Only a few clicks to the desired purchase from 150 BGN (75 EUR) to 50 000 BGN (25 000 EUR):</source>
-        <target>Само с няколко кликвания до желаната покупка от 150 лв. (75 евро) до 50 000 лв. (25 000 евро):</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="f4b0086abb1829097573f5bb4c36fedc">
-        <source>Only a few clicks to the desired purchase from 75 EUR (150 BGN) to 25 000 EUR (50 000 BGN):</source>
-        <target>Само няколко клика до желаната покупка от 75 евро (150 лева) до 25 000 евро (50 000 лева):</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="28d9bb99eabc2c652babacb20dd220f4">
-        <source>Only a few clicks to the desired purchase from 75 EUR to 25 000 EUR:</source>
-        <target>Само с няколко кликвания до желаната покупка от 75 EUR до 25 000 EUR:</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="a15ad8145a015f5f6368dadb96c27a2c">
-        <source>1. Review your cart total and choose the loan term.</source>
-        <target>1. Прегледайте общата сума в количката си и изберете срока на заема.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="cee54c6777b41dd92a35843c020206db">
-        <source>2. Click "Buy on installment" — you will proceed to checkout with UniCredit as the selected payment method.</source>
-        <target>2. Click "Buy on installment" — you will proceed to checkout with UniCredit as the selected payment method.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="1bd7432422fe148087d4f3901499070a">
-        <source>3. Complete the application fully digitally or wait for a phone call.</source>
-        <target>3. Попълнете заявлението изцяло дигитално или изчакайте телефонно обаждане.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="ae9a134243362e66fef28a6b2e8a77c4">
-        <source>Cart total</source>
-        <target>Обща сума в кошницата</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="da36cfaf48b9e19896e23e1207040d1e">
-        <source>months</source>
-        <target>месеци</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="fc8995e80dfa07e093cbe4dee2b98c15">
-        <source>GLP</source>
-        <target>ГЛП</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="400b07623925470b21ca55c3ce9913f4">
-        <source>APR</source>
-        <target>ГПР</target>
-        <note>Line: </note>
       </trans-unit>
       <trans-unit id="f011a02322ae85590f254f88154dd845">
         <source>* The repayment term is chosen when you complete the order.</source>
         <target>* Срокът за погасяване се избира при завършване на поръчката.</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="ea4788705e6873b424c65e91c2846b19">
-        <source>Cancel</source>
-        <target>Отказ</target>
-        <note>Line: </note>
-      </trans-unit>
-      <trans-unit id="f12ac85e55fb229d7107b617036f46fd">
-        <source>Buy on installment</source>
-        <target>Купете на изплащане</target>
-        <note>Line: </note>
       </trans-unit>
       <trans-unit id="cb4dcf099a53897f0e07131243580fc5">
         <source>1. Add the product you want to the cart.</source>
         <target>1. Добавете желания от Вас продукт в кошницата.</target>
-        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="a15ad8145a015f5f6368dadb96c27a2c">
+        <source>1. Review your cart total and choose the loan term.</source>
+        <target>1. Прегледайте общата сума в количката си и изберете срока на заема.</target>
+      </trans-unit>
+      <trans-unit id="cee54c6777b41dd92a35843c020206db">
+        <source>2. Click "Buy on installment" — you will proceed to checkout with UniCredit as the selected payment method.</source>
+        <target>2. Кликнете върху „Купи на изплащане“ — ще продължите към плащането, като изберете UniCredit като метод на плащане.</target>
       </trans-unit>
       <trans-unit id="d3613c85ee9e5aa993aed07a8b42ca52">
         <source>2. In the "Payment method" menu choose "On credit with UniCredit Consumer Financing".</source>
         <target>2. В меню "Метод на плащане" изберете "На кредит с УниКредит Кънсюмър Файненсинг".</target>
-        <note>Line: </note>
       </trans-unit>
       <trans-unit id="d306477a26dfa46893bb3bff88460515">
         <source>3. Choose the number of monthly installments according to your possibilities and preferences.</source>
         <target>3. Изберете брой месечни вноски, според Вашите възможности и предпочитания.</target>
-        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="1bd7432422fe148087d4f3901499070a">
+        <source>3. Complete the application fully digitally or wait for a phone call.</source>
+        <target>3. Попълнете заявлението изцяло дигитално или изчакайте телефонно обаждане.</target>
       </trans-unit>
       <trans-unit id="97eb8fd3899dee3a562b3f4c59097fcf">
         <source>4. Complete the application fully digitally or wait for a phone call.</source>
         <target>4. Завършете кандидатстването изцяло дигитално или очаквайте телефонно обаждане.</target>
-        <note>Line: </note>
       </trans-unit>
-      <trans-unit id="a6b61379bbf55188a90077a8e2dd5e3c">
-        <source>Item price</source>
-        <target>Цена на артикула</target>
-        <note>Line: </note>
+      <trans-unit id="400b07623925470b21ca55c3ce9913f4">
+        <source>APR</source>
+        <target>ГПР</target>
+      </trans-unit>
+      <trans-unit id="44b63229686d426cac8563eff1acd526">
+        <source>APR /%/</source>
+        <target>ГПР /%/</target>
       </trans-unit>
       <trans-unit id="2d0f6b8300be19cf35e89e66f0677f95">
         <source>Add to cart</source>
         <target>Добавете в количката</target>
-        <note>Line: </note>
       </trans-unit>
-      <trans-unit id="e4bfd4c917e35e986294535e39516aef">
-        <source>Information about online shopping on credit</source>
-        <target>Информация за онлайн пазаруване на кредит</target>
-        <note>Line: </note>
+      <trans-unit id="c204050f08c0bdbc3968e5bc3bcb909c">
+        <source>Additional phone</source>
+        <target>Допълнителен телефон</target>
+      </trans-unit>
+      <trans-unit id="15049fd2bbb5ac2d4f554e336327a39a">
+        <source>An error occurred while contacting the store.</source>
+        <target>Възникна грешка при свързването с магазина.</target>
+      </trans-unit>
+      <trans-unit id="f12ac85e55fb229d7107b617036f46fd">
+        <source>Buy on installment</source>
+        <target>Купете на изплащане</target>
+      </trans-unit>
+      <trans-unit id="ea4788705e6873b424c65e91c2846b19">
+        <source>Cancel</source>
+        <target>Отказ</target>
+      </trans-unit>
+      <trans-unit id="b55da596142f65e95ea387a65816bb60">
+        <source>Cart error.</source>
+        <target>Грешка в количката.</target>
+      </trans-unit>
+      <trans-unit id="ae9a134243362e66fef28a6b2e8a77c4">
+        <source>Cart total</source>
+        <target>Обща сума в кошницата</target>
+      </trans-unit>
+      <trans-unit id="365d8fd244d4b9ff1b8d1e6c13ab46b6">
+        <source>Check this box if you want to use the initial down payment field.</source>
+        <target>Отбележете това квадратче, ако искате да използвате полето за първоначално авансово плащане.</target>
+      </trans-unit>
+      <trans-unit id="0be8406951cdfda82f00f79328cf4efc">
+        <source>Comment</source>
+        <target>Коментар</target>
+      </trans-unit>
+      <trans-unit id="1780943536b02882e2bee798bc2224fe">
+        <source>Could not add to cart.</source>
+        <target>Не можа да се добави в количката.</target>
+      </trans-unit>
+      <trans-unit id="1f1d23c3991fad7b4a91abe3c5fe455e">
+        <source>Could not add to cart. Please try again.</source>
+        <target>Не можа да се добави в количката. Моля, опитайте отново.</target>
+      </trans-unit>
+      <trans-unit id="cb01dd6535ae490a9d522fc276ea79b4">
+        <source>Could not redirect to checkout. Please try again.</source>
+        <target>Не можах да пренасоча към касата. Моля, опитайте отново.</target>
+      </trans-unit>
+      <trans-unit id="1e884e3078d9978e216a027ecd57fb34">
+        <source>E-mail</source>
+        <target>E-mail</target>
+      </trans-unit>
+      <trans-unit id="20db0bfeecd8fe60533206a2b5e9891a">
+        <source>First name</source>
+        <target>Собствено име</target>
+      </trans-unit>
+      <trans-unit id="fc8995e80dfa07e093cbe4dee2b98c15">
+        <source>GLP</source>
+        <target>ГЛП</target>
+      </trans-unit>
+      <trans-unit id="a6d3d6c3d7eee1450c1aae302c8ca588">
+        <source>GLP /%/</source>
+        <target>ГЛП /%/</target>
+      </trans-unit>
+      <trans-unit id="19fc15a987ba5ed10f052b78705c398f">
+        <source>I have read and agree to the UniCredit terms and conditions</source>
+        <target>Прочетох и съм съгласен с общите условия на УниКредит</target>
       </trans-unit>
       <trans-unit id="5535fbb278428e90c02bd99aff429a21">
         <source>INFORMATION ABOUT ONLINE SHOPPING ON CREDIT</source>
         <target>ИНФОРМАЦИЯ ЗА ОНЛАЙН ПАЗАРУВАНЕ НА КРЕДИТ</target>
-        <note>Line: </note>
+      </trans-unit>
+      <trans-unit id="5e3b40f08789f7301586ea2eff2bee8e">
+        <source>INSTALLMENTS</source>
+        <target>ВНОСКИ</target>
+      </trans-unit>
+      <trans-unit id="e4bfd4c917e35e986294535e39516aef">
+        <source>Information about online shopping on credit</source>
+        <target>Информация за онлайн пазаруване на кредит</target>
+      </trans-unit>
+      <trans-unit id="b8561e0eed649eb78c5caae9c04c5ccf">
+        <source>Initial payment to the merchant /%s/</source>
+        <target>Първоначално плащане към търговеца /%s/</target>
+      </trans-unit>
+      <trans-unit id="6b4e72e7cf9c59d33fdb4e72a164baad">
+        <source>Installment payment</source>
+        <target>Плащане на вноски</target>
+      </trans-unit>
+      <trans-unit id="c9cb95751d19325b9b6d89536e0067cf">
+        <source>Invalid product or quantity.</source>
+        <target>Невалиден продукт или количество.</target>
+      </trans-unit>
+      <trans-unit id="66dff4bc6149738292b7b2737e7e2e8c">
+        <source>Invalid security token.</source>
+        <target>Невалиден токен за сигурност.</target>
+      </trans-unit>
+      <trans-unit id="a6b61379bbf55188a90077a8e2dd5e3c">
+        <source>Item price</source>
+        <target>Цена на артикула</target>
+      </trans-unit>
+      <trans-unit id="8d3f5eff9c40ee315d452392bed5309b">
+        <source>Last name</source>
+        <target>Фамилия</target>
+      </trans-unit>
+      <trans-unit id="4922673d4daafe7112c7557fbc30076c">
+        <source>Loan term (months)</source>
+        <target>Срок на заема (месеци)</target>
+      </trans-unit>
+      <trans-unit id="12e10ea135bca77c48bc84605cf032bf">
+        <source>Minimum quantity not reached.</source>
+        <target>Минималното количество не е достигнато.</target>
+      </trans-unit>
+      <trans-unit id="3e73cf78a01045aa177f0478acd2d3fe">
+        <source>Monthly installment /%s/</source>
+        <target>Месечна вноска /%s/</target>
+      </trans-unit>
+      <trans-unit id="b1d3b5b0b05f2e6fcc781f5f7a8c774b">
+        <source>Monthly installment /%s/(%s)/</source>
+        <target>Месечна вноска /%s/(%s)/</target>
+      </trans-unit>
+      <trans-unit id="1341a4a4e0bd247c42033d59319c522f">
+        <source>Monthly installment amount</source>
+        <target>Размер на погасителна вноска</target>
+      </trans-unit>
+      <trans-unit id="266c8a8ac004fbce21ec12022db83224">
+        <source>Number of months *</source>
+        <target>Брой месеци *</target>
+      </trans-unit>
+      <trans-unit id="f6af0d04c777b8f0e4c99927856361f5">
+        <source>Number of months for repayment *</source>
+        <target>Брой месеци за погасяване *</target>
+      </trans-unit>
+      <trans-unit id="c24150ed7d5eed6e683070c6ad67a08f">
+        <source>Only a few clicks to the desired purchase from 150 BGN (75 EUR) to 50 000 BGN (25 000 EUR):</source>
+        <target>Само с няколко кликвания до желаната покупка от 150 лв. (75 евро) до 50 000 лв. (25 000 евро):</target>
+      </trans-unit>
+      <trans-unit id="66cb39bbacd9914f0c84c49f16d8682b">
+        <source>Only a few clicks to the desired purchase from 150 BGN to 50 000 BGN:</source>
+        <target>Само с няколко кликвания до желаната покупка от 150 лв. до 50 000 лв.:</target>
+      </trans-unit>
+      <trans-unit id="f4b0086abb1829097573f5bb4c36fedc">
+        <source>Only a few clicks to the desired purchase from 75 EUR (150 BGN) to 25 000 EUR (50 000 BGN):</source>
+        <target>Само няколко клика до желаната покупка от 75 евро (150 лева) до 25 000 евро (50 000 лева):</target>
+      </trans-unit>
+      <trans-unit id="28d9bb99eabc2c652babacb20dd220f4">
+        <source>Only a few clicks to the desired purchase from 75 EUR to 25 000 EUR:</source>
+        <target>Само с няколко кликвания до желаната покупка от 75 EUR до 25 000 EUR:</target>
+      </trans-unit>
+      <trans-unit id="ff9eb96fe587449f815149a7716b7376">
+        <source>Personal ID</source>
+        <target>ЕГН</target>
+      </trans-unit>
+      <trans-unit id="bcc254b55c4a1babdf1dcb82c207506b">
+        <source>Phone</source>
+        <target>Телефон</target>
+      </trans-unit>
+      <trans-unit id="13bd9e1d294be5e1250636590438cc1a">
+        <source>Please fill in the E-mail field.</source>
+        <target>Моля, попълнете полето за имейл.</target>
+      </trans-unit>
+      <trans-unit id="545a44a36864f4ef8077ffffb9f9a2f6">
+        <source>Please fill in the First name field.</source>
+        <target>Моля, попълнете полето „Име“.</target>
+      </trans-unit>
+      <trans-unit id="d50f052434229d7d319d493e08d26336">
+        <source>Please fill in the Last name field.</source>
+        <target>Моля, попълнете полето „Фамилия“.</target>
+      </trans-unit>
+      <trans-unit id="ee0771b6c022ddb44c2f0632ca99382e">
+        <source>Please fill in the Personal ID field.</source>
+        <target>Моля, попълнете полето „Личен идентификатор“.</target>
+      </trans-unit>
+      <trans-unit id="1153b1625c350c0bc6d128538c71d325">
+        <source>Please fill in the Phone field.</source>
+        <target>Моля, попълнете полето „Телефон“.</target>
+      </trans-unit>
+      <trans-unit id="fb01d2526304ccb764cb51c1260fb04b">
+        <source>Please wait, installment values are being updated.</source>
+        <target>Моля, изчакайте, стойностите на вноските се актуализират.</target>
+      </trans-unit>
+      <trans-unit id="6bf85657361b5db1eda4d240c939a1ae">
+        <source>Product not available.</source>
+        <target>Продуктът не е наличен.</target>
+      </trans-unit>
+      <trans-unit id="f55c227f23898592d6c25eeef103e058">
+        <source>Product price /%s/</source>
+        <target>Цена на продукта /%s/</target>
+      </trans-unit>
+      <trans-unit id="e15d66676fd92524b27102294ced2d0f">
+        <source>Product price /%s/(%s)/</source>
+        <target>Цена на продукта /%s/(%s)/</target>
+      </trans-unit>
+      <trans-unit id="df502bd93fe766033816b11bf6866fdb">
+        <source>Recalculate</source>
+        <target>Преизчисляване</target>
+      </trans-unit>
+      <trans-unit id="d4bb9f15f5e466aa663133336dc1dbc6">
+        <source>There was a problem with your order. If you believe this is incorrect, you can contact</source>
+        <target>Възникна проблем с поръчката ви. Ако смятате, че това е неправилно, можете да се свържете с</target>
+      </trans-unit>
+      <trans-unit id="e2b7dec8fa4b498156dfee6e4c84b156">
+        <source>This payment method is not available.</source>
+        <target>Този метод на плащане не е наличен.</target>
+      </trans-unit>
+      <trans-unit id="296ab4f57e55fcf58e4a6459615be626">
+        <source>Total amount payable /%s/</source>
+        <target>Обща дължима сума /%s/</target>
+      </trans-unit>
+      <trans-unit id="65476c8bafc51a4b61e8edeb0035535b">
+        <source>Total amount payable /%s/(%s)/</source>
+        <target>Обща дължима сума /%s/(%s)/</target>
+      </trans-unit>
+      <trans-unit id="321de7353c7b8a4170f5c3d8a00f917f">
+        <source>Total loan amount /%s/</source>
+        <target>Обща сума на заема /%s/</target>
+      </trans-unit>
+      <trans-unit id="0e09ee93c463f82b63a2389b1de75ee1">
+        <source>Total loan amount /%s/(%s)/</source>
+        <target>Обща сума на заема /%s/(%s)/</target>
+      </trans-unit>
+      <trans-unit id="1efcce687bbe7eed4a4e8a223d3cf81c">
+        <source>UniCredit</source>
+        <target>UniCredit</target>
+      </trans-unit>
+      <trans-unit id="e842e1dc1844feb73845c92a43694b89">
+        <source>UniCredit general terms for leasing.</source>
+        <target>Общи условия за лизинг на УниКредит.</target>
+      </trans-unit>
+      <trans-unit id="e36bfee33cd1bf81de0daf97248c36a1">
+        <source>UniCredit loan calculator %s</source>
+        <target>Кредитен Калкулатор на УниКредит %s</target>
+      </trans-unit>
+      <trans-unit id="2760f66a1630e9aa643ef1477247baa4">
+        <source>UniCredit promotional information</source>
+        <target>Промоционална информация на УниКредит</target>
+      </trans-unit>
+      <trans-unit id="d2c6160ed2f37abf0b5f81ac5b4f96a5">
+        <source>UniCredit purchases on credit</source>
+        <target>УниКредит покупки на кредит</target>
+      </trans-unit>
+      <trans-unit id="6893758a3ee04d5ff14f2b4e860f3a28">
+        <source>We could not redirect you to the UniCredit system. Please try again or contact us.</source>
+        <target>We could not redirect you to the UniCredit system. Please try again or contact us.</target>
+      </trans-unit>
+      <trans-unit id="28c21714b40a4522a192d15da23203fc">
+        <source>You can select the loan term, your preferred monthly installment, and optionally an initial down payment. Enter the required personal data and accept the terms of use. Then you can confirm your choice. A UniCredit representative will contact you to complete the process.</source>
+        <target>Можете да изберете срока на кредита, предпочитаната от вас месечна вноска и по желание първоначална вноска. Въведете необходимите лични данни и приемете условията за ползване. След това можете да потвърдите избора си. Представител на UniCredit ще се свърже с вас, за да завърши процеса.</target>
+      </trans-unit>
+      <trans-unit id="6645b2e6e1934b8f2a116c6ec04ca568">
+        <source>You can select the loan term, your preferred monthly installment, and optionally an initial down payment. Then confirm your choice. You will be redirected to UniCredit to complete your credit purchase.</source>
+        <target>Можете да изберете 'Срок за кредита', предпочитаната от Вас 'Месечна вноска', както и при желание 'Първоначална вноска'. След което да потвърдите избора си. Ще бъдете прехвърлени към страницата на UniCredit за довършване на покупката си на кредит.</target>
+      </trans-unit>
+      <trans-unit id="122d9cd162ea7e01fca237a8c5085bd6">
+        <source>You must agree to the UniCredit terms and conditions.</source>
+        <target>Трябва да се съгласите с общите условия на UniCredit.</target>
+      </trans-unit>
+      <trans-unit id="6a93fd3856e209ebfd942f1199976fce">
+        <source>You will be redirected to UniCredit.</source>
+        <target>Ще бъдете пренасочени към УниКредит.</target>
+      </trans-unit>
+      <trans-unit id="1167e46c7a94af11bd9bef3805ef4e73">
+        <source>Your order has been completed.</source>
+        <target>Вашата поръчка е изпълнена.</target>
+      </trans-unit>
+      <trans-unit id="da36cfaf48b9e19896e23e1207040d1e">
+        <source>months</source>
+        <target>месеци</target>
+      </trans-unit>
+      <trans-unit id="71ca125434f4e20f89158d822879a071">
+        <source>our support team</source>
+        <target>нашият екип за поддръжка</target>
       </trans-unit>
     </body>
   </file>
