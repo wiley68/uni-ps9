@@ -17,7 +17,7 @@ use Configuration;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
- * Админ мапинг категория → КОП/промо в keys/kop.json (списък от всички категории под home).
+ * Админ мапинг категория → КОП/промо в keys/kop.json (само ниво 1: директни деца на Home).
  */
 final class KopMappingService
 {
@@ -33,7 +33,7 @@ final class KopMappingService
      */
     public function getMappings(): array
     {
-        $categoryIds = $this->getAllCategoryIds((int) Configuration::get('PS_HOME_CATEGORY'));
+        $categoryIds = $this->getLevelOneCategoryIds((int) Configuration::get('PS_HOME_CATEGORY'));
         $persisted = $this->loadPersistedMappingsIndexed();
         $rows = [];
 
@@ -194,13 +194,20 @@ final class KopMappingService
     /**
      * @return array<int, int>
      */
-    private function getAllCategoryIds(int $parentId): array
+    private function getLevelOneCategoryIds(int $homeCategoryId): array
     {
-        $ids = [$parentId];
-        $category = new Category($parentId);
+        if ($homeCategoryId <= 0) {
+            return [];
+        }
+
+        $ids = [];
+        $category = new Category($homeCategoryId);
         $children = $category->getSubCategories((int) Configuration::get('PS_LANG_DEFAULT'));
         foreach ($children as $child) {
-            $ids = array_merge($ids, $this->getAllCategoryIds((int) $child['id_category']));
+            $cid = (int) ($child['id_category'] ?? 0);
+            if ($cid > 0) {
+                $ids[] = $cid;
+            }
         }
 
         return $ids;

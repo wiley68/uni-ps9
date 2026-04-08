@@ -578,11 +578,10 @@ class UniPayment extends PaymentModule
             return '';
         }
 
-        $prod_categories = Product::getProductCategories($product_id);
-        if (empty($prod_categories)) {
+        $product_category_ids = $this->getTopLevelCategoryIdsForProduct($product_id, (int) $this->context->language->id);
+        if ($product_category_ids === []) {
             return '';
         }
-        $product_category_ids = array_values(array_unique(array_map('intval', $prod_categories)));
 
         $uni_unicid = (string) (Configuration::get(UnipaymentConf::UNIPAYMENT_UNICID) ?: '');
         $paramsuni = $this->getCachedUniParams($uni_unicid);
@@ -1435,8 +1434,9 @@ class UniPayment extends PaymentModule
     }
 
     /**
-     * Id-та на категории за търсене на КОП в checkout: 1 продукт — всички категории (ред като getProductCategories), при липса — default;
-     * 2+ продукта — сечение на категориите на всеки продукт (ред по първия); при празно сечение — fallback като първия продукт сам.
+     * Id-та на категории за търсене на КОП в checkout:
+     * работим само с главни категории ниво 1 (директни деца на Home), по реда на срещане.
+     * При 2+ продукта ползваме сечение; при празно сечение — fallback към първия продукт.
      *
      * @param array<int, array<string, mixed>> $cartProducts редове от Cart::getProducts(true)
      *
@@ -1460,12 +1460,12 @@ class UniPayment extends PaymentModule
         }
 
         if (count($uniqueProductIdsOrdered) === 1) {
-            return $this->getOrderedProductCategoriesForCheckoutKop($uniqueProductIdsOrdered[0], $langID);
+            return $this->getTopLevelCategoryIdsForProduct($uniqueProductIdsOrdered[0], $langID);
         }
 
         $perProductOrdered = [];
         foreach ($uniqueProductIdsOrdered as $pid) {
-            $perProductOrdered[$pid] = $this->getOrderedProductCategoriesRaw($pid);
+            $perProductOrdered[$pid] = $this->getTopLevelCategoryIdsForProduct($pid, $langID);
         }
 
         $firstPid = $uniqueProductIdsOrdered[0];
@@ -1489,7 +1489,7 @@ class UniPayment extends PaymentModule
             return $orderedIntersection;
         }
 
-        return $this->getOrderedProductCategoriesForCheckoutKop($firstPid, $langID);
+        return $this->getTopLevelCategoryIdsForProduct($firstPid, $langID);
     }
 
     /**
@@ -1517,15 +1517,81 @@ class UniPayment extends PaymentModule
     /**
      * @return list<int>
      */
-    private function getOrderedProductCategoriesForCheckoutKop(int $pid, int $langID): array
+    private function getTopLevelCategoryIdsForProduct(int $pid, int $langID): array
     {
         $ordered = $this->getOrderedProductCategoriesRaw($pid);
-        if ($ordered !== []) {
-            return $ordered;
+        $topLevel = [];
+        $seenTop = [];
+        foreach ($ordered as $cid) {
+            $topCid = $this->resolveLevelOneCategoryId($cid);
+            if ($topCid > 0 && !isset($seenTop[$topCid])) {
+                $seenTop[$topCid] = true;
+                $topLevel[] = $topCid;
+            }
         }
+        if ($topLevel !== []) {
+            return $topLevel;
+        }
+
         $product = new Product($pid, false, $langID);
         $def = (int) $product->id_category_default;
+        $defTop = $this->resolveLevelOneCategoryId($def);
 
-        return $def > 0 ? [$def] : [];
+        return $defTop > 0 ? [$defTop] : [];
+    }
+
+    /**
+     * Връща id на главната категория ниво 1 (директно дете на Home) за подадена категория.
+     */
+    private function resolveLevelOneCategoryId(int $categoryId): int
+    {
+        if ($categoryId <= 0) {
+            return 0;
+        }
+
+        $homeId = (int) Configuration::get('PS_HOME_CATEGORY');
+        if ($homeId <= 0 || $categoryId === $homeId) {
+            return 0;
+        }
+
+        $current = $categoryId;
+        $visited = [];
+        for ($i = 0; $i < 32; ++$i) {
+            if (isset($visited[$current])) {
+                break;
+            }
+            $visited[$current] = true;
+
+            $category = new Category($current, (int) Configuration::get('PS_LANG_DEFAULT'));
+            if (!Validate::isLoadedObject($category)) {
+                break;
+            }
+            $parentId = $this->getCategoryParentId($current);
+            if ($parentId === $homeId) {
+                return $current;
+            }
+            if ($parentId <= 0 || $parentId === $current) {
+                break;
+            }
+
+            $current = $parentId;
+        }
+
+        return 0;
+    }
+
+    private function getCategoryParentId(int $categoryId): int
+    {
+        if ($categoryId <= 0) {
+            return 0;
+        }
+
+        $sql = 'SELECT c.id_parent FROM ' . _DB_PREFIX_ . 'category c WHERE c.id_category = ' . (int) $categoryId;
+        $value = Db::getInstance()->getValue($sql);
+        if ($value === false || $value === null || $value === '') {
+            return 0;
+        }
+
+        return (int) $value;
     }
 }

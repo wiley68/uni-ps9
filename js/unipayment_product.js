@@ -1,4 +1,5 @@
 let uni_old_vnoski;
+let unipaymentPrepareCheckoutBusy = false;
 
 /** @type {ReturnType<typeof setTimeout>|null} */
 let unipaymentProductPriceRefreshTimer = null;
@@ -134,9 +135,13 @@ function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
     if (!idProduct) {
         return;
     }
+    if (unipaymentPrepareCheckoutBusy) {
+        return;
+    }
     if ($busyTarget.data("uniBusy")) {
         return;
     }
+    unipaymentPrepareCheckoutBusy = true;
     $busyTarget.data("uniBusy", true);
     $.ajax({
         url: urlEl.value,
@@ -181,6 +186,7 @@ function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
             );
         })
         .always(function () {
+            unipaymentPrepareCheckoutBusy = false;
             $busyTarget.data("uniBusy", false);
         });
 }
@@ -694,6 +700,17 @@ $(document).ready(function (e) {
     $(document).on("click", "#uni_buy_unicredit", function (e) {
         e.preventDefault();
         $("#uni-product-popup-container").hide("slow");
-        $("button[data-button-action=add-to-cart]").trigger("click");
+        // Trigger only one concrete add-to-cart button (avoid multi-click on themes with duplicated selectors).
+        const addToCartBtn =
+            document.querySelector(
+                "form#add-to-cart-or-refresh button[data-button-action='add-to-cart']",
+            ) ||
+            document.querySelector(
+                ".product-add-to-cart button[data-button-action='add-to-cart']",
+            ) ||
+            document.querySelector("button[data-button-action='add-to-cart']");
+        if (addToCartBtn) {
+            addToCartBtn.click();
+        }
     });
 });
