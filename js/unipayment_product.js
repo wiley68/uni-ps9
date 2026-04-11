@@ -165,7 +165,7 @@ function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
             }
             const _str =
                 typeof window.uniPaymentShopStrings === "object" &&
-                window.uniPaymentShopStrings !== null
+                    window.uniPaymentShopStrings !== null
                     ? window.uniPaymentShopStrings
                     : {};
             const msg =
@@ -177,12 +177,12 @@ function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
         .fail(function () {
             const _str =
                 typeof window.uniPaymentShopStrings === "object" &&
-                window.uniPaymentShopStrings !== null
+                    window.uniPaymentShopStrings !== null
                     ? window.uniPaymentShopStrings
                     : {};
             window.alert(
                 _str.storeError ||
-                    "An error occurred while contacting the store.",
+                "An error occurred while contacting the store.",
             );
         })
         .always(function () {
@@ -684,6 +684,17 @@ $(document).ready(function (e) {
             scheduleUnipaymentProductPriceRefresh();
         });
     }
+
+    /**
+     * Пълно зареждане / F5: темата възстановява избрана комбинация от URL или сесия,
+     * но не вдига updatedProduct* — бутонът иначе остава със SSR вноска за дефолтната комбинация.
+     */
+    scheduleUnipaymentProductPriceRefresh();
+    setTimeout(function () {
+        if (document.getElementById("uni_price")) {
+            scheduleUnipaymentProductPriceRefresh();
+        }
+    }, 350);
 
     $(document).on("click", "#uni_buy_on_installment", function (e) {
         e.preventDefault();
