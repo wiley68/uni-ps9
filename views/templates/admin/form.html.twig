@@ -91,7 +91,7 @@
         saveProblem: 'A problem occurred while saving.'|trans({}, 'Modules.Unipayment.Admin'),
         refreshProblem: 'A problem occurred while refreshing the cache.'|trans({}, 'Modules.Unipayment.Admin'),
         refreshSuccess: 'KOP mapping and bank parameters have been refreshed.'|trans({}, 'Modules.Unipayment.Admin'),
-        coeffPurgedNote: '%n% coefficient cache file(s) older than today were removed from keys/coeff/.'|trans({}, 'Modules.Unipayment.Admin'),
+        coeffPurgedNote: '%n% coefficient cache row(s) older than today were removed from the database.'|trans({}, 'Modules.Unipayment.Admin'),
     } %}
     <script type="application/json" id="uni-kop-admin-i18n">{{ uniKopAdminJsData|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_QUOT') b-or constant('JSON_HEX_AMP'))|raw }}</script>
     <script>

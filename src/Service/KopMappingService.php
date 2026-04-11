@@ -14,10 +14,12 @@ namespace PrestaShop\Module\Unipayment\Service;
 
 use Category;
 use Configuration;
+use Db;
+use PrestaShop\Module\Unipayment\Config\UnipaymentConfig;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
- * Админ мапинг категория → КОП/промо в keys/kop.json (само ниво 1: директни деца на Home).
+ * Админ мапинг категория -> КОП/промо в DB (само категории ниво 1 под Home).
  */
 final class KopMappingService
 {
@@ -25,15 +27,14 @@ final class KopMappingService
 
     public function __construct(
         private readonly TranslatorInterface $translator,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<int, array<string, mixed>>
      */
     public function getMappings(): array
     {
-        $categoryIds = $this->getLevelOneCategoryIds((int) Configuration::get('PS_HOME_CATEGORY'));
+        $categoryIds = $this->getTopLevelCategoryIdsUnderHome((int) Configuration::get('PS_HOME_CATEGORY'));
         $persisted = $this->loadPersistedMappingsIndexed();
         $rows = [];
 
@@ -129,18 +130,27 @@ final class KopMappingService
     }
 
     /**
-     * Нулира kimb/kimb_time/stats във всички редове и записва kop.json (преди пълнене от банка/UI).
+     * Нулира kimb/kimb_time/stats във всички редове в DB (преди пълнене от банка/UI).
      */
     public function refreshMappings(): bool
     {
         $rows = $this->getMappings();
-        foreach ($rows as &$row) {
-            $row['kimb'] = '';
-            $row['kimb_time'] = '';
-            $row['stats'] = $this->defaultStats();
+        $ok = true;
+        foreach ($rows as $row) {
+            $categoryId = (int) ($row['category_id'] ?? 0);
+            if ($categoryId <= 0) {
+                continue;
+            }
+            $ok = $this->upsertRow($categoryId, [
+                'kop' => (string) ($row['kop'] ?? ''),
+                'promo' => (string) ($row['promo'] ?? ''),
+                'kimb' => '',
+                'kimb_time' => '',
+                'stats' => $this->defaultStats(),
+            ]) && $ok;
         }
 
-        return $this->writeMappings($rows);
+        return $ok;
     }
 
     /**
@@ -148,22 +158,37 @@ final class KopMappingService
      */
     private function loadPersistedMappingsIndexed(): array
     {
-        $filePath = $this->getStorageFilePath();
-        if (!is_file($filePath)) {
-            return [];
-        }
-
-        $decoded = json_decode((string) file_get_contents($filePath), true);
-        if (!is_array($decoded)) {
+        /** @var mixed $db */
+        $db = Db::getInstance();
+        $rows = $db->executeS(
+            'SELECT `id_category`, `kop`, `promo`, `kimb`, `kimb_time`, `stats`
+            FROM `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_KOP_MAPPING . '`'
+        );
+        if (!is_array($rows) || $rows === []) {
             return [];
         }
 
         $indexed = [];
-        foreach ($decoded as $row) {
-            if (!is_array($row) || !isset($row['category_id'])) {
+        foreach ($rows as $dbRow) {
+            if (!is_array($dbRow)) {
                 continue;
             }
-            $indexed[(int) $row['category_id']] = $row;
+            $categoryId = (int) ($dbRow['id_category'] ?? 0);
+            if ($categoryId <= 0) {
+                continue;
+            }
+            $statsRaw = (string) ($dbRow['stats'] ?? '');
+            $statsDecoded = json_decode($statsRaw, true);
+            $stats = is_array($statsDecoded) ? array_merge($this->defaultStats(), $statsDecoded) : $this->defaultStats();
+
+            $indexed[$categoryId] = [
+                'category_id' => $categoryId,
+                'kop' => (string) ($dbRow['kop'] ?? ''),
+                'promo' => (string) ($dbRow['promo'] ?? ''),
+                'kimb' => (string) ($dbRow['kimb'] ?? ''),
+                'kimb_time' => (string) ($dbRow['kimb_time'] ?? ''),
+                'stats' => $stats,
+            ];
         }
 
         return $indexed;
@@ -174,40 +199,91 @@ final class KopMappingService
      */
     private function writeMappings(array $rows): bool
     {
-        $filePath = $this->getStorageFilePath();
-        return false !== file_put_contents($filePath, (string) json_encode($rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-    }
-
-    /** Път към keys/kop.json под корена на модула. */
-    private function getStorageFilePath(): string
-    {
-        $moduleRoot = dirname(__DIR__, 2);
-        $keysDir = $moduleRoot . '/keys';
-
-        if (!is_dir($keysDir)) {
-            mkdir($keysDir, 0755, true);
+        $ok = true;
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $categoryId = (int) ($row['category_id'] ?? 0);
+            if ($categoryId <= 0) {
+                continue;
+            }
+            $ok = $this->upsertRow($categoryId, [
+                'kop' => (string) ($row['kop'] ?? ''),
+                'promo' => (string) ($row['promo'] ?? ''),
+                'kimb' => (string) ($row['kimb'] ?? ''),
+                'kimb_time' => (string) ($row['kimb_time'] ?? ''),
+                'stats' => isset($row['stats']) && is_array($row['stats']) ? $row['stats'] : $this->defaultStats(),
+            ]) && $ok;
         }
 
-        return $keysDir . '/kop.json';
+        return $ok;
     }
 
     /**
-     * @return array<int, int>
+     * @param array{kop: string, promo: string, kimb: string, kimb_time: string, stats: array<string, mixed>} $row
      */
-    private function getLevelOneCategoryIds(int $homeCategoryId): array
+    private function upsertRow(int $categoryId, array $row): bool
+    {
+        /** @var mixed $db */
+        $db = Db::getInstance();
+        $table = _DB_PREFIX_ . UnipaymentConfig::TABLE_KOP_MAPPING;
+        $statsJson = json_encode($row['stats'], JSON_UNESCAPED_UNICODE);
+        if (!is_string($statsJson)) {
+            return false;
+        }
+
+        $kimbTimeVal = $row['kimb_time'];
+        $kimbTimeInt = is_numeric($kimbTimeVal) ? (int) $kimbTimeVal : 0;
+
+        $data = [
+            'id_category' => (int) $categoryId,
+            'kop' => $row['kop'],
+            'promo' => $row['promo'],
+            'kimb' => $row['kimb'],
+            'kimb_time' => $kimbTimeInt,
+            'stats' => $statsJson,
+            'date_upd' => date('Y-m-d H:i:s'),
+        ];
+
+        $exists = (int) $db->getValue(
+            'SELECT `id_category` FROM `' . $table . '` WHERE `id_category` = ' . (int) $categoryId
+        ) > 0;
+        if ($exists) {
+            return (bool) $db->update(
+                UnipaymentConfig::TABLE_KOP_MAPPING,
+                $data,
+                '`id_category` = ' . (int) $categoryId
+            );
+        }
+
+        $data['date_add'] = date('Y-m-d H:i:s');
+
+        return (bool) $db->insert(UnipaymentConfig::TABLE_KOP_MAPPING, $data);
+    }
+
+    /** @return list<int> Само директните подкатегории на Home (ниво 1). */
+    private function getTopLevelCategoryIdsUnderHome(int $homeCategoryId): array
     {
         if ($homeCategoryId <= 0) {
             return [];
         }
 
-        $ids = [];
         $category = new Category($homeCategoryId);
         $children = $category->getSubCategories((int) Configuration::get('PS_LANG_DEFAULT'));
+        if (!is_array($children) || $children === []) {
+            return [];
+        }
+
+        $ids = [];
+        $seen = [];
         foreach ($children as $child) {
-            $cid = (int) ($child['id_category'] ?? 0);
-            if ($cid > 0) {
-                $ids[] = $cid;
+            $id = (int) ($child['id_category'] ?? 0);
+            if ($id <= 0 || isset($seen[$id])) {
+                continue;
             }
+            $seen[$id] = true;
+            $ids[] = $id;
         }
 
         return $ids;

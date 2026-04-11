@@ -118,7 +118,9 @@ class UniPayment extends PaymentModule
             !$this->registerHook('paymentReturn') ||
             !$this->registerHook('displayHome') ||
             !$this->registerHook('actionValidateOrder') ||
-            !Configuration::updateValue('UNIPAYMENT_NAME', 'UniCredit Credit purchases')
+            !Configuration::updateValue('UNIPAYMENT_NAME', 'UniCredit Credit purchases') ||
+            !$this->createKopMappingTable() ||
+            !$this->createApiCacheTable()
         ) {
             return false;
         }
@@ -161,7 +163,70 @@ class UniPayment extends PaymentModule
             Configuration::deleteByName($legacyKey);
         }
 
-        return true;
+        return $this->dropApiCacheTable() && $this->dropKopMappingTable();
+    }
+
+    private function createKopMappingTable(): bool
+    {
+        $engine = defined('_MYSQL_ENGINE_') ? (string) constant('_MYSQL_ENGINE_') : 'InnoDB';
+        $sql = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_KOP_MAPPING . '` (
+            `id_unipayment_kop` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `id_category` INT UNSIGNED NOT NULL,
+            `kop` VARCHAR(64) NOT NULL DEFAULT \'\',
+            `promo` VARCHAR(64) NOT NULL DEFAULT \'\',
+            `kimb` VARCHAR(32) NOT NULL DEFAULT \'\',
+            `kimb_time` INT UNSIGNED NOT NULL DEFAULT 0,
+            `stats` LONGTEXT NULL,
+            `date_add` DATETIME NOT NULL,
+            `date_upd` DATETIME NOT NULL,
+            PRIMARY KEY (`id_unipayment_kop`),
+            UNIQUE KEY `uniq_unipayment_kop_category` (`id_category`)
+        ) ENGINE=' . $engine . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;';
+
+        /** @var mixed $db */
+        $db = Db::getInstance();
+
+        return (bool) $db->execute($sql);
+    }
+
+    private function dropKopMappingTable(): bool
+    {
+        $sql = 'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_KOP_MAPPING . '`';
+
+        /** @var mixed $db */
+        $db = Db::getInstance();
+
+        return (bool) $db->execute($sql);
+    }
+
+    private function createApiCacheTable(): bool
+    {
+        $engine = defined('_MYSQL_ENGINE_') ? (string) constant('_MYSQL_ENGINE_') : 'InnoDB';
+        $sql = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_API_CACHE . '` (
+            `id_unipayment_api_cache` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `cache_group` VARCHAR(32) NOT NULL,
+            `cache_key` VARCHAR(191) NOT NULL,
+            `payload` LONGTEXT NULL,
+            `date_add` DATETIME NOT NULL,
+            `date_upd` DATETIME NOT NULL,
+            PRIMARY KEY (`id_unipayment_api_cache`),
+            UNIQUE KEY `uniq_unipayment_api_cache_key` (`cache_key`),
+            KEY `idx_unipayment_api_cache_group_upd` (`cache_group`, `date_upd`)
+        ) ENGINE=' . $engine . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;';
+
+        /** @var mixed $db */
+        $db = Db::getInstance();
+
+        return (bool) $db->execute($sql);
+    }
+
+    private function dropApiCacheTable(): bool
+    {
+        $sql = 'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_API_CACHE . '`';
+        /** @var mixed $db */
+        $db = Db::getInstance();
+
+        return (bool) $db->execute($sql);
     }
 
     /**
@@ -885,12 +950,12 @@ class UniPayment extends PaymentModule
      */
     private function getCachedUniParams(string $cid, bool $forceReload = false): ?array
     {
-        $cacheDir = $this->getCacheDirectoryPath();
-        $cacheFile = $cacheDir . '/params_' . md5($cid) . '.json';
-        if (!$forceReload && file_exists($cacheFile) && (time() - (int) filemtime($cacheFile)) < 600) {
-            $cached = json_decode((string) file_get_contents($cacheFile), true);
-
-            return is_array($cached) ? $cached : null;
+        $cacheKey = 'params:' . md5($cid);
+        if (!$forceReload) {
+            $cached = $this->readApiCache($cacheKey, 600);
+            if (is_array($cached)) {
+                return $cached;
+            }
         }
 
         $ch = curl_init();
@@ -913,7 +978,7 @@ class UniPayment extends PaymentModule
             return null;
         }
 
-        file_put_contents($cacheFile, (string) $response);
+        $this->writeApiCache($cacheKey, 'params', $params);
 
         return $params;
     }
@@ -925,12 +990,12 @@ class UniPayment extends PaymentModule
      */
     private function getCachedUniCalculation(string $cid, string $deviceis, bool $forceReload = false): ?array
     {
-        $cacheDir = $this->getCacheDirectoryPath();
-        $cacheFile = $cacheDir . '/calc_' . md5($cid . '_' . $deviceis) . '.json';
-        if (!$forceReload && file_exists($cacheFile) && (time() - (int) filemtime($cacheFile)) < 600) {
-            $cached = json_decode((string) file_get_contents($cacheFile), true);
-
-            return is_array($cached) ? $cached : null;
+        $cacheKey = 'calc:' . md5($cid . '_' . $deviceis);
+        if (!$forceReload) {
+            $cached = $this->readApiCache($cacheKey, 600);
+            if (is_array($cached)) {
+                return $cached;
+            }
         }
 
         $ch = curl_init();
@@ -957,7 +1022,7 @@ class UniPayment extends PaymentModule
             return null;
         }
 
-        file_put_contents($cacheFile, (string) $response);
+        $this->writeApiCache($cacheKey, 'calc', $params);
 
         return $params;
     }
@@ -976,17 +1041,63 @@ class UniPayment extends PaymentModule
         return is_array($this->getCachedUniParams($cid, true));
     }
 
-    /** Директория keys/ под модула (кеш JSON за getparameters). */
-    private function getCacheDirectoryPath(): string
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function readApiCache(string $cacheKey, int $ttlSeconds): ?array
     {
-        $moduleRoot = __DIR__;
-        $keysDir = $moduleRoot . '/keys';
-
-        if (!is_dir($keysDir)) {
-            mkdir($keysDir, 0755, true);
+        /** @var mixed $db */
+        $db = Db::getInstance();
+        $row = $db->getRow(
+            'SELECT `payload`, `date_upd` FROM `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_API_CACHE . '`
+            WHERE `cache_key` = \'' . $this->escapeSqlLiteral($cacheKey) . '\''
+        );
+        if (!is_array($row)) {
+            return null;
         }
+        $updatedTs = isset($row['date_upd']) ? strtotime((string) $row['date_upd']) : false;
+        if ($updatedTs === false || (time() - (int) $updatedTs) >= $ttlSeconds) {
+            return null;
+        }
+        $payload = isset($row['payload']) ? json_decode((string) $row['payload'], true) : null;
 
-        return $keysDir;
+        return is_array($payload) ? $payload : null;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function writeApiCache(string $cacheKey, string $group, array $payload): void
+    {
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        if (!is_string($json)) {
+            return;
+        }
+        $now = date('Y-m-d H:i:s');
+        /** @var mixed $db */
+        $db = Db::getInstance();
+        $exists = (int) $db->getValue(
+            'SELECT `id_unipayment_api_cache` FROM `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_API_CACHE . '`
+            WHERE `cache_key` = \'' . $this->escapeSqlLiteral($cacheKey) . '\''
+        ) > 0;
+        $data = [
+            'cache_group' => $group,
+            'cache_key' => $cacheKey,
+            'payload' => $json,
+            'date_upd' => $now,
+        ];
+        if ($exists) {
+            $db->update(UnipaymentConfig::TABLE_API_CACHE, $data, '`cache_key` = \'' . $this->escapeSqlLiteral($cacheKey) . '\'');
+
+            return;
+        }
+        $data['date_add'] = $now;
+        $db->insert(UnipaymentConfig::TABLE_API_CACHE, $data);
+    }
+
+    private function escapeSqlLiteral(string $value): string
+    {
+        return addslashes($value);
     }
 
     /**

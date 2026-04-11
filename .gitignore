@@ -19,11 +19,7 @@ pnpm-debug.log*
 .sass-cache/
 .cache/
 
-# Модул keys/: JSON кеш от getparameters / getcalculation / getCoeff — създава се при работа, не се комитва.
-/keys/params_*
-/keys/calc_*
-/keys/coeff/coeff_*
-# Останали runtime файлове в keys/ (kop.json, *.pem, uni_debug.json, …); не /keys/coeff/* — покрито от реда по-горе.
+# Модул keys/: изтеглени PEM от банката, debug JSON и др. (не се комитват); API/KOP данните са в DB.
 # Запазваме само защитения index.php (PrestaShop конвенция).
 /keys/*
 !/keys/index.php

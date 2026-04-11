@@ -16,6 +16,11 @@ namespace PrestaShop\Module\Unipayment\Config;
 
 final class UnipaymentConfig
 {
+    /** Име на таблицата (без _DB_PREFIX_) за мапинг категория -> KOP. */
+    public const TABLE_KOP_MAPPING = 'unipayment_kop_mapping';
+    /** Име на таблицата (без _DB_PREFIX_) за API кеш (params/calc/coeff). */
+    public const TABLE_API_CACHE = 'unipayment_api_cache';
+
     /** Праг за сходимост при финансови изчисления (напр. IRR/анюитет). */
     public const FINANCIAL_PRECISION = 1.0e-8;
 
@@ -34,7 +39,7 @@ final class UnipaymentConfig
     public const LIVE_URL = 'https://unicreditconsumerfinancing.info';
 
     /**
-     * Периоди (брой месеци), за които се вика getCoeff и се пълнят kimb_X / glp_X в kop.json.
+     * Периоди (брой месеци), за които се вика getCoeff и се пълнят kimb_X / glp_X в DB stats.
      * 15 не се подава от банката — не е в този списък; UI/конфиг могат да го ползват отделно.
      *
      * @var list<int>
@@ -48,7 +53,5 @@ final class UnipaymentConfig
      */
     public const PRODUCT_INSTALLMENT_MONTHS = [3, 4, 5, 6, 9, 10, 12, 15, 18, 24, 30, 36];
 
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 }

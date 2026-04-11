@@ -7,7 +7,7 @@
  * @copyright Ilko Ivanov
  * @license   https://opensource.org/licenses/AFL-3.0 Academic Free License 3.0 (AFL-3.0)
  *
- * Checkout калкулатор UniCredit: избор на КОП (вкл. промо), getCoeff през {@see UniCreditGetCoeffService} (кеш) или kop.json,
+ * Checkout калкулатор UniCredit: избор на КОП (вкл. промо), getCoeff през {@see UniCreditGetCoeffService} (кеш) или DB stats,
  * ГПР чрез {@see FinancialRateHelper} (аналог на PS 1.7 RATE).
  */
 
@@ -15,6 +15,7 @@ declare(strict_types=1);
 
 namespace PrestaShop\Module\Unipayment\Service;
 
+use Db;
 use PrestaShop\Module\Unipayment\Config\UnipaymentConfig;
 use PrestaShop\Module\Unipayment\Helper\FinancialRateHelper;
 
@@ -23,7 +24,7 @@ final class CheckoutUniCalculationService
     private readonly UniCreditGetCoeffService $getCoeffService;
 
     /**
-     * @param string $moduleRootPath абсолютен път към корена на модула (за keys/kop.json)
+     * @param string $moduleRootPath абсолютен път към корена на модула (за PEM материали при getCoeff)
      */
     public function __construct(
         private readonly string $moduleRootPath,
@@ -32,7 +33,7 @@ final class CheckoutUniCalculationService
     }
 
     /**
-     * @param list<int> $productCategoryIds първо съвпадение с kop.json по този ред (checkout: сечение при мулти-количка)
+     * @param list<int> $productCategoryIds първо съвпадение с DB мапинга по този ред (checkout: сечение при мулти-количка)
      *
      * @return array{success: string, result: array<string, mixed>}|null
      */
@@ -238,22 +239,26 @@ final class CheckoutUniCalculationService
         if ($productCategoryIds === []) {
             return null;
         }
-        $path = $this->moduleRootPath . '/keys/kop.json';
-        if (!is_readable($path)) {
-            return null;
-        }
-        $raw = file_get_contents($path);
-        if ($raw === false) {
-            return null;
-        }
-        $data = json_decode($raw, true);
-        if (!is_array($data)) {
+        /** @var mixed $db */
+        $db = Db::getInstance();
+        $data = $db->executeS(
+            'SELECT `id_category`, `kop`, `promo`, `stats`
+            FROM `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_KOP_MAPPING . '`'
+        );
+        if (!is_array($data) || $data === []) {
             return null;
         }
         $rows = [];
         foreach ($data as $row) {
             if (is_array($row)) {
-                $rows[] = $row;
+                $statsRaw = (string) ($row['stats'] ?? '');
+                $statsDecoded = json_decode($statsRaw, true);
+                $rows[] = [
+                    'category_id' => (int) ($row['id_category'] ?? 0),
+                    'kop' => (string) ($row['kop'] ?? ''),
+                    'promo' => (string) ($row['promo'] ?? ''),
+                    'stats' => is_array($statsDecoded) ? $statsDecoded : [],
+                ];
             }
         }
         if ($rows === []) {

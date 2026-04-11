@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace PrestaShop\Module\Unipayment\Service;
 
+use Db;
 use PrestaShop\Module\Unipayment\Config\UnipaymentConfig;
 use PrestaShop\Module\Unipayment\DTO\ProductAdditionalInfoRequest;
 
@@ -28,11 +29,10 @@ final class ProductAdditionalInfoBlockService
      */
     public function __construct(
         private readonly string $moduleRootPath,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param list<int> $productCategoryIds всички id_category на продукта; използва се първото съвпадение с kop.json
+     * @param list<int> $productCategoryIds всички id_category на продукта; използва се първото съвпадение с DB мапинга
      *
      * @return array{assign: array<string, mixed>, should_display: bool}|null null = не показвай блока
      */
@@ -53,8 +53,7 @@ final class ProductAdditionalInfoBlockService
         $uni_password = htmlspecialchars_decode((string) $paramsuni['uni_password']);
         $uni_shema_current = (int) $paramsuni['uni_shema_current'];
 
-        $kopJsonPath = $this->getKopJsonPath();
-        $uni_categories_kop = $this->loadKopMapping($kopJsonPath);
+        $uni_categories_kop = $this->loadKopMappingFromDb();
         $uni_key = $this->findKopRowIndexForProductCategories($uni_categories_kop, $productCategoryIds);
         if ($uni_key === false) {
             return null;
@@ -131,7 +130,7 @@ final class ProductAdditionalInfoBlockService
                 $kimbForCurrent = $this->kimbFromStatsForInstallments($row['stats'], $uni_shema_current);
                 $row['kimb'] = $kimbForCurrent > 0 ? (string) $kimbForCurrent : '';
                 $row['kimb_time'] = (string) time();
-                file_put_contents($kopJsonPath, (string) json_encode($uni_categories_kop, JSON_PRETTY_PRINT));
+                $this->persistKopRuntimeData($row);
             }
             $stats = isset($row['stats']) && is_array($row['stats']) ? $row['stats'] : [];
             $uni_param_kimb = $row['kimb'];
@@ -350,7 +349,7 @@ final class ProductAdditionalInfoBlockService
     }
 
     /**
-     * @param array<string, mixed> $stats ред stats от kop.json
+     * @param array<string, mixed> $stats ред stats от DB мапинга
      */
     private function kimbFromStatsForInstallments(array $stats, int $installments): float
     {
@@ -366,29 +365,76 @@ final class ProductAdditionalInfoBlockService
         return (float) str_replace(',', '.', $raw);
     }
 
-    /** Абсолютен път към keys/kop.json. */
-    private function getKopJsonPath(): string
-    {
-        return $this->moduleRootPath . '/keys/kop.json';
-    }
-
     /**
-     * Зарежда kop.json като списък редове (празно при липса/невалиден JSON).
+     * Зарежда KOP мапинга от DB като списък редове.
      *
      * @return array<int, array<string, mixed>>
      */
-    private function loadKopMapping(string $kopJsonPath): array
+    private function loadKopMappingFromDb(): array
     {
-        if (!file_exists($kopJsonPath)) {
+        /** @var mixed $db */
+        $db = Db::getInstance();
+        $rows = $db->executeS(
+            'SELECT `id_category`, `kop`, `promo`, `kimb`, `kimb_time`, `stats`
+            FROM `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_KOP_MAPPING . '`'
+        );
+        if (!is_array($rows) || $rows === []) {
             return [];
         }
-        $data = json_decode((string) file_get_contents($kopJsonPath), true);
 
-        return is_array($data) ? $data : [];
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $statsRaw = (string) ($row['stats'] ?? '');
+            $statsDecoded = json_decode($statsRaw, true);
+            $out[] = [
+                'category_id' => (int) ($row['id_category'] ?? 0),
+                'kop' => (string) ($row['kop'] ?? ''),
+                'promo' => (string) ($row['promo'] ?? ''),
+                'kimb' => (string) ($row['kimb'] ?? ''),
+                'kimb_time' => (string) ($row['kimb_time'] ?? ''),
+                'stats' => is_array($statsDecoded) ? $statsDecoded : [],
+            ];
+        }
+
+        return $out;
     }
 
     /**
-     * Първо съвпадение между категориите на продукта и редовете в kop.json (редът на id-тата е от {@see Product::getProductCategories}).
+     * Записва runtime полетата kimb/kimb_time/stats за конкретна категория.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function persistKopRuntimeData(array $row): void
+    {
+        $categoryId = (int) ($row['category_id'] ?? 0);
+        if ($categoryId <= 0) {
+            return;
+        }
+        $stats = isset($row['stats']) && is_array($row['stats']) ? $row['stats'] : [];
+        $statsJson = json_encode($stats, JSON_UNESCAPED_UNICODE);
+        if (!is_string($statsJson)) {
+            return;
+        }
+
+        /** @var mixed $db */
+        $db = Db::getInstance();
+        $db->update(
+            UnipaymentConfig::TABLE_KOP_MAPPING,
+            [
+                'kimb' => (string) ($row['kimb'] ?? ''),
+                'kimb_time' => (int) ($row['kimb_time'] ?? 0),
+                'stats' => $statsJson,
+                'date_upd' => date('Y-m-d H:i:s'),
+            ],
+            '`id_category` = ' . $categoryId
+        );
+    }
+
+    /**
+     * Първо съвпадение между категориите на продукта и редовете в DB мапинга (редът на id-тата е от {@see Product::getProductCategories}).
      *
      * @param array<int, array<string, mixed>> $uni_categories_kop
      * @param list<int> $productCategoryIds

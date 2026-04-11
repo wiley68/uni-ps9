@@ -12,10 +12,11 @@ declare(strict_types=1);
 
 namespace PrestaShop\Module\Unipayment\Service;
 
+use Db;
 use PrestaShop\Module\Unipayment\Config\UnipaymentConfig;
 
 /**
- * getCoeff към UniCredit + файлов кеш в {@see self::getCoeffCacheDirectory()} (coeff_*.json) —
+ * getCoeff към UniCredit + DB кеш (group=coeff) —
  * споделен от продуктовия блок и checkout калкулатора.
  */
 final class UniCreditGetCoeffService
@@ -29,50 +30,30 @@ final class UniCreditGetCoeffService
      */
     public function __construct(
         private readonly string $moduleRootPath,
-    ) {
-    }
+    ) {}
 
     /**
-     * Път към директорията с кеш файловете на getCoeff (не в корена на keys/).
-     */
-    public function getCoeffCacheDirectory(): string
-    {
-        return $this->moduleRootPath . '/keys/coeff';
-    }
-
-    /**
-     * В keys/coeff/: изтрива coeff_*.json с mtime преди началото на текущия календарен ден (PS_TIMEZONE при наличност).
-     * Не пипа keys/coeff_*.json в корена на keys/.
-     *
-     * @return int брой успешно изтрити файлове
+     * Изтрива coeff cache редове с date_upd преди началото на текущия календарен ден (PS_TIMEZONE при наличност).
      */
     public function purgeCoeffCacheFilesOlderThanToday(): int
     {
-        $threshold = $this->getStartOfTodayTimestamp();
-        $deleted = 0;
-        $coeffDir = $this->getCoeffCacheDirectory();
-        if (!is_dir($coeffDir)) {
+        $thresholdSql = date('Y-m-d H:i:s', $this->getStartOfTodayTimestamp());
+        /** @var mixed $db */
+        $db = Db::getInstance();
+        $table = _DB_PREFIX_ . UnipaymentConfig::TABLE_API_CACHE;
+        $existing = $db->getValue(
+            'SELECT COUNT(*) FROM `' . $table . '`
+            WHERE `cache_group` = \'coeff\' AND `date_upd` < \'' . $this->escapeSqlLiteral($thresholdSql) . '\''
+        );
+        if ((int) $existing <= 0) {
             return 0;
         }
-        foreach (glob($coeffDir . '/coeff_*.json') ?: [] as $file) {
-            if ($this->unlinkCoeffFileIfOlderThan($file, $threshold)) {
-                ++$deleted;
-            }
-        }
+        $db->execute(
+            'DELETE FROM `' . $table . '`
+            WHERE `cache_group` = \'coeff\' AND `date_upd` < \'' . $this->escapeSqlLiteral($thresholdSql) . '\''
+        );
 
-        return $deleted;
-    }
-
-    private function unlinkCoeffFileIfOlderThan(string $file, int $threshold): bool
-    {
-        if (!is_file($file)) {
-            return false;
-        }
-        if ((int) filemtime($file) >= $threshold) {
-            return false;
-        }
-
-        return @unlink($file);
+        return (int) $existing;
     }
 
     private function getStartOfTodayTimestamp(): int
@@ -91,16 +72,8 @@ final class UniCreditGetCoeffService
         return $t !== false ? $t : time();
     }
 
-    private function ensureCoeffCacheDirectoryExists(): void
-    {
-        $dir = $this->getCoeffCacheDirectory();
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
-    }
-
     /**
-     * Кеш (ако е валиден), иначе банка; при успех записва кеша.
+     * Кеш (ако е валиден), иначе банка; при успех записва кеша в DB.
      *
      * @return array{kimb: float, glp: float}|null
      */
@@ -143,15 +116,21 @@ final class UniCreditGetCoeffService
      */
     private function readBankCoeffCache(string $user, string $kop, int $installments, bool $useCert): ?array
     {
-        $file = $this->bankCacheFilePath($user, $kop, $installments, $useCert);
-        if (!is_readable($file) || (time() - (int) filemtime($file)) >= self::BANK_COEFF_CACHE_TTL) {
+        $cacheKey = $this->bankCoeffCacheKey($user, $kop, $installments, $useCert);
+        /** @var mixed $db */
+        $db = Db::getInstance();
+        $row = $db->getRow(
+            'SELECT `payload`, `date_upd` FROM `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_API_CACHE . '`
+            WHERE `cache_key` = \'' . $this->escapeSqlLiteral($cacheKey) . '\''
+        );
+        if (!is_array($row)) {
             return null;
         }
-        $raw = file_get_contents($file);
-        if ($raw === false) {
+        $updatedTs = isset($row['date_upd']) ? strtotime((string) $row['date_upd']) : false;
+        if ($updatedTs === false || (time() - (int) $updatedTs) >= self::BANK_COEFF_CACHE_TTL) {
             return null;
         }
-        $data = json_decode($raw, true);
+        $data = isset($row['payload']) ? json_decode((string) $row['payload'], true) : null;
         if (!is_array($data) || !isset($data['kimb'])) {
             return null;
         }
@@ -167,30 +146,44 @@ final class UniCreditGetCoeffService
      */
     private function writeBankCoeffCache(string $user, string $kop, int $installments, bool $useCert, array $payload): void
     {
-        $keysRoot = $this->moduleRootPath . '/keys';
-        if (!is_dir($keysRoot)) {
-            mkdir($keysRoot, 0755, true);
+        $cacheKey = $this->bankCoeffCacheKey($user, $kop, $installments, $useCert);
+        $json = json_encode(['kimb' => $payload['kimb'], 'glp' => $payload['glp']], JSON_UNESCAPED_UNICODE);
+        if (!is_string($json)) {
+            return;
         }
-        $this->ensureCoeffCacheDirectoryExists();
-        $file = $this->bankCacheFilePath($user, $kop, $installments, $useCert);
-        file_put_contents(
-            $file,
-            (string) json_encode(['kimb' => $payload['kimb'], 'glp' => $payload['glp']], JSON_UNESCAPED_UNICODE)
-        );
+        $now = date('Y-m-d H:i:s');
+        /** @var mixed $db */
+        $db = Db::getInstance();
+        $exists = (int) $db->getValue(
+            'SELECT `id_unipayment_api_cache` FROM `' . _DB_PREFIX_ . UnipaymentConfig::TABLE_API_CACHE . '`
+            WHERE `cache_key` = \'' . $this->escapeSqlLiteral($cacheKey) . '\''
+        ) > 0;
+        $data = [
+            'cache_group' => 'coeff',
+            'cache_key' => $cacheKey,
+            'payload' => $json,
+            'date_upd' => $now,
+        ];
+        if ($exists) {
+            $db->update(UnipaymentConfig::TABLE_API_CACHE, $data, '`cache_key` = \'' . $this->escapeSqlLiteral($cacheKey) . '\'');
+
+            return;
+        }
+        $data['date_add'] = $now;
+        $db->insert(UnipaymentConfig::TABLE_API_CACHE, $data);
     }
 
-    /** Име на JSON файл в keys/coeff/ по user|kop|срок|сертификат. */
-    private function bankCoeffCacheFileName(string $user, string $kop, int $installments, bool $useCert): string
+    /** Име на DB cache key за coeff по user|kop|срок|сертификат. */
+    private function bankCoeffCacheKey(string $user, string $kop, int $installments, bool $useCert): string
     {
         $key = $user . '|' . $kop . '|' . $installments . '|' . ($useCert ? '1' : '0');
 
-        return 'coeff_' . md5($key) . '.json';
+        return 'coeff:' . md5($key);
     }
 
-    /** Пълен път към един кеш файл в {@see self::getCoeffCacheDirectory()}. */
-    private function bankCacheFilePath(string $user, string $kop, int $installments, bool $useCert): string
+    private function escapeSqlLiteral(string $value): string
     {
-        return $this->getCoeffCacheDirectory() . '/' . $this->bankCoeffCacheFileName($user, $kop, $installments, $useCert);
+        return addslashes($value);
     }
 
     /**

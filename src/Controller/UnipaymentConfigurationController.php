@@ -31,8 +31,7 @@ class UnipaymentConfigurationController extends PrestaShopAdminController
     public function __construct(
         private readonly Handler $unipaymentConfigurationFormHandler,
         private readonly KopMappingService $kopMappingService,
-    ) {
-    }
+    ) {}
 
     /**
      * Главна страница на конфигурацията (форма + таблица KOP).
@@ -66,7 +65,7 @@ class UnipaymentConfigurationController extends PrestaShopAdminController
     }
 
     /**
-     * AJAX запис на редове от админ таблицата (валидация + keys/kop.json).
+     * AJAX запис на редове от админ таблицата (валидация + DB мапинг).
      */
     public function saveKopMapping(Request $request): JsonResponse
     {
@@ -94,7 +93,7 @@ class UnipaymentConfigurationController extends PrestaShopAdminController
     }
 
     /**
-     * AJAX: нулира stats в kop.json, опреснява кеша на параметрите от getparameters, чисти стар getCoeff кеш.
+     * AJAX: нулира stats в DB, опреснява кеша на параметрите от getparameters, чисти стар getCoeff кеш (DB).
      */
     public function refreshKopMapping(): JsonResponse
     {
@@ -143,7 +142,7 @@ class UnipaymentConfigurationController extends PrestaShopAdminController
         ], 200);
     }
 
-    /** @return int брой изтрити coeff_*.json преди началото на днешния ден */
+    /** @return int брой изтрити coeff редове в API кеш таблицата преди началото на днешния ден */
     private function purgeUniCoeffCacheOlderThanToday(): int
     {
         $module = Module::getInstanceByName('unipayment');

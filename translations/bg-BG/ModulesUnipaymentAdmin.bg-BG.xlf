@@ -11,8 +11,8 @@
         <target>%field% is too long (maximum %max% characters).</target>
       </trans-unit>
       <trans-unit id="e7d3e05bcd0517f316b939e37156183a">
-        <source>%n% coefficient cache file(s) older than today were removed from keys/coeff/.</source>
-        <target>%n% coefficient cache file(s) older than today were removed from keys/coeff/.</target>
+        <source>%n% coefficient cache row(s) older than today were removed from the database.</source>
+        <target>%n% записа в кеша на коефициенти (по-стари от днес) бяха изтрити от базата данни.</target>
       </trans-unit>
       <trans-unit id="188a8f36d5cb42a2791d9c50698f5493">
         <source>A problem occurred while refreshing the cache.</source>
