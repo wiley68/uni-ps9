@@ -1028,11 +1028,20 @@ class UniPayment extends PaymentModule
     }
 
     /**
+     * Публичен вход за webhook/скриптове: мигрира legacy lowercase ключове към UNIPAYMENT_* (идемпотентно).
+     */
+    public function migrateLegacyUnipaymentKeysIfNeeded(): void
+    {
+        $this->migrateLegacyConfigurationKeysIfNeeded();
+    }
+
+    /**
      * Принудително презареждане на кеша с параметри от банковия API (getparameters.php).
      * Използва се от админ refresh бутона заедно с обновяване на КОП мапинга.
      */
     public function refreshCachedUniParamsFromApi(): bool
     {
+        $this->migrateLegacyConfigurationKeysIfNeeded();
         $cid = (string) (Configuration::get(UnipaymentConf::UNIPAYMENT_UNICID) ?: '');
         if ($cid === '') {
             return false;
