@@ -2,7 +2,7 @@
 <module>
     <name>unipayment</name>
     <displayName><![CDATA[UniCredit Credit purchases]]></displayName>
-    <version><![CDATA[1.4.0]]></version>
+    <version><![CDATA[1.4.1]]></version>
     <description><![CDATA[Enables your customers to purchase goods on installments with UniCredit.]]></description>
     <author><![CDATA[Ilko Ivanov]]></author>
     <tab><![CDATA[payments_gateways]]></tab>
