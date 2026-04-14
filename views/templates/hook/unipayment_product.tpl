@@ -58,8 +58,8 @@
     </div>
     <input type="hidden" name="product_id" id="product_id" value="{$uni_product_id}" />
     <div id="uni-product-popup-container" class="modalpayment_uni unipayment-product-scope">
-        <div class="{$modalpayment_content_uni}">
-            <div id="uni_body" class="{$uni_body}">
+        <div class="modalpayment_content_uni">
+            <div id="uni_body" class="uni_body">
                 <div>
                     <div class="uni_body">
                         <a target="_blank" rel="noopener noreferrer" href="{$uni_reklama_url}"><img class="uni_image"
@@ -67,25 +67,25 @@
                                 src="{$uni_picture}"
                                 alt="{l s='UniCredit loan calculator %s' sprintf=[$uni_mod_version] d='Modules.Unipayment.Shop'}"></a>
                         <div class="uni_body_txt">
-                            <div class="{$uni_gpr_container}">
+                            <div class="uni_gpr_container">
                                 {if $uni_eur == 0}
-                                    <div class="{$uni_title_head}">
+                                    <div class="uni_title_head">
                                         {l s='Only a few clicks to the desired purchase from 150 BGN to 50 000 BGN:' d='Modules.Unipayment.Shop'}
                                     </div>
                                 {elseif $uni_eur == 1}
-                                    <div class="{$uni_title_head}">
+                                    <div class="uni_title_head">
                                         {l s='Only a few clicks to the desired purchase from 150 BGN (75 EUR) to 50 000 BGN (25 000 EUR):' d='Modules.Unipayment.Shop'}
                                     </div>
                                 {elseif $uni_eur == 2}
-                                    <div class="{$uni_title_head}">
+                                    <div class="uni_title_head">
                                         {l s='Only a few clicks to the desired purchase from 75 EUR (150 BGN) to 25 000 EUR (50 000 BGN):' d='Modules.Unipayment.Shop'}
                                     </div>
                                 {elseif $uni_eur == 3}
-                                    <div class="{$uni_title_head}">
+                                    <div class="uni_title_head">
                                         {l s='Only a few clicks to the desired purchase from 75 EUR to 25 000 EUR:' d='Modules.Unipayment.Shop'}
                                     </div>
                                 {/if}
-                                <div class="{$uni_title}">
+                                <div class="uni_title">
                                     <p>{l s='1. Add the product you want to the cart.' d='Modules.Unipayment.Shop'}</p>
                                     <p>{l s='2. In the "Payment method" menu choose "On credit with UniCredit Consumer Financing".' d='Modules.Unipayment.Shop'}
                                     </p>
@@ -94,14 +94,14 @@
                                     <p>{l s='4. Complete the application fully digitally or wait for a phone call.' d='Modules.Unipayment.Shop'}
                                     </p>
                                 </div>
-                                <div class="{$uni_calc_back}">
+                                <div class="uni_calc_back">
                                     <div class="uni_calc_logo"></div>
-                                    <div class="{$uni_calc}">
-                                        <div class="{$uni_gpr_container_row}">
-                                            <div class="{$uni_gpr_column}">
+                                    <div class="uni_calc">
+                                        <div class="uni_gpr_container_row">
+                                            <div class="uni_gpr_column">
                                                 {l s='Item price' d='Modules.Unipayment.Shop'}
                                             </div>
-                                            <div class="{$uni_gpr_column_right}">
+                                            <div class="uni_gpr_column_right">
                                                 <input type="hidden" id="uni_price" value="{$uni_price}" />
                                                 {assign var="uniPriceStr" value=$uni_price|number_format:2:".":""}
                                                 {assign var=uniPriceArr value="."|explode:$uniPriceStr}
@@ -127,12 +127,12 @@
                                                 {/if}
                                             </div>
                                         </div>
-                                        <div class="{$uni_gpr_container_row}">
-                                            <div class="{$uni_gpr_column}">
+                                        <div class="uni_gpr_container_row">
+                                            <div class="uni_gpr_column">
                                                 <span class="uni_red">{$uni_meseci_txt}</span>
                                             </div>
-                                            <div class="{$uni_gpr_column_right}">
-                                                <select id="uni_pogasitelni_vnoski_input" class="{$uni_txt_right}">
+                                            <div class="uni_gpr_column_right">
+                                                <select id="uni_pogasitelni_vnoski_input" class="uni_txt_right">
                                                     {foreach from=$uni_product_installment_options item=pio}
                                                         {if $pio.show_in_select}
                                                             <option value="{$pio.months|intval}"
@@ -144,11 +144,11 @@
                                                 </select>
                                             </div>
                                         </div>
-                                        <div class="{$uni_gpr_container_row}">
-                                            <div class="{$uni_gpr_column}">
+                                        <div class="uni_gpr_container_row">
+                                            <div class="uni_gpr_column">
                                                 {$uni_vnoska_txt}
                                             </div>
-                                            <div class="{$uni_gpr_column_right}">
+                                            <div class="uni_gpr_column_right">
                                                 {if $uni_eur == 0 or $uni_eur == 3}
                                                     <span class="uni_red">
                                                         <span id="uni_vnoska_int"></span>
@@ -169,24 +169,24 @@
                                                 {/if}
                                             </div>
                                         </div>
-                                        <div class="{$uni_gpr_container_row}">
-                                            <div class="{$uni_gpr_column}">
+                                        <div class="uni_gpr_container_row">
+                                            <div class="uni_gpr_column">
                                                 {l s='GLP' d='Modules.Unipayment.Shop'}
                                             </div>
-                                            <div class="{$uni_gpr_column_right}">
+                                            <div class="uni_gpr_column_right">
                                                 <span class="uni_red"><span id="uni_glp_int"></span>%</span>
                                             </div>
                                         </div>
-                                        <div class="{$uni_gpr_container_row}">
-                                            <div class="{$uni_gpr_column}">
+                                        <div class="uni_gpr_container_row">
+                                            <div class="uni_gpr_column">
                                                 {l s='APR' d='Modules.Unipayment.Shop'}
                                             </div>
-                                            <div class="{$uni_gpr_column_right}">
+                                            <div class="uni_gpr_column_right">
                                                 <span class="uni_red"><span id="uni_gpr_int"></span>%</span>
                                             </div>
                                         </div>
-                                        <div class="{$uni_gpr_container_row}">
-                                            <div class="{$uni_panel_help_text}">
+                                        <div class="uni_gpr_container_row">
+                                            <div class="uni_panel_help_text">
                                                 {l s='* The repayment term is chosen when you complete the order.' d='Modules.Unipayment.Shop'}
                                             </div>
                                         </div>
@@ -195,21 +195,21 @@
                             </div>
                             <div style="padding-bottom:20px;"></div>
                             <div class="uni_buttons">
-                                <div class="{$uni_btn_seccondary}" id="uni_back_unicredit">
-                                    <div class="{$uni_btn_seccondary_inner}">
+                                <div class="uni_btn_seccondary" id="uni_back_unicredit">
+                                    <div class="uni_btn_seccondary_inner">
                                         <div class="uni_btn_seccondary_inner_text">
                                             {l s='Cancel' d='Modules.Unipayment.Shop'}</div>
                                     </div>
                                 </div>
-                                <div class="{$uni_btn_seccondary}" id="uni_buy_unicredit">
-                                    <div class="{$uni_btn_seccondary_inner}">
+                                <div class="uni_btn_seccondary" id="uni_buy_unicredit">
+                                    <div class="uni_btn_seccondary_inner">
                                         <div class="uni_btn_seccondary_inner_text">
                                             {l s='Add to cart' d='Modules.Unipayment.Shop'}</div>
                                     </div>
                                 </div>
-                                <div class="{$uni_btn_primary}" id="uni_buy_on_installment">
-                                    <div class="{$notify_badge}"></div>
-                                    <div class="{$uni_btn_primary_inner}">
+                                <div class="uni_btn_primary" id="uni_buy_on_installment">
+                                    <div class="notify-badge"></div>
+                                    <div class="uni_btn_primary_inner">
                                         <div class="uni_btn_primary_inner_text">
                                             {l s='Buy on installment' d='Modules.Unipayment.Shop'}</div>
                                     </div>

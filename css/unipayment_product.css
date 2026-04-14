@@ -723,3 +723,85 @@ select.unim_txt_right:focus {
         transform: rotate(360deg);
     }
 }
+
+@media (max-width: 767px) {
+    .unipayment-product-scope .modalpayment_content_uni {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .unipayment-product-scope .uni_body {
+        width: 100% !important;
+    }
+
+    .unipayment-product-scope .uni_title_head {
+        font-size: 16px !important;
+    }
+
+    .unipayment-product-scope .uni_title {
+        font-size: 14px !important;
+    }
+
+    .unipayment-product-scope .uni_calc {
+        padding: 8px 10px 5px 10px !important;
+        font-size: 14px !important;
+    }
+
+    .unipayment-product-scope .uni_calc_back {
+        background-image: none !important;
+    }
+
+    .unipayment-product-scope .uni_gpr_container {
+        width: 100% !important;
+        border-radius: 14.5px !important;
+        padding: 10px 15px !important;
+    }
+
+    .unipayment-product-scope .uni_gpr_container_row {
+        column-gap: 0 !important;
+    }
+
+    .unipayment-product-scope .uni_gpr_column {
+        font-size: 16px !important;
+    }
+
+    .unipayment-product-scope .uni_gpr_column_right {
+        font-size: 16px !important;
+    }
+
+    .unipayment-product-scope select.uni_txt_right {
+        font-size: 16px !important;
+    }
+
+    .unipayment-product-scope .uni_panel_help_text {
+        font-size: 12px !important;
+        padding: 15px 0 20px 0 !important;
+    }
+
+    .unipayment-product-scope .uni_btn_primary,
+    .unipayment-product-scope .uni_btn_seccondary {
+        font-size: 14px !important;
+        border-radius: 3px !important;
+    }
+
+    .unipayment-product-scope .notify-badge {
+        left: -5px !important;
+        top: -5px !important;
+        border-radius: 12px !important;
+        width: 24px !important;
+        height: 24px !important;
+        background-size: cover !important;
+    }
+
+    .unipayment-product-scope .uni_btn_primary_inner {
+        padding: 5px 25px !important;
+        border-width: 2px !important;
+        border-radius: 3px !important;
+    }
+
+    .unipayment-product-scope .uni_btn_seccondary_inner {
+        padding: 5px 10px !important;
+        border-width: 2px !important;
+        border-radius: 3px !important;
+    }
+}

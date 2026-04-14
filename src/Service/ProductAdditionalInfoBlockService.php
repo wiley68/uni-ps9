@@ -29,7 +29,8 @@ final class ProductAdditionalInfoBlockService
      */
     public function __construct(
         private readonly string $moduleRootPath,
-    ) {}
+    ) {
+    }
 
     /**
      * @param list<int> $productCategoryIds всички id_category на продукта; използва се първото съвпадение с DB мапинга
@@ -235,7 +236,7 @@ final class ProductAdditionalInfoBlockService
 
         $uni_mini_logo = $host . '/modules/unipayment/css/uni_mini_logo.png';
 
-        $classes = $this->resolveUiClasses($deviceis, $req);
+        $uiTextLabels = $this->resolveUiTextLabels($deviceis, $req);
 
         $uni_product_installment_options = [];
         foreach (UnipaymentConfig::PRODUCT_INSTALLMENT_MONTHS as $m) {
@@ -257,74 +258,73 @@ final class ProductAdditionalInfoBlockService
             ];
         }
 
-        $assign = array_merge(
-            [
-                'UNIPAYMENT_UNICID' => '',
-                'uni_status' => $req->uniStatus,
-                'uni_cart' => $req->uniCart,
-                'uni_minstojnost' => $uni_minstojnost,
-                'uni_price' => $uni_price,
-                'uni_maxstojnost' => $uni_maxstojnost,
-                'uni_zaglavie' => $uni_zaglavie,
-                'uni_vnoska' => $uni_vnoska,
-                'uni_mesecna' => $uni_mesecna,
-                'uni_product_id' => $req->productId,
-                'uni_reklama_url' => $uni_reklama_url,
-                'uni_mod_version' => $req->moduleVersion,
-                'uni_picture' => $uni_picture,
-                'uni_mesecna_3' => $uni_mesecna_3,
-                'uni_param_glp_3' => $uni_param_glp_3,
-                'uni_param_kimb_3' => $uni_param_kimb_3,
-                'uni_mesecna_4' => $uni_mesecna_4,
-                'uni_param_glp_4' => $uni_param_glp_4,
-                'uni_param_kimb_4' => $uni_param_kimb_4,
-                'uni_mesecna_5' => $uni_mesecna_5,
-                'uni_param_glp_5' => $uni_param_glp_5,
-                'uni_param_kimb_5' => $uni_param_kimb_5,
-                'uni_mesecna_6' => $uni_mesecna_6,
-                'uni_param_glp_6' => $uni_param_glp_6,
-                'uni_param_kimb_6' => $uni_param_kimb_6,
-                'uni_mesecna_9' => $uni_mesecna_9,
-                'uni_param_glp_9' => $uni_param_glp_9,
-                'uni_param_kimb_9' => $uni_param_kimb_9,
-                'uni_mesecna_10' => $uni_mesecna_10,
-                'uni_param_glp_10' => $uni_param_glp_10,
-                'uni_param_kimb_10' => $uni_param_kimb_10,
-                'uni_mesecna_12' => $uni_mesecna_12,
-                'uni_param_glp_12' => $uni_param_glp_12,
-                'uni_param_kimb_12' => $uni_param_kimb_12,
-                'uni_mesecna_15' => $uni_mesecna_15,
-                'uni_param_glp_15' => $uni_param_glp_15,
-                'uni_param_kimb_15' => $uni_param_kimb_15,
-                'uni_mesecna_18' => $uni_mesecna_18,
-                'uni_param_glp_18' => $uni_param_glp_18,
-                'uni_param_kimb_18' => $uni_param_kimb_18,
-                'uni_mesecna_24' => $uni_mesecna_24,
-                'uni_param_glp_24' => $uni_param_glp_24,
-                'uni_param_kimb_24' => $uni_param_kimb_24,
-                'uni_mesecna_30' => $uni_mesecna_30,
-                'uni_param_glp_30' => $uni_param_glp_30,
-                'uni_param_kimb_30' => $uni_param_kimb_30,
-                'uni_mesecna_36' => $uni_mesecna_36,
-                'uni_param_glp_36' => $uni_param_glp_36,
-                'uni_param_kimb_36' => $uni_param_kimb_36,
-                'token' => $req->csrfToken,
-                'uni_proces1' => $uni_proces1,
-                'uni_shema_current' => $uni_shema_current,
-                'uni_product_installment_options' => $uni_product_installment_options,
-                'uni_kimb_hidden_fields' => $uni_kimb_hidden_fields,
-                'uni_mini_logo' => $uni_mini_logo,
-                'uni_get_product_link' => $req->getProductModuleLink,
-                'UNIPAYMENT_GAP' => $req->unipaymentGap,
-                'uni_eur' => $uni_eur,
-                'uni_currency_code' => $uni_currency_code,
-                'uni_sign' => $uni_sign,
-                'uni_mesecna_second' => $uni_mesecna_second,
-                'uni_sign_second' => $uni_sign_second,
-                'uni_price_second' => $uni_price_second,
-            ],
-            $classes
-        );
+        $assign = [
+            'UNIPAYMENT_UNICID' => '',
+            'uni_status' => $req->uniStatus,
+            'uni_cart' => $req->uniCart,
+            'uni_minstojnost' => $uni_minstojnost,
+            'uni_price' => $uni_price,
+            'uni_maxstojnost' => $uni_maxstojnost,
+            'uni_zaglavie' => $uni_zaglavie,
+            'uni_vnoska' => $uni_vnoska,
+            'uni_mesecna' => $uni_mesecna,
+            'uni_product_id' => $req->productId,
+            'uni_reklama_url' => $uni_reklama_url,
+            'uni_mod_version' => $req->moduleVersion,
+            'uni_picture' => $uni_picture,
+            'uni_mesecna_3' => $uni_mesecna_3,
+            'uni_param_glp_3' => $uni_param_glp_3,
+            'uni_param_kimb_3' => $uni_param_kimb_3,
+            'uni_mesecna_4' => $uni_mesecna_4,
+            'uni_param_glp_4' => $uni_param_glp_4,
+            'uni_param_kimb_4' => $uni_param_kimb_4,
+            'uni_mesecna_5' => $uni_mesecna_5,
+            'uni_param_glp_5' => $uni_param_glp_5,
+            'uni_param_kimb_5' => $uni_param_kimb_5,
+            'uni_mesecna_6' => $uni_mesecna_6,
+            'uni_param_glp_6' => $uni_param_glp_6,
+            'uni_param_kimb_6' => $uni_param_kimb_6,
+            'uni_mesecna_9' => $uni_mesecna_9,
+            'uni_param_glp_9' => $uni_param_glp_9,
+            'uni_param_kimb_9' => $uni_param_kimb_9,
+            'uni_mesecna_10' => $uni_mesecna_10,
+            'uni_param_glp_10' => $uni_param_glp_10,
+            'uni_param_kimb_10' => $uni_param_kimb_10,
+            'uni_mesecna_12' => $uni_mesecna_12,
+            'uni_param_glp_12' => $uni_param_glp_12,
+            'uni_param_kimb_12' => $uni_param_kimb_12,
+            'uni_mesecna_15' => $uni_mesecna_15,
+            'uni_param_glp_15' => $uni_param_glp_15,
+            'uni_param_kimb_15' => $uni_param_kimb_15,
+            'uni_mesecna_18' => $uni_mesecna_18,
+            'uni_param_glp_18' => $uni_param_glp_18,
+            'uni_param_kimb_18' => $uni_param_kimb_18,
+            'uni_mesecna_24' => $uni_mesecna_24,
+            'uni_param_glp_24' => $uni_param_glp_24,
+            'uni_param_kimb_24' => $uni_param_kimb_24,
+            'uni_mesecna_30' => $uni_mesecna_30,
+            'uni_param_glp_30' => $uni_param_glp_30,
+            'uni_param_kimb_30' => $uni_param_kimb_30,
+            'uni_mesecna_36' => $uni_mesecna_36,
+            'uni_param_glp_36' => $uni_param_glp_36,
+            'uni_param_kimb_36' => $uni_param_kimb_36,
+            'token' => $req->csrfToken,
+            'uni_proces1' => $uni_proces1,
+            'uni_shema_current' => $uni_shema_current,
+            'uni_product_installment_options' => $uni_product_installment_options,
+            'uni_kimb_hidden_fields' => $uni_kimb_hidden_fields,
+            'uni_mini_logo' => $uni_mini_logo,
+            'uni_get_product_link' => $req->getProductModuleLink,
+            'UNIPAYMENT_GAP' => $req->unipaymentGap,
+            'uni_eur' => $uni_eur,
+            'uni_currency_code' => $uni_currency_code,
+            'uni_sign' => $uni_sign,
+            'uni_mesecna_second' => $uni_mesecna_second,
+            'uni_sign_second' => $uni_sign_second,
+            'uni_price_second' => $uni_price_second,
+            'uni_meseci_txt' => $uiTextLabels['uni_meseci_txt'],
+            'uni_vnoska_txt' => $uiTextLabels['uni_vnoska_txt'],
+        ];
 
         $should_display = $req->uniStatus > 0
             && $uni_price <= (float) $paramsuni['uni_maxstojnost']
@@ -525,50 +525,16 @@ final class ProductAdditionalInfoBlockService
     /**
      * @return array<string, string>
      */
-    private function resolveUiClasses(string $deviceis, ProductAdditionalInfoRequest $req): array
+    private function resolveUiTextLabels(string $deviceis, ProductAdditionalInfoRequest $req): array
     {
         if ($deviceis === 'mobile') {
             return [
-                'modalpayment_content_uni' => 'modalpaymentm_content_uni',
-                'uni_body' => 'unim_body',
-                'uni_title_head' => 'unim_title_head',
-                'uni_title' => 'unim_title',
-                'uni_calc' => 'unim_calc',
-                'uni_calc_back' => 'unim_calc_back',
-                'uni_gpr_container' => 'unim_gpr_container',
-                'uni_gpr_container_row' => 'unim_gpr_container_row',
-                'uni_gpr_column' => 'unim_gpr_column',
-                'uni_gpr_column_right' => 'unim_gpr_column_right',
-                'uni_txt_right' => 'unim_txt_right',
-                'uni_panel_help_text' => 'unim_panel_help_text',
-                'uni_btn_primary' => 'unim_btn_primary',
-                'uni_btn_primary_inner' => 'unim_btn_primary_inner',
-                'notify_badge' => 'notifym-badge',
-                'uni_btn_seccondary' => 'unim_btn_seccondary',
-                'uni_btn_seccondary_inner' => 'unim_btn_seccondary_inner',
                 'uni_meseci_txt' => $req->shopLabelMonthsMobile,
                 'uni_vnoska_txt' => $req->shopLabelInstallmentMobile,
             ];
         }
 
         return [
-            'modalpayment_content_uni' => 'modalpayment_content_uni',
-            'uni_body' => 'uni_body',
-            'uni_title_head' => 'uni_title_head',
-            'uni_title' => 'uni_title',
-            'uni_calc' => 'uni_calc',
-            'uni_calc_back' => 'uni_calc_back',
-            'uni_gpr_container' => 'uni_gpr_container',
-            'uni_gpr_container_row' => 'uni_gpr_container_row',
-            'uni_gpr_column' => 'uni_gpr_column',
-            'uni_gpr_column_right' => 'uni_gpr_column_right',
-            'uni_txt_right' => 'uni_txt_right',
-            'uni_panel_help_text' => 'uni_panel_help_text',
-            'uni_btn_primary' => 'uni_btn_primary',
-            'uni_btn_primary_inner' => 'uni_btn_primary_inner',
-            'notify_badge' => 'notify-badge',
-            'uni_btn_seccondary' => 'uni_btn_seccondary',
-            'uni_btn_seccondary_inner' => 'uni_btn_seccondary_inner',
             'uni_meseci_txt' => $req->shopLabelMonthsDesktop,
             'uni_vnoska_txt' => $req->shopLabelInstallmentDesktop,
         ];
