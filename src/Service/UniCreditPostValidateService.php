@@ -447,6 +447,7 @@ final class UniCreditPostValidateService
 
         $subject = 'Заявка за лизинг с UniCredit.';
         $idLang = (int) Configuration::get('PS_LANG_DEFAULT');
+        $resultText = trim((string) preg_replace('/\n{3,}/', "\n\n", html_entity_decode((string) strip_tags(str_replace(['<br />', '<br/>', '<br>'], "\n", $resultHtml)), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
 
         Mail::send(
             $idLang,
@@ -455,6 +456,7 @@ final class UniCreditPostValidateService
             [
                 '{email}' => $toEmailAdmin,
                 '{message}' => $resultHtml,
+                '{message_text}' => $resultText,
             ],
             $toml,
             null,
