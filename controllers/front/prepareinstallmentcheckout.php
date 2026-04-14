@@ -34,9 +34,7 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
         $this->ajax = true;
 
         if (Tools::getToken(false) !== (string) Tools::getValue('token')) {
-            $this->result['message'] = $this->module instanceof UniPayment
-                ? $this->module->trans('Invalid security token.', [], 'Modules.Unipayment.Shop')
-                : 'Invalid security token.';
+            $this->result['message'] = $this->translateShop('Invalid security token.');
             parent::initContent();
 
             return;
@@ -48,9 +46,7 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
         $installmentsRequested = (int) Tools::getValue('installments', 0);
 
         if ($idProduct <= 0 || $qty < 1) {
-            $this->result['message'] = $this->module instanceof UniPayment
-                ? $this->module->trans('Invalid product or quantity.', [], 'Modules.Unipayment.Shop')
-                : 'Invalid product or quantity.';
+            $this->result['message'] = $this->translateShop('Invalid product or quantity.');
             parent::initContent();
 
             return;
@@ -58,9 +54,7 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
 
         $product = new Product($idProduct, true, $this->context->language->id, $this->context->shop->id);
         if (!Validate::isLoadedObject($product)) {
-            $this->result['message'] = $this->module instanceof UniPayment
-                ? $this->module->trans('Product not available.', [], 'Modules.Unipayment.Shop')
-                : 'Product not available.';
+            $this->result['message'] = $this->translateShop('Product not available.');
             parent::initContent();
 
             return;
@@ -70,9 +64,7 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
             . ' AND `id_shop` = ' . (int) $this->context->shop->id
         );
         if (!$activeInShop) {
-            $this->result['message'] = $this->module instanceof UniPayment
-                ? $this->module->trans('Product not available.', [], 'Modules.Unipayment.Shop')
-                : 'Product not available.';
+            $this->result['message'] = $this->translateShop('Product not available.');
             parent::initContent();
 
             return;
@@ -81,9 +73,10 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
         /** @var Cart $cart */
         $cart = $this->context->cart;
         if (!Validate::isLoadedObject($cart) || (int) $cart->id <= 0) {
-            $this->result['message'] = $this->module instanceof UniPayment
-                ? $this->module->trans('Cart error.', [], 'Modules.Unipayment.Shop')
-                : 'Cart error.';
+            $cart = $this->initializeContextCart();
+        }
+        if (!Validate::isLoadedObject($cart) || (int) $cart->id <= 0) {
+            $this->result['message'] = $this->translateShop('Cart error.');
             parent::initContent();
 
             return;
@@ -99,11 +92,9 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
         );
 
         if ($update !== true) {
-            $this->result['message'] = $this->module instanceof UniPayment
-                ? ($update === -1
-                    ? $this->module->trans('Minimum quantity not reached.', [], 'Modules.Unipayment.Shop')
-                    : $this->module->trans('Could not add to cart.', [], 'Modules.Unipayment.Shop'))
-                : ($update === -1 ? 'Minimum quantity not reached.' : 'Could not add to cart.');
+            $this->result['message'] = $update === -1
+                ? $this->translateShop('Minimum quantity not reached.')
+                : $this->translateShop('Could not add to cart.');
             parent::initContent();
 
             return;
@@ -176,5 +167,57 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
             'httponly' => false,
             'samesite' => 'Lax',
         ]);
+    }
+
+    private function initializeContextCart(): Cart
+    {
+        /** @var mixed $cartModel */
+        $cartModel = new Cart();
+        $cartModel->id_shop = (int) $this->context->shop->id;
+        $cartModel->id_shop_group = (int) $this->getCurrentShopGroupId();
+        $cartModel->id_lang = (int) $this->context->language->id;
+        $cartModel->id_currency = (int) $this->context->currency->id;
+        $cartModel->id_guest = (int) $this->context->cookie->id_guest;
+
+        if (Validate::isLoadedObject($this->context->customer)) {
+            $cartModel->id_customer = (int) $this->context->customer->id;
+            $cartModel->secure_key = (string) $this->context->customer->secure_key;
+        }
+
+        $cartModel->add();
+
+        $cartId = isset($cartModel->id) ? (int) $cartModel->id : 0;
+        $cart = $cartId > 0 ? new Cart($cartId) : new Cart();
+        if (Validate::isLoadedObject($cart) && (int) $cart->id > 0) {
+            $this->context->cart = $cart;
+            $this->context->cookie->id_cart = (int) $cart->id;
+            $this->context->cookie->write();
+        }
+
+        return $cart;
+    }
+
+    private function translateShop(string $message): string
+    {
+        if ($this->module instanceof UniPayment) {
+            return (string) $this->module->l($message, 'prepareinstallmentcheckout');
+        }
+
+        return $message;
+    }
+
+    private function getCurrentShopGroupId(): int
+    {
+        $shopId = (int) $this->context->shop->id;
+        if ($shopId <= 0) {
+            return 0;
+        }
+        $sql = 'SELECT s.id_shop_group FROM `' . _DB_PREFIX_ . 'shop` s WHERE s.id_shop = ' . $shopId;
+        $value = Db::getInstance()->getValue($sql);
+        if ($value === false || $value === null || $value === '') {
+            return 0;
+        }
+
+        return (int) $value;
     }
 }
