@@ -733,6 +733,16 @@ select.unim_txt_right:focus {
 }
 
 @media (max-width: 767px) {
+    .unipayment-cart-scope .uni_buttons {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+    }
+
+    .unipayment-cart-scope .uni_buttons > div {
+        width: 100% !important;
+    }
+
     .unipayment-cart-scope .modalpayment_content_uni {
         width: 100% !important;
         max-width: 100% !important;
