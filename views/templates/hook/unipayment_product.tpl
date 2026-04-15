@@ -26,8 +26,7 @@
     </script>
 {/if}
 <div class="unipayment-product-scope">
-    <div id="uni-product-button-container"
-        {if $UNIPAYMENT_GAP|default:0 != 0}style="margin-top:{$UNIPAYMENT_GAP|floatval}px;" {/if}>
+    <div id="uni-product-button-container">
         {if $uni_zaglavie ne ''}
             <div class="uni_zaglavie">
                 {$uni_zaglavie}
