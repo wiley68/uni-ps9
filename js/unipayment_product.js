@@ -1,5 +1,6 @@
 let uni_old_vnoski;
 let unipaymentPrepareCheckoutBusy = false;
+const UNIPAYMENT_ADD_TO_CART_LOCK_KEY = "__unipaymentAddToCartBusy";
 
 /** @type {ReturnType<typeof setTimeout>|null} */
 let unipaymentProductPriceRefreshTimer = null;
@@ -46,7 +47,77 @@ function unipaymentReadRawUnitPriceStringFromPage() {
             priceContent = elItemprop.getAttribute("content");
         }
     }
-    return typeof priceContent === "string" ? priceContent : "";
+    if (typeof priceContent === "string" && priceContent !== "") {
+        return priceContent;
+    }
+
+    // Fallback for themes (e.g. Hummingbird) where content attr is missing.
+    const textSelectors = [
+        ".current-price .price",
+        ".product-prices .current-price .price",
+        ".product-price",
+        ".price[itemprop='price']",
+    ];
+    for (let i = 0; i < textSelectors.length; i += 1) {
+        const el = document.querySelector(textSelectors[i]);
+        if (!el) {
+            continue;
+        }
+        const txt = (el.textContent || "").trim();
+        if (txt !== "") {
+            return txt;
+        }
+    }
+
+    // Fallback to product JSON payload used by PrestaShop themes.
+    const details = document.querySelector(
+        "#product-details[data-product], .js-product-details[data-product]",
+    );
+    if (details && details.dataset && details.dataset.product) {
+        try {
+            const data = JSON.parse(details.dataset.product);
+            if (data) {
+                const candidates = [
+                    data.price_amount,
+                    data.price,
+                    data.price_tax_exc,
+                    data.price_tax_inc,
+                    data.unit_price,
+                ];
+                for (let i = 0; i < candidates.length; i += 1) {
+                    const val = candidates[i];
+                    if (
+                        val !== null &&
+                        val !== undefined &&
+                        String(val) !== ""
+                    ) {
+                        return String(val);
+                    }
+                }
+            }
+        } catch (e) {
+            // ignore malformed JSON
+        }
+    }
+
+    // Fallback to OpenGraph/meta amount.
+    const metaPrice = document.querySelector(
+        'meta[property="product:price:amount"], meta[itemprop="price"]',
+    );
+    if (metaPrice) {
+        const metaContent = metaPrice.getAttribute("content");
+        if (typeof metaContent === "string" && metaContent.trim() !== "") {
+            return metaContent.trim();
+        }
+    }
+
+    // Last fallback: existing hidden value in popup.
+    const uniPriceEl = document.getElementById("uni_price");
+    if (uniPriceEl && String(uniPriceEl.value).trim() !== "") {
+        return String(uniPriceEl.value).trim();
+    }
+
+    return "";
 }
 
 function unipaymentGetProductPageQuantity() {
@@ -165,7 +236,7 @@ function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
             }
             const _str =
                 typeof window.uniPaymentShopStrings === "object" &&
-                    window.uniPaymentShopStrings !== null
+                window.uniPaymentShopStrings !== null
                     ? window.uniPaymentShopStrings
                     : {};
             const msg =
@@ -177,18 +248,117 @@ function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
         .fail(function () {
             const _str =
                 typeof window.uniPaymentShopStrings === "object" &&
-                    window.uniPaymentShopStrings !== null
+                window.uniPaymentShopStrings !== null
                     ? window.uniPaymentShopStrings
                     : {};
             window.alert(
                 _str.storeError ||
-                "An error occurred while contacting the store.",
+                    "An error occurred while contacting the store.",
             );
         })
         .always(function () {
             unipaymentPrepareCheckoutBusy = false;
             $busyTarget.data("uniBusy", false);
         });
+}
+
+function unipaymentAddToCartFromPopup($busyTarget) {
+    const urlEl = document.getElementById(
+        "uni_prepare_installmentcheckout_url",
+    );
+    const tokenEl = document.getElementById("uni_csrf_token");
+    const productEl = document.getElementById("product_id");
+    if (!urlEl || !tokenEl || !productEl) {
+        return;
+    }
+    const idProduct = parseInt(productEl.value, 10);
+    if (!idProduct) {
+        return;
+    }
+    if (unipaymentIsAddToCartLocked()) {
+        return;
+    }
+    if ($busyTarget && $busyTarget.data && $busyTarget.data("uniBusy")) {
+        return;
+    }
+    unipaymentLockAddToCart();
+    if ($busyTarget && $busyTarget.data) {
+        $busyTarget.data("uniBusy", true);
+    }
+    $.ajax({
+        url: urlEl.value,
+        type: "POST",
+        dataType: "json",
+        data: {
+            token: tokenEl.value,
+            id_product: idProduct,
+            id_product_attribute: unipaymentGetSelectedProductAttributeId(),
+            qty: unipaymentGetProductPageQuantity(),
+            add_to_cart_only: 1,
+        },
+    })
+        .done(function (data) {
+            if (data && data.success) {
+                if (data.cart_url) {
+                    window.location.href = data.cart_url;
+                    return;
+                }
+                if (
+                    typeof prestashop !== "undefined" &&
+                    typeof prestashop.emit === "function"
+                ) {
+                    prestashop.emit("updateCart", {
+                        reason: {
+                            idProduct: idProduct,
+                            idProductAttribute:
+                                unipaymentGetSelectedProductAttributeId(),
+                            linkAction: "add-to-cart",
+                        },
+                        resp: data,
+                    });
+                }
+                return;
+            }
+            const _str =
+                typeof window.uniPaymentShopStrings === "object" &&
+                window.uniPaymentShopStrings !== null
+                    ? window.uniPaymentShopStrings
+                    : {};
+            window.alert(
+                (data && data.message) ||
+                    _str.cartAddFailed ||
+                    "Could not add to cart. Please try again.",
+            );
+        })
+        .fail(function () {
+            const _str =
+                typeof window.uniPaymentShopStrings === "object" &&
+                window.uniPaymentShopStrings !== null
+                    ? window.uniPaymentShopStrings
+                    : {};
+            window.alert(
+                _str.storeError ||
+                    "An error occurred while contacting the store.",
+            );
+        })
+        .always(function () {
+            if ($busyTarget && $busyTarget.data) {
+                $busyTarget.data("uniBusy", false);
+            }
+            window.setTimeout(unipaymentReleaseAddToCartLock, 300);
+        });
+}
+
+function unipaymentReleaseAddToCartLock() {
+    window[UNIPAYMENT_ADD_TO_CART_LOCK_KEY] = false;
+}
+
+function unipaymentIsAddToCartLocked() {
+    return window[UNIPAYMENT_ADD_TO_CART_LOCK_KEY] === true;
+}
+
+function unipaymentLockAddToCart() {
+    window[UNIPAYMENT_ADD_TO_CART_LOCK_KEY] = true;
 }
 
 /**
@@ -231,12 +401,21 @@ function unipaymentComputeProductTotalPriceForCalculator() {
     if (raw === "") {
         return NaN;
     }
-    let uni_price1;
-    if (raw.indexOf(".") !== -1) {
-        uni_price1 = raw.replace(/[^\d.-]/g, "");
-    } else {
-        uni_price1 = raw.replace(/,/g, ".");
+    const normalized = raw.replace(/\u00A0/g, " ").trim();
+    let uni_price1 = normalized;
+
+    // If both separators are present, treat the right-most one as decimal separator.
+    if (normalized.indexOf(",") !== -1 && normalized.indexOf(".") !== -1) {
+        if (normalized.lastIndexOf(",") > normalized.lastIndexOf(".")) {
+            uni_price1 = normalized.replace(/\./g, "").replace(/,/g, ".");
+        } else {
+            uni_price1 = normalized.replace(/,/g, "");
+        }
+    } else if (normalized.indexOf(",") !== -1) {
+        // Only comma present -> decimal comma.
+        uni_price1 = normalized.replace(/,/g, ".");
     }
+    uni_price1 = uni_price1.replace(/[^\d.-]/g, "");
     const uni_quantity = unipaymentGetProductPageQuantity();
     let uni_priceall = parseFloat(uni_price1) * uni_quantity;
     if (Number.isNaN(uni_priceall)) {
@@ -620,6 +799,7 @@ $(document).ready(function (e) {
             return;
         }
         uni_pogasitelni_vnoski_input_change();
+
         if (openPopup) {
             $("#uni-product-popup-container").first().show("slow");
         }
@@ -683,6 +863,9 @@ $(document).ready(function (e) {
             unipaymentRelinkProductPopup();
             scheduleUnipaymentProductPriceRefresh();
         });
+        prestashop.on("updateCart", function () {
+            unipaymentReleaseAddToCartLock();
+        });
     }
 
     /**
@@ -708,20 +891,20 @@ $(document).ready(function (e) {
         $("#uni-product-popup-container").hide("slow");
     });
 
-    $(document).on("click", "#uni_buy_unicredit", function (e) {
-        e.preventDefault();
-        $("#uni-product-popup-container").hide("slow");
-        // Trigger only one concrete add-to-cart button (avoid multi-click on themes with duplicated selectors).
-        const addToCartBtn =
-            document.querySelector(
-                "form#add-to-cart-or-refresh button[data-button-action='add-to-cart']",
-            ) ||
-            document.querySelector(
-                ".product-add-to-cart button[data-button-action='add-to-cart']",
-            ) ||
-            document.querySelector("button[data-button-action='add-to-cart']");
-        if (addToCartBtn) {
-            addToCartBtn.click();
-        }
-    });
+    $(document)
+        .off("click.unipaymentProductAddToCart", "#uni_buy_unicredit")
+        .on(
+            "click.unipaymentProductAddToCart",
+            "#uni_buy_unicredit",
+            function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                if (unipaymentIsAddToCartLocked()) {
+                    return;
+                }
+                $("#uni-product-popup-container").hide("slow");
+                unipaymentAddToCartFromPopup($(this));
+            },
+        );
 });

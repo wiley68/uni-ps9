@@ -18,11 +18,12 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
     public $ssl = true;
 
     /**
-     * @var array{success: bool, checkout_url: string, message: string}
+     * @var array{success: bool, checkout_url: string, cart_url: string, message: string}
      */
     public $result = [
         'success' => false,
         'checkout_url' => '',
+        'cart_url' => '',
         'message' => '',
     ];
 
@@ -44,6 +45,7 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
         $idProductAttribute = (int) Tools::getValue('id_product_attribute');
         $qty = (int) Tools::getValue('qty', 1);
         $installmentsRequested = (int) Tools::getValue('installments', 0);
+        $addToCartOnly = (int) Tools::getValue('add_to_cart_only', 0) === 1;
 
         if ($idProduct <= 0 || $qty < 1) {
             $this->result['message'] = $this->translateShop('Invalid product or quantity.');
@@ -95,6 +97,14 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
             $this->result['message'] = $update === -1
                 ? $this->translateShop('Minimum quantity not reached.')
                 : $this->translateShop('Could not add to cart.');
+            parent::initContent();
+
+            return;
+        }
+
+        if ($addToCartOnly) {
+            $this->result['success'] = true;
+            $this->result['cart_url'] = $this->buildCartShowUrl();
             parent::initContent();
 
             return;
@@ -219,5 +229,28 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
         }
 
         return (int) $value;
+    }
+
+    private function buildCartShowUrl(): string
+    {
+        $cartUrl = $this->context->link->getPageLink('cart', true, null, ['action' => 'show']);
+        $homeUrl = $this->context->link->getPageLink('index', true);
+
+        // Some themes/routes may resolve cart URL to home. Fallback to order page in that case.
+        if ($this->urlsLookEquivalent($cartUrl, $homeUrl)) {
+            return $this->context->link->getPageLink('order', true);
+        }
+
+        return $cartUrl;
+    }
+
+    private function urlsLookEquivalent(string $left, string $right): bool
+    {
+        $leftPath = (string) parse_url($left, PHP_URL_PATH);
+        $rightPath = (string) parse_url($right, PHP_URL_PATH);
+        $leftQuery = (string) parse_url($left, PHP_URL_QUERY);
+        $rightQuery = (string) parse_url($right, PHP_URL_QUERY);
+
+        return rtrim($leftPath, '/') === rtrim($rightPath, '/') && $leftQuery === $rightQuery;
     }
 }
