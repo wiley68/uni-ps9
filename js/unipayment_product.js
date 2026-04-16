@@ -95,7 +95,9 @@ function unipaymentReadRawUnitPriceStringFromPage() {
             return content;
         }
     }
-    const elProductCurrent = document.querySelector(".product__current-price");
+    const elProductCurrent = document.querySelector(
+        ".product__current-price, .product__price",
+    );
     if (elProductCurrent) {
         const extracted = unipaymentExtractNumericPriceStringFromDisplayText(
             elProductCurrent.textContent || "",
