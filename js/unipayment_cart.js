@@ -1,6 +1,12 @@
 /** UNI блок — страница количка (сума = общо продукти). */
 let uni_old_vnoski_cart;
 const UNIPAYMENT_EUR_BGN_RATE = 1.95583;
+/** @type {MutationObserver|null} */
+let unipaymentCartRefreshObserver = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let unipaymentCartRefreshTimer = null;
+/** @type {Element|null} */
+let unipaymentObservedCartRoot = null;
 
 function unipaymentUpdateCartButtonLabels(uniVnoski, uniMesecna) {
     const elCnt = document.getElementById("uni_button_installments_label");
@@ -63,6 +69,124 @@ function unipaymentGetPopupInstallmentsMonthsCart() {
     }
     const v = parseInt(String(el.value), 10);
     return Number.isNaN(v) ? 0 : v;
+}
+
+function unipaymentExtractNumericPriceStringFromDisplayText(text) {
+    if (text == null || typeof text !== "string") {
+        return "";
+    }
+    let s = text
+        .replace(/\u00a0/gi, " ")
+        .replace(/\s+/g, "")
+        .replace(/[^\d.,-]/g, "");
+    if (!s) {
+        return "";
+    }
+    const hasComma = s.indexOf(",") !== -1;
+    const hasDot = s.indexOf(".") !== -1;
+    if (hasComma && hasDot) {
+        const lastC = s.lastIndexOf(",");
+        const lastD = s.lastIndexOf(".");
+        if (lastC > lastD) {
+            return s.replace(/\./g, "").replace(",", ".");
+        }
+        return s.replace(/,/g, "");
+    }
+    if (hasComma && !hasDot) {
+        const parts = s.split(",");
+        if (parts.length === 2 && parts[1].length <= 2) {
+            return parts[0].replace(/\./g, "") + "." + parts[1];
+        }
+        return s.replace(/,/g, "");
+    }
+    if (hasDot && !hasComma) {
+        const parts = s.split(".");
+        if (parts.length === 2 && parts[1].length <= 2) {
+            return parts[0].replace(/,/g, "") + "." + parts[1];
+        }
+        if (parts.length > 2) {
+            return s.replace(/\./g, "");
+        }
+    }
+    return s;
+}
+
+function unipaymentReadCartTotalRawStringFromPage() {
+    const selectors = [
+        ".cart-summary__line.cart-total .cart-summary__value",
+        ".cart-summary__totals .cart-summary__line.cart-total .cart-summary__value",
+        ".cart-summary__line.cart-total .cart-summary__line__value .cart-summary__value",
+        ".cart-summary__line.cart-total .cart-summary__line__value",
+        ".cart-summary__line.cart-total .value",
+        ".cart-summary-line.cart-total .value",
+        ".cart-summary-totals .value",
+        ".cart__totals .cart-summary-line .value",
+        ".cart-total .value",
+        ".product-line__discount .product-line__price strong",
+        ".product-line__discount .product-line__price",
+        ".cart__total .price",
+        ".cart__total .value",
+    ];
+    for (let i = 0; i < selectors.length; i += 1) {
+        const el = document.querySelector(selectors[i]);
+        if (!el) {
+            continue;
+        }
+        const fromContent = el.getAttribute("content");
+        if (fromContent != null && fromContent !== "") {
+            return fromContent;
+        }
+        const extracted = unipaymentExtractNumericPriceStringFromDisplayText(
+            el.textContent || "",
+        );
+        if (extracted !== "") {
+            return extracted;
+        }
+    }
+    return "";
+}
+
+function unipaymentSyncCartTotalFromDom() {
+    const uniPriceEl = document.getElementById("uni_price");
+    const uniEurEl = document.getElementById("uni_eur");
+    if (!uniPriceEl || !uniEurEl) {
+        return;
+    }
+    const raw = unipaymentReadCartTotalRawStringFromPage();
+    if (raw === "") {
+        return;
+    }
+    const normalized = raw.indexOf(".") !== -1 ? raw : raw.replace(/,/g, ".");
+    const parsed = parseFloat(normalized);
+    if (Number.isNaN(parsed)) {
+        return;
+    }
+    uniPriceEl.value = String(parsed);
+
+    const uniPriceInt = document.getElementById("uni_price_int");
+    const uniPriceDec = document.getElementById("uni_price_dec");
+    if (uniPriceInt && uniPriceDec) {
+        const parts = parsed.toFixed(2).split(".");
+        uniPriceInt.textContent = parts[0];
+        uniPriceDec.textContent = parts[1];
+    }
+
+    const uniPriceSecondInt = document.getElementById("uni_price_second_int");
+    const uniPriceSecondDec = document.getElementById("uni_price_second_dec");
+    if (uniPriceSecondInt && uniPriceSecondDec) {
+        const uni_eur = parseInt(uniEurEl.value, 10);
+        let second = 0;
+        if (uni_eur === 1) {
+            second = parsed / UNIPAYMENT_EUR_BGN_RATE;
+        } else if (uni_eur === 2) {
+            second = parsed * UNIPAYMENT_EUR_BGN_RATE;
+        }
+        if (second > 0) {
+            const secondParts = second.toFixed(2).split(".");
+            uniPriceSecondInt.textContent = secondParts[0];
+            uniPriceSecondDec.textContent = secondParts[1];
+        }
+    }
 }
 
 function uniCartPogasitelniInputChange() {
@@ -271,6 +395,78 @@ function uniCartPogasitelniInputChange() {
     });
 }
 
+function unipaymentScheduleCartRecalculation() {
+    if (unipaymentCartRefreshTimer !== null) {
+        clearTimeout(unipaymentCartRefreshTimer);
+    }
+    unipaymentCartRefreshTimer = setTimeout(function () {
+        unipaymentCartRefreshTimer = null;
+        // При AJAX някои теми подменят целия .js-cart; пре-закачаме observer-а.
+        unipaymentSetupAjaxCartObserver();
+        unipaymentSyncCartTotalFromDom();
+        unipaymentRelinkCartPopup();
+        uniCartPogasitelniInputChange();
+    }, 120);
+}
+
+function unipaymentSetupAjaxCartObserver() {
+    if (typeof MutationObserver === "undefined") {
+        return;
+    }
+    const cartRoot = document.querySelector(".cart-overview.js-cart, .js-cart");
+    if (!cartRoot) {
+        return;
+    }
+    if (
+        unipaymentCartRefreshObserver !== null &&
+        unipaymentObservedCartRoot === cartRoot
+    ) {
+        return;
+    }
+    if (unipaymentCartRefreshObserver !== null) {
+        unipaymentCartRefreshObserver.disconnect();
+    }
+    unipaymentCartRefreshObserver = new MutationObserver(function (mutations) {
+        for (let i = 0; i < mutations.length; i += 1) {
+            const mutation = mutations[i];
+            if (
+                mutation.type === "childList" &&
+                (mutation.addedNodes.length > 0 ||
+                    mutation.removedNodes.length > 0)
+            ) {
+                unipaymentScheduleCartRecalculation();
+                return;
+            }
+            if (
+                mutation.type === "characterData" ||
+                mutation.type === "attributes"
+            ) {
+                unipaymentScheduleCartRecalculation();
+                return;
+            }
+        }
+    });
+    unipaymentObservedCartRoot = cartRoot;
+    unipaymentCartRefreshObserver.observe(cartRoot, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ["value", "data-refresh-url"],
+    });
+}
+
+function unipaymentIsCartAjaxUrl(url) {
+    if (typeof url !== "string" || url === "") {
+        return false;
+    }
+    return (
+        url.indexOf("action=refresh") !== -1 ||
+        url.indexOf("update=1") !== -1 ||
+        url.indexOf("delete=1") !== -1
+    );
+}
+
 $(document).ready(function () {
     if (!document.getElementById("uni_prepare_cart_checkout_url")) {
         return;
@@ -283,6 +479,24 @@ $(document).ready(function () {
     $("#uni-cart-popup-container").prependTo("body");
     unipaymentRelinkCartPopup();
     uniCartPogasitelniInputChange();
+    unipaymentSetupAjaxCartObserver();
+    if (
+        typeof window.prestashop !== "undefined" &&
+        typeof window.prestashop.on === "function"
+    ) {
+        window.prestashop.on("updatedCart", function () {
+            unipaymentScheduleCartRecalculation();
+        });
+    }
+    $(document).ajaxComplete(function (_evt, xhr, settings) {
+        const reqUrl =
+            settings && typeof settings.url === "string" ? settings.url : "";
+        if (!unipaymentIsCartAjaxUrl(reqUrl)) {
+            return;
+        }
+        unipaymentScheduleCartRecalculation();
+        setTimeout(unipaymentScheduleCartRecalculation, 300);
+    });
 
     $(document).on("change", "#uni_pogasitelni_vnoski_input", function () {
         uniCartPogasitelniInputChange();
@@ -300,6 +514,11 @@ $(document).ready(function () {
 
     $(document).on("click", "#uni_back_unicredit_cart", function () {
         $("#uni-cart-popup-container").hide("slow");
+    });
+    $(document).on("click", ".remove-from-cart", function () {
+        unipaymentScheduleCartRecalculation();
+        setTimeout(unipaymentScheduleCartRecalculation, 300);
+        setTimeout(unipaymentScheduleCartRecalculation, 900);
     });
 
     $(document).on("click", "#uni_cart_buy_on_installment", function (e) {
