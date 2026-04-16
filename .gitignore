@@ -38,9 +38,7 @@ phpunit.xml.bak
 .phpstan.result.cache
 psalm.xml
 
-# IDE: PHP stubs само за локален анализ (не са част от модула в продукция)
-prestashop-stubs.php
-intelephense-extra-stubs.php
+# IDE stubs се версионират в репото (помощ за локален анализ).
 
 # IDE и редактори
 .idea/

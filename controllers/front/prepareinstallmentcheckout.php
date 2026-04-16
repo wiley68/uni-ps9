@@ -61,7 +61,7 @@ class UnipaymentPrepareinstallmentcheckoutModuleFrontController extends ModuleFr
         }
         $activeInShop = (bool) Db::getInstance()->getValue(
             'SELECT `active` FROM `' . _DB_PREFIX_ . 'product_shop` WHERE `id_product` = ' . (int) $idProduct
-            . ' AND `id_shop` = ' . (int) $this->context->shop->id
+                . ' AND `id_shop` = ' . (int) $this->context->shop->id
         );
         if (!$activeInShop) {
             $this->result['message'] = $this->translateShop('Product not available.');
