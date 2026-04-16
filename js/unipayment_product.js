@@ -30,23 +30,81 @@ function unipaymentRelinkProductPopup() {
 }
 
 /**
- * Единична цена от DOM (PS теми: .current-price-value / itemprop=price content).
+ * Текст като „1030,00 €“ / с &nbsp; → низ за {@link unipaymentComputeProductTotalPriceForCalculator}.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function unipaymentExtractNumericPriceStringFromDisplayText(text) {
+    if (text == null || typeof text !== "string") {
+        return "";
+    }
+    let s = text
+        .replace(/\u00a0/gi, " ")
+        .replace(/\s+/g, "")
+        .replace(/[^\d.,-]/g, "");
+    if (!s) {
+        return "";
+    }
+    const hasComma = s.indexOf(",") !== -1;
+    const hasDot = s.indexOf(".") !== -1;
+    if (hasComma && hasDot) {
+        const lastC = s.lastIndexOf(",");
+        const lastD = s.lastIndexOf(".");
+        if (lastC > lastD) {
+            return s.replace(/\./g, "").replace(",", ".");
+        }
+        return s.replace(/,/g, "");
+    }
+    if (hasComma && !hasDot) {
+        const parts = s.split(",");
+        if (parts.length === 2 && parts[1].length <= 2) {
+            return parts[0].replace(/\./g, "") + "." + parts[1];
+        }
+        return s.replace(/,/g, "");
+    }
+    if (hasDot && !hasComma) {
+        const parts = s.split(".");
+        if (parts.length === 2 && parts[1].length <= 2) {
+            return parts[0].replace(/,/g, "") + "." + parts[1];
+        }
+        if (parts.length > 2) {
+            return s.replace(/\./g, "");
+        }
+    }
+    return s;
+}
+
+/**
+ * Единична цена от DOM (PS теми: .current-price-value / itemprop=price / .product__current-price).
  *
  * @returns {string}
  */
 function unipaymentReadRawUnitPriceStringFromPage() {
-    let priceContent = null;
     const elCurrent = document.querySelector(".current-price-value");
     if (elCurrent) {
-        priceContent = elCurrent.getAttribute("content");
-    }
-    if (priceContent == null || priceContent === "") {
-        const elItemprop = document.querySelector('[itemprop="price"]');
-        if (elItemprop) {
-            priceContent = elItemprop.getAttribute("content");
+        const content = elCurrent.getAttribute("content");
+        if (content != null && content !== "") {
+            return content;
         }
     }
-    return typeof priceContent === "string" ? priceContent : "";
+    const elItemprop = document.querySelector('[itemprop="price"]');
+    if (elItemprop) {
+        const content = elItemprop.getAttribute("content");
+        if (content != null && content !== "") {
+            return content;
+        }
+    }
+    const elProductCurrent = document.querySelector(".product__current-price");
+    if (elProductCurrent) {
+        const extracted = unipaymentExtractNumericPriceStringFromDisplayText(
+            elProductCurrent.textContent || "",
+        );
+        if (extracted !== "") {
+            return extracted;
+        }
+    }
+    return "";
 }
 
 function unipaymentGetProductPageQuantity() {
@@ -165,7 +223,7 @@ function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
             }
             const _str =
                 typeof window.uniPaymentShopStrings === "object" &&
-                    window.uniPaymentShopStrings !== null
+                window.uniPaymentShopStrings !== null
                     ? window.uniPaymentShopStrings
                     : {};
             const msg =
@@ -177,12 +235,12 @@ function unipaymentRunPrepareInstallmentCheckout($busyTarget, opts) {
         .fail(function () {
             const _str =
                 typeof window.uniPaymentShopStrings === "object" &&
-                    window.uniPaymentShopStrings !== null
+                window.uniPaymentShopStrings !== null
                     ? window.uniPaymentShopStrings
                     : {};
             window.alert(
                 _str.storeError ||
-                "An error occurred while contacting the store.",
+                    "An error occurred while contacting the store.",
             );
         })
         .always(function () {
