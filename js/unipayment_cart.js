@@ -258,6 +258,43 @@ function unipaymentReadCartTotalRawStringFromPage() {
     return "";
 }
 
+function unipaymentCartHasProducts() {
+    if (typeof window.prestashop === "object" && window.prestashop !== null) {
+        const cart = window.prestashop.cart;
+        if (typeof cart === "object" && cart !== null) {
+            if (Array.isArray(cart.products)) {
+                return cart.products.length > 0;
+            }
+            if (
+                typeof cart.products_count !== "undefined" &&
+                !Number.isNaN(parseInt(String(cart.products_count), 10))
+            ) {
+                return parseInt(String(cart.products_count), 10) > 0;
+            }
+        }
+    }
+    return document.querySelectorAll(".cart__item, .cart-item").length > 0;
+}
+
+function unipaymentApplyEmptyCartVisibility() {
+    const hasProducts = unipaymentCartHasProducts();
+    const container = document.getElementById("uni-product-button-container");
+    const popup = document.getElementById("uni-cart-popup-container");
+    if (!hasProducts) {
+        if (container) {
+            container.style.setProperty("display", "none", "important");
+        }
+        if (popup) {
+            popup.style.setProperty("display", "none", "important");
+        }
+        return false;
+    }
+    if (container) {
+        container.style.removeProperty("display");
+    }
+    return true;
+}
+
 function unipaymentApplyCartButtonVisibilityFromTotals() {
     const priceEl = document.getElementById("uni_price");
     const minEl = document.getElementById("uni_param_minstojnost");
@@ -357,6 +394,9 @@ function unipaymentSyncCartTotalFromDom() {
 }
 
 function uniCartPogasitelniInputChange() {
+    if (!unipaymentCartHasProducts()) {
+        return;
+    }
     const uniGetProductLinkEl = document.getElementById("uni_get_product_link");
     const uniVnoskiEl = document.getElementById("uni_pogasitelni_vnoski_input");
     const uniPriceEl = document.getElementById("uni_price");
@@ -575,6 +615,10 @@ function unipaymentScheduleCartRecalculation() {
         unipaymentCartRecalcBusy = true;
         // При AJAX някои теми подменят целия .js-cart; пре-закачаме observer-а.
         unipaymentSetupAjaxCartObserver();
+        if (!unipaymentApplyEmptyCartVisibility()) {
+            unipaymentCartRecalcBusy = false;
+            return;
+        }
         unipaymentSyncCartTotalFromDom();
         unipaymentApplyCartButtonVisibilityFromTotals();
         unipaymentRelinkCartPopup();
@@ -730,6 +774,9 @@ $(document).ready(function () {
     const uniLatentInput = document.getElementById("uni_cart_latent");
     if (uniLatentInput && String(uniLatentInput.value) === "1") {
         unipaymentDomCartSyncAllowed = false;
+    }
+    if (!unipaymentApplyEmptyCartVisibility()) {
+        return;
     }
     unipaymentSyncCartTotalFromDom();
     unipaymentApplyCartButtonVisibilityFromTotals();
