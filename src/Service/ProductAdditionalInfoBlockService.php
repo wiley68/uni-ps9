@@ -29,13 +29,12 @@ final class ProductAdditionalInfoBlockService
      */
     public function __construct(
         private readonly string $moduleRootPath,
-    ) {
-    }
+    ) {}
 
     /**
      * @param list<int> $productCategoryIds всички id_category на продукта; използва се първото съвпадение с DB мапинга
      *
-     * @return array{assign: array<string, mixed>, should_display: bool}|null null = не показвай блока
+     * @return array{assign: array<string, mixed>, should_display: bool, render_cart_latent: bool}|null null = не показвай блока
      */
     public function buildTemplatePayload(ProductAdditionalInfoRequest $req, array $productCategoryIds): ?array
     {
@@ -258,6 +257,15 @@ final class ProductAdditionalInfoBlockService
             ];
         }
 
+        $paramsMin = (float) $paramsuni['uni_minstojnost'];
+        $paramsMax = (float) $paramsuni['uni_maxstojnost'];
+        $aboveMax = $uni_price > $paramsMax;
+        $belowMin = $uni_price < $paramsMin;
+        $renderCartLatent = $req->isShoppingCartContext
+            && $req->uniStatus > 0
+            && $belowMin
+            && !$aboveMax;
+
         $assign = [
             'UNIPAYMENT_UNICID' => '',
             'uni_status' => $req->uniStatus,
@@ -265,6 +273,7 @@ final class ProductAdditionalInfoBlockService
             'uni_minstojnost' => $uni_minstojnost,
             'uni_price' => $uni_price,
             'uni_maxstojnost' => $uni_maxstojnost,
+            'uni_cart_latent' => $renderCartLatent,
             'uni_zaglavie' => $uni_zaglavie,
             'uni_vnoska' => $uni_vnoska,
             'uni_mesecna' => $uni_mesecna,
@@ -327,12 +336,13 @@ final class ProductAdditionalInfoBlockService
         ];
 
         $should_display = $req->uniStatus > 0
-            && $uni_price <= (float) $paramsuni['uni_maxstojnost']
-            && $uni_price >= (float) $paramsuni['uni_minstojnost'];
+            && !$aboveMax
+            && !$belowMin;
 
         return [
             'assign' => $assign,
             'should_display' => $should_display,
+            'render_cart_latent' => $renderCartLatent,
         ];
     }
 

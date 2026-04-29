@@ -833,9 +833,8 @@ class UniPayment extends PaymentModule
             return '';
         }
 
-        $uni_minstojnost = (float) ($paramsuni['uni_minstojnost'] ?? 0);
         $uni_maxstojnost = (float) ($paramsuni['uni_maxstojnost'] ?? 0);
-        if ($uni_price < $uni_minstojnost || $uni_price > $uni_maxstojnost) {
+        if ($uni_price > $uni_maxstojnost) {
             return '';
         }
 
@@ -874,11 +873,15 @@ class UniPayment extends PaymentModule
             $this->trans('Monthly installment amount', [], 'Modules.Unipayment.Shop'),
             function (string $cid, string $deviceis): ?array {
                 return $this->getCachedUniCalculation($cid, $deviceis);
-            }
+            },
+            true
         );
 
         $payload = $this->getProductAdditionalInfoBlockService()->buildTemplatePayload($request, $product_category_ids);
-        if ($payload === null || !$payload['should_display']) {
+        if ($payload === null) {
+            return '';
+        }
+        if (!($payload['should_display'] ?? false) && !($payload['render_cart_latent'] ?? false)) {
             return '';
         }
 

@@ -43,6 +43,7 @@ final class ProductAdditionalInfoRequest
         public readonly string $shopLabelInstallmentMobile,
         public readonly string $shopLabelInstallmentDesktop,
         public $getCachedUniCalculation,
-    ) {
-    }
+        /** Само за {@see \UniPayment::hookDisplayShoppingCart} — динамичен праг min/max в количката. */
+        public readonly bool $isShoppingCartContext = false,
+    ) {}
 }

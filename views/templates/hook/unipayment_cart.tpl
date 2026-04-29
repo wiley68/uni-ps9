@@ -13,6 +13,9 @@
 <input type="hidden" id="uni_currency_code" value="{$uni_currency_code}" />
 <input type="hidden" id="uni_sign" value="{$uni_sign|escape:'html':'UTF-8'}" />
 <input type="hidden" id="uni_sign_second" value="{$uni_sign_second|escape:'html':'UTF-8'}" />
+<input type="hidden" id="uni_param_minstojnost" value="{$uni_minstojnost|escape:'html':'UTF-8'}" />
+<input type="hidden" id="uni_param_maxstojnost" value="{$uni_maxstojnost|escape:'html':'UTF-8'}" />
+<input type="hidden" id="uni_cart_latent" value="{if isset($uni_cart_latent) && $uni_cart_latent}1{else}0{/if}" />
 {if isset($uni_js_shop_strings)}
     <script type="text/javascript">
         window.uniPaymentShopStrings = {$uni_js_shop_strings nofilter};
@@ -26,7 +29,8 @@
             </div>
         {/if}
         {if $uni_vnoska eq 'Yes'}
-            <div id="btn_uni" class="uni_button">
+            <div id="btn_uni" class="uni_button" {if isset($uni_cart_latent) && $uni_cart_latent}
+                style="display: none !important;" {/if}>
                 <div class="uni_button_body">
                     <div class="uni_button_body_left">
                         <div class="uni_button_txt1"><span id="uni_button_installments_label">{$uni_shema_current}</span>

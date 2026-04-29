@@ -9,6 +9,12 @@ let unipaymentCartRefreshTimer = null;
 let unipaymentObservedCartRoot = null;
 let unipaymentCartRecalcBusy = false;
 let unipaymentCartNetworkHooksReady = false;
+/** Само при първо зареждане с цена под мин. (latent) — false, за да не презаписваме #uni_price с грешен тотал от DOM преди реална промяна в количката. */
+let unipaymentDomCartSyncAllowed = true;
+
+function unipaymentEnableDomCartSyncFromUserOrNetwork() {
+    unipaymentDomCartSyncAllowed = true;
+}
 
 function unipaymentUpdateCartButtonLabels(uniVnoski, uniMesecna) {
     const elCnt = document.getElementById("uni_button_installments_label");
@@ -73,6 +79,74 @@ function unipaymentGetPopupInstallmentsMonthsCart() {
     return Number.isNaN(v) ? 0 : v;
 }
 
+/**
+ * Сума на продукти без доставка — съвпада с Cart::ONLY_PRODUCTS (като PS8 скрипта).
+ * @returns {number|null}
+ */
+function unipaymentResolveProductsTotalFromPrestashopCart() {
+    if (typeof window.prestashop !== "object" || window.prestashop === null) {
+        return null;
+    }
+    const cart = window.prestashop.cart;
+    if (typeof cart !== "object" || cart === null) {
+        return null;
+    }
+    const productsSub = cart.subtotals && cart.subtotals.products;
+    if (typeof productsSub === "object" && productsSub !== null) {
+        if (typeof productsSub.amount !== "undefined") {
+            const a = parseFloat(String(productsSub.amount).replace(/,/g, "."));
+            if (!Number.isNaN(a)) {
+                return a;
+            }
+        }
+        if (productsSub.value != null) {
+            const fromText = unipaymentExtractNumericPriceStringFromDisplayText(
+                String(productsSub.value),
+            );
+            if (fromText !== "") {
+                const norm =
+                    fromText.indexOf(".") !== -1
+                        ? fromText
+                        : fromText.replace(/,/g, ".");
+                const p = parseFloat(norm);
+                if (!Number.isNaN(p)) {
+                    return p;
+                }
+            }
+        }
+    }
+    if (Array.isArray(cart.products) && cart.products.length > 0) {
+        let sum = 0;
+        let n = 0;
+        for (let i = 0; i < cart.products.length; i += 1) {
+            const p = cart.products[i];
+            if (typeof p !== "object" || p === null) {
+                continue;
+            }
+            let line = null;
+            if (typeof p.total_wt !== "undefined") {
+                line = parseFloat(String(p.total_wt).replace(/,/g, "."));
+            } else if (typeof p.total !== "undefined") {
+                line = parseFloat(String(p.total).replace(/,/g, "."));
+            } else if (typeof p.price_wt !== "undefined") {
+                const pr = parseFloat(String(p.price_wt).replace(/,/g, "."));
+                const q = parseInt(String(p.quantity), 10);
+                if (!Number.isNaN(pr) && !Number.isNaN(q) && q > 0) {
+                    line = pr * q;
+                }
+            }
+            if (line != null && !Number.isNaN(line)) {
+                sum += line;
+                n += 1;
+            }
+        }
+        if (n > 0) {
+            return sum;
+        }
+    }
+    return null;
+}
+
 function unipaymentExtractNumericPriceStringFromDisplayText(text) {
     if (text == null || typeof text !== "string") {
         return "";
@@ -113,38 +187,7 @@ function unipaymentExtractNumericPriceStringFromDisplayText(text) {
     return s;
 }
 
-function unipaymentReadCartTotalRawStringFromPage() {
-    const selectors = [
-        ".cart-summary__line.cart-total .cart-summary__value",
-        ".cart-summary__totals .cart-summary__line.cart-total .cart-summary__value",
-        ".cart-summary__line.cart-total .cart-summary__line__value .cart-summary__value",
-        ".cart-summary__line.cart-total .cart-summary__line__value",
-        ".cart-summary__line.cart-total .value",
-        ".cart-summary-line.cart-total .value",
-        ".cart-summary-totals .value",
-        ".cart__totals .cart-summary-line .value",
-        ".cart-total .value",
-        ".product-line__discount .product-line__price strong",
-        ".product-line__discount .product-line__price",
-        ".cart__total .price",
-        ".cart__total .value",
-    ];
-    for (let i = 0; i < selectors.length; i += 1) {
-        const el = document.querySelector(selectors[i]);
-        if (!el) {
-            continue;
-        }
-        const fromContent = el.getAttribute("content");
-        if (fromContent != null && fromContent !== "") {
-            return fromContent;
-        }
-        const extracted = unipaymentExtractNumericPriceStringFromDisplayText(
-            el.textContent || "",
-        );
-        if (extracted !== "") {
-            return extracted;
-        }
-    }
+function unipaymentReadCartLineProductsSumRawString() {
     const lineTotalNodes = document.querySelectorAll(
         ".product-line__content-right .product-line__price, .cart__item .product-line__price",
     );
@@ -176,19 +219,80 @@ function unipaymentReadCartTotalRawStringFromPage() {
     return "";
 }
 
-function unipaymentSyncCartTotalFromDom() {
+function unipaymentReadCartTotalRawStringFromPage() {
+    const fromLines = unipaymentReadCartLineProductsSumRawString();
+    if (fromLines !== "") {
+        return fromLines;
+    }
+    const selectors = [
+        ".cart-summary__line.cart-total .cart-summary__value",
+        ".cart-summary__totals .cart-summary__line.cart-total .cart-summary__value",
+        ".cart-summary__line.cart-total .cart-summary__line__value .cart-summary__value",
+        ".cart-summary__line.cart-total .cart-summary__line__value",
+        ".cart-summary__line.cart-total .value",
+        ".cart-summary-line.cart-total .value",
+        ".cart-summary-totals .value",
+        ".cart__totals .cart-summary-line .value",
+        ".cart-total .value",
+        ".product-line__discount .product-line__price strong",
+        ".product-line__discount .product-line__price",
+        ".cart__total .price",
+        ".cart__total .value",
+    ];
+    for (let i = 0; i < selectors.length; i += 1) {
+        const el = document.querySelector(selectors[i]);
+        if (!el) {
+            continue;
+        }
+        const fromContent = el.getAttribute("content");
+        if (fromContent != null && fromContent !== "") {
+            return fromContent;
+        }
+        const extracted = unipaymentExtractNumericPriceStringFromDisplayText(
+            el.textContent || "",
+        );
+        if (extracted !== "") {
+            return extracted;
+        }
+    }
+    return "";
+}
+
+function unipaymentApplyCartButtonVisibilityFromTotals() {
+    const priceEl = document.getElementById("uni_price");
+    const minEl = document.getElementById("uni_param_minstojnost");
+    const maxEl = document.getElementById("uni_param_maxstojnost");
+    const btn = document.getElementById("btn_uni");
+    if (!priceEl || !minEl || !maxEl || !btn) {
+        return;
+    }
+    if (!btn.classList.contains("uni_button")) {
+        return;
+    }
+    const p = parseFloat(String(priceEl.value).replace(/,/g, "."));
+    const minV = parseFloat(String(minEl.value).replace(/,/g, "."));
+    const maxV = parseFloat(String(maxEl.value).replace(/,/g, "."));
+    if (Number.isNaN(p) || Number.isNaN(minV) || Number.isNaN(maxV)) {
+        return;
+    }
+    /* .uni_button в unipayment_cart.css е display:flex !important — inline display:none без !important не важи. */
+    if (p >= minV && p <= maxV) {
+        btn.style.removeProperty("display");
+    } else {
+        btn.style.setProperty("display", "none", "important");
+    }
+}
+
+/**
+ * @param {number} parsed
+ */
+function unipaymentApplyNumericTotalToCartUi(parsed) {
+    if (Number.isNaN(parsed)) {
+        return;
+    }
     const uniPriceEl = document.getElementById("uni_price");
     const uniEurEl = document.getElementById("uni_eur");
     if (!uniPriceEl || !uniEurEl) {
-        return;
-    }
-    const raw = unipaymentReadCartTotalRawStringFromPage();
-    if (raw === "") {
-        return;
-    }
-    const normalized = raw.indexOf(".") !== -1 ? raw : raw.replace(/,/g, ".");
-    const parsed = parseFloat(normalized);
-    if (Number.isNaN(parsed)) {
         return;
     }
     uniPriceEl.value = String(parsed);
@@ -217,6 +321,39 @@ function unipaymentSyncCartTotalFromDom() {
             uniPriceSecondDec.textContent = secondParts[1];
         }
     }
+}
+
+function unipaymentSyncCartTotalFromDom() {
+    const uniPriceEl = document.getElementById("uni_price");
+    const uniEurEl = document.getElementById("uni_eur");
+    if (!uniPriceEl || !uniEurEl) {
+        return;
+    }
+
+    const fromPs = unipaymentResolveProductsTotalFromPrestashopCart();
+    if (fromPs !== null) {
+        unipaymentApplyNumericTotalToCartUi(fromPs);
+        return;
+    }
+
+    const latentEl = document.getElementById("uni_cart_latent");
+    if (
+        latentEl &&
+        String(latentEl.value) === "1" &&
+        !unipaymentDomCartSyncAllowed
+    ) {
+        return;
+    }
+    const raw = unipaymentReadCartTotalRawStringFromPage();
+    if (raw === "") {
+        return;
+    }
+    const normalized = raw.indexOf(".") !== -1 ? raw : raw.replace(/,/g, ".");
+    const parsed = parseFloat(normalized);
+    if (Number.isNaN(parsed)) {
+        return;
+    }
+    unipaymentApplyNumericTotalToCartUi(parsed);
 }
 
 function uniCartPogasitelniInputChange() {
@@ -420,6 +557,7 @@ function uniCartPogasitelniInputChange() {
                 uni_glp_int.textContent = uni_glp.toFixed(2);
                 uni_gpr_int.textContent = uni_gpr.toFixed(2);
                 unipaymentUpdateCartButtonLabels(uni_vnoski, uni_mesecna);
+                unipaymentApplyCartButtonVisibilityFromTotals();
             }
         },
     });
@@ -438,6 +576,7 @@ function unipaymentScheduleCartRecalculation() {
         // При AJAX някои теми подменят целия .js-cart; пре-закачаме observer-а.
         unipaymentSetupAjaxCartObserver();
         unipaymentSyncCartTotalFromDom();
+        unipaymentApplyCartButtonVisibilityFromTotals();
         unipaymentRelinkCartPopup();
         uniCartPogasitelniInputChange();
         setTimeout(function () {
@@ -510,6 +649,14 @@ function unipaymentIsCartAjaxUrl(url) {
     );
 }
 
+/** Само промяна на съдържание на количката, не първоначален/фонов refresh (в комб. с карт-latent избягваме погрешен #uni_price при зареждане). */
+function unipaymentIsCartMutatingRequest(url) {
+    if (typeof url !== "string" || url === "") {
+        return false;
+    }
+    return url.indexOf("update=1") !== -1 || url.indexOf("delete=1") !== -1;
+}
+
 function unipaymentSetupCartNetworkHooks() {
     if (unipaymentCartNetworkHooksReady) {
         return;
@@ -527,6 +674,11 @@ function unipaymentSetupCartNetworkHooks() {
             }
             return originalFetch.call(this, input, init).then(function (resp) {
                 if (unipaymentIsCartAjaxUrl(reqUrl)) {
+                    const latentIn = document.getElementById("uni_cart_latent");
+                    const isLatent = latentIn && String(latentIn.value) === "1";
+                    if (!isLatent || unipaymentIsCartMutatingRequest(reqUrl)) {
+                        unipaymentEnableDomCartSyncFromUserOrNetwork();
+                    }
                     unipaymentScheduleCartRecalculationBurst();
                 }
                 return resp;
@@ -552,6 +704,12 @@ function unipaymentSetupCartNetworkHooks() {
             ) {
                 this.__uniCartHooked = true;
                 this.addEventListener("loadend", function () {
+                    const latentIn = document.getElementById("uni_cart_latent");
+                    const isLatent = latentIn && String(latentIn.value) === "1";
+                    const u = this.__uniCartUrl || "";
+                    if (!isLatent || unipaymentIsCartMutatingRequest(u)) {
+                        unipaymentEnableDomCartSyncFromUserOrNetwork();
+                    }
                     unipaymentScheduleCartRecalculationBurst();
                 });
             }
@@ -569,6 +727,13 @@ $(document).ready(function () {
         return;
     }
 
+    const uniLatentInput = document.getElementById("uni_cart_latent");
+    if (uniLatentInput && String(uniLatentInput.value) === "1") {
+        unipaymentDomCartSyncAllowed = false;
+    }
+    unipaymentSyncCartTotalFromDom();
+    unipaymentApplyCartButtonVisibilityFromTotals();
+
     $("#uni-cart-popup-container").prependTo("body");
     unipaymentRelinkCartPopup();
     uniCartPogasitelniInputChange();
@@ -579,9 +744,11 @@ $(document).ready(function () {
         typeof window.prestashop.on === "function"
     ) {
         window.prestashop.on("updatedCart", function () {
+            unipaymentEnableDomCartSyncFromUserOrNetwork();
             unipaymentScheduleCartRecalculation();
         });
         window.prestashop.on("updateCart", function () {
+            unipaymentEnableDomCartSyncFromUserOrNetwork();
             unipaymentScheduleCartRecalculationBurst();
         });
     }
@@ -606,6 +773,7 @@ $(document).ready(function () {
         "click",
         ".remove-from-cart, .js-remove-from-cart, [data-link-action='delete-from-cart']",
         function () {
+            unipaymentEnableDomCartSyncFromUserOrNetwork();
             unipaymentScheduleCartRecalculationBurst();
         },
     );
@@ -613,6 +781,7 @@ $(document).ready(function () {
         "click",
         ".js-increment-button, .js-decrement-button",
         function () {
+            unipaymentEnableDomCartSyncFromUserOrNetwork();
             unipaymentScheduleCartRecalculationBurst();
         },
     );
@@ -620,6 +789,7 @@ $(document).ready(function () {
         "change input",
         ".js-cart-line-product-quantity",
         function () {
+            unipaymentEnableDomCartSyncFromUserOrNetwork();
             unipaymentScheduleCartRecalculationBurst();
         },
     );
