@@ -21,8 +21,8 @@ final class CheckoutPreferenceStore
 
     /**
      * @param object $cookie PrestaShop Cookie or test double with write()
-     * @param string|null $expectedFingerprint When provided, preference is cleared if stored
-     *                                         cart_fingerprint is present and does not match.
+     * @param string|null $expectedFingerprint When provided, stored cart_fingerprint must be
+     *                                         non-empty and match (legacy cookies without fingerprint are rejected).
      * @return array<string, mixed>|null
      */
     public function load($cookie, int $cartId, int $customerId, ?string $expectedFingerprint = null): ?array
@@ -39,15 +39,13 @@ final class CheckoutPreferenceStore
             return null;
         }
 
-        $storedFingerprint = trim((string) ($preference['cart_fingerprint'] ?? ''));
-        if (
-            $expectedFingerprint !== null
-            && $storedFingerprint !== ''
-            && !hash_equals($storedFingerprint, $expectedFingerprint)
-        ) {
-            $this->clear($cookie);
+        if ($expectedFingerprint !== null) {
+            $storedFingerprint = trim((string) ($preference['cart_fingerprint'] ?? ''));
+            if ($storedFingerprint === '' || !hash_equals($storedFingerprint, $expectedFingerprint)) {
+                $this->clear($cookie);
 
-            return null;
+                return null;
+            }
         }
 
         return $preference;
