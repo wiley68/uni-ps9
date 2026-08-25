@@ -54,9 +54,16 @@ assertProductFrontend(
     'initialization must be idempotent via data-unipayment-ready'
 );
 assertProductFrontend(
-    strpos($js, 'updatedProduct') !== false
-        && strpos($js, 'updatedProductCombination') !== false,
-    'JS must subscribe to updatedProduct and updatedProductCombination'
+    (bool) preg_match('/prestashop\.on\(\s*[\'"]updatedProduct[\'"]/', $js),
+    'JS must subscribe to prestashop updatedProduct'
+);
+assertProductFrontend(
+    strpos($js, '.js-product-details[data-product]') !== false,
+    'JS must resolve Hummingbird .js-product-details combination state'
+);
+assertProductFrontend(
+    strpos($js, '#product-details[data-product]') !== false,
+    'JS must keep Classic #product-details combination state'
 );
 assertProductFrontend(
     strpos($template, 'data-unipayment-calculator') !== false,

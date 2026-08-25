@@ -3,6 +3,8 @@
 
     var selector = "[data-unipayment-calculator]";
     var domRefreshTimer = null;
+    // Authoritative combination hint from prestashop.emit('updatedProduct', eventPayload).
+    var pendingProductUpdateHint = null;
 
     function parseConfig(root) {
         try {
@@ -12,9 +14,29 @@
         }
     }
 
-    function productAttributeId(doc) {
+    /**
+     * Resolve current combination id after native PrestaShop product refresh.
+     *
+     * Hummingbird 2.0 uses `.js-product-details[data-product]` (no #product-details)
+     * and typically has no hidden id_product_attribute input. Classic keeps
+     * `#product-details[data-product]`. Prefer theme product state, then form field,
+     * then optional updatedProduct payload hint.
+     *
+     * @param {Document|Object} doc
+     * @param {Object|null|undefined} updateHint
+     */
+    function productAttributeId(doc, updateHint) {
+        var hint = updateHint || null;
+        if (hint && typeof hint === "object") {
+            var hinted = parseInt(hint.id_product_attribute, 10);
+            if (!isNaN(hinted) && hinted > 0) {
+                return hinted;
+            }
+        }
+
+        // Classic: #product-details; Hummingbird: .js-product-details (no id).
         var productDetails = doc.querySelector(
-            "#product-details[data-product]",
+            "#product-details[data-product], .js-product-details[data-product]",
         );
         if (productDetails) {
             try {
@@ -28,7 +50,9 @@
                 // Fall back to the theme's hidden field when the PrestaShop state is unavailable.
             }
         }
-        var field = doc.querySelector('input[name="id_product_attribute"]');
+        var field = doc.querySelector(
+            '#add-to-cart-or-refresh input[name="id_product_attribute"], input[name="id_product_attribute"]',
+        );
         return field ? Math.max(0, parseInt(field.value, 10) || 0) : 0;
     }
 
@@ -121,6 +145,10 @@
         module.exports.attachPreselectOperationToken =
             attachPreselectOperationToken;
         return;
+    }
+
+    function readProductAttributeId() {
+        return productAttributeId(document, pendingProductUpdateHint);
     }
 
     function quantity() {
@@ -900,7 +928,7 @@
             );
             payload.set(
                 "id_product_attribute",
-                String(productAttributeId(document)),
+                String(readProductAttributeId()),
             );
             payload.set("quantity", String(quantity()));
             payload.set("popup_offer_type", activeType);
@@ -1085,7 +1113,7 @@
             var state = {
                 productId:
                     parseInt(root.getAttribute("data-product-id"), 10) || 0,
-                productAttributeId: productAttributeId(document),
+                productAttributeId: readProductAttributeId(),
                 quantity: quantity(),
                 type: activeType,
                 schemeType: lastCalculation.scheme_type,
@@ -1569,11 +1597,12 @@
         root.unipaymentRefresh = function () {
             window.clearTimeout(refreshTimer);
             refreshTimer = window.setTimeout(function () {
+                if (!root.isConnected) return;
                 var endpoint = root.getAttribute("data-endpoint");
                 var productId =
                     parseInt(root.getAttribute("data-product-id"), 10) || 0;
                 if (!endpoint || !productId) return;
-                var currentAttributeId = productAttributeId(document);
+                var currentAttributeId = readProductAttributeId();
                 var currentQuantity = quantity();
                 var requestKey =
                     productId +
@@ -1613,7 +1642,7 @@
                         return response.json();
                     })
                     .then(function (payload) {
-                        if (sequence === refreshSequence)
+                        if (sequence === refreshSequence && root.isConnected)
                             root.unipaymentUpdate(
                                 payload.success ? payload.calculator : null,
                             );
@@ -1621,6 +1650,7 @@
                     .catch(function (error) {
                         if (
                             sequence === refreshSequence &&
+                            root.isConnected &&
                             (!error || error.name !== "AbortError")
                         ) {
                             lastRequestKey = "";
@@ -1636,14 +1666,31 @@
     }
     function refresh() {
         document.querySelectorAll(selector).forEach(function (root) {
+            if (!root.isConnected) return;
             setup(root);
             root.unipaymentInvalidatePopup();
             root.unipaymentRefresh();
         });
     }
-    function scheduleDomRefresh() {
+    function captureProductUpdateHint(payload) {
+        if (payload && typeof payload === "object") {
+            var hinted = parseInt(payload.id_product_attribute, 10);
+            if (!isNaN(hinted) && hinted > 0) {
+                pendingProductUpdateHint = {
+                    id_product_attribute: hinted,
+                };
+                return;
+            }
+        }
+    }
+    function scheduleDomRefresh(payload) {
+        captureProductUpdateHint(payload);
         window.clearTimeout(domRefreshTimer);
-        domRefreshTimer = window.setTimeout(refresh, 0);
+        // Defer one task so core replaceWith(.js-product-details / additional-info) can settle.
+        domRefreshTimer = window.setTimeout(function () {
+            refresh();
+            pendingProductUpdateHint = null;
+        }, 0);
     }
     function mutationNeedsRefresh(mutation) {
         var target =
@@ -1653,7 +1700,9 @@
         return !target || !target.closest(selector);
     }
     function initializeProductObservers() {
-        var productActions = document.querySelector(".product-actions");
+        var productActions = document.querySelector(
+            ".product-actions, .js-product-actions",
+        );
         if (!productActions || typeof MutationObserver !== "function") return;
         var observer = new MutationObserver(function (mutations) {
             if (mutations.some(mutationNeedsRefresh)) scheduleDomRefresh();
@@ -1667,14 +1716,15 @@
     if (document.readyState === "loading")
         document.addEventListener("DOMContentLoaded", start);
     else start();
+
+    // Core emits updatedProduct AFTER product_details / additional_info replaceWith.
+    // updatedProductCombination is only an updateProduct eventType, not a separate emit.
     if (window.prestashop && typeof window.prestashop.on === "function") {
         window.prestashop.on("updatedProduct", scheduleDomRefresh);
-        // Hummingbird 2.0 / PS9 may emit combination updates separately from updatedProduct.
-        window.prestashop.on("updatedProductCombination", scheduleDomRefresh);
     }
-    // Classic / theme bridge: document-level CustomEvent fallback (no library dependency).
-    document.addEventListener("updatedProduct", scheduleDomRefresh);
-    document.addEventListener("updatedProductCombination", scheduleDomRefresh);
+    document.addEventListener("updatedProduct", function (event) {
+        scheduleDomRefresh(event && event.detail ? event.detail : null);
+    });
     document.addEventListener("input", function (event) {
         if (
             event.target &&

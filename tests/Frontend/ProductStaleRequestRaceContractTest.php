@@ -23,7 +23,7 @@ $js = (string) file_get_contents(dirname(__DIR__, 2) . '/views/js/product-calcul
 assertRaceContract(strpos($js, 'var refreshSequence = 0') !== false, 'refreshSequence counter must exist');
 assertRaceContract(strpos($js, 'var sequence = ++refreshSequence') !== false, 'each refresh must bump sequence');
 assertRaceContract(
-    (bool) preg_match('/if\s*\(\s*sequence\s*===\s*refreshSequence\s*\)/', $js),
+    (bool) preg_match('/if\s*\(\s*sequence\s*===\s*refreshSequence(?:\s*&&\s*root\.isConnected)?\s*\)/', $js),
     'response must apply only when sequence is still current'
 );
 assertRaceContract(strpos($js, 'AbortController') !== false, 'AbortController must abort superseded requests');
