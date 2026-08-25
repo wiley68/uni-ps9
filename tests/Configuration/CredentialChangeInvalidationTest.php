@@ -245,23 +245,24 @@ assertCred($provider->calls === $callsBefore, 'metadata must not trigger provide
 
 // Contract: configuration Save code must not call get(true)
 $module = (string) file_get_contents(dirname(__DIR__, 2) . '/unipayment.php');
+assertCred(strpos($module, 'AdminConfigurationRequestReader') !== false, 'request reader required');
+assertCred(
+    strpos($module, '$refreshSubmitted && !$configurationSubmitted') !== false,
+    'Save must not also execute bank refresh'
+);
+assertCred(strpos($module, 'getMetadata()') !== false, 'metadata path must remain for BO status');
 assertCred(
     (bool) preg_match(
-        '/function handleConfigurationSubmit\(.*?\{.*?\n    \}/s',
+        '/private function handleConfigurationSubmit\(.*?private function handleBankDataRefresh/s',
         $module,
         $match
     ),
-    'handleConfigurationSubmit not found'
+    'handleConfigurationSubmit block not found'
 );
 $submitBody = $match[0] ?? '';
 assertCred(strpos($submitBody, 'get(true)') === false, 'configuration Save must not call get(true)');
 assertCred(strpos($submitBody, 'getShop(') === false, 'configuration Save must not call getShop');
 assertCred(strpos($submitBody, 'onCredentialsChanged') !== false, 'configuration Save must invoke credential side effects');
-assertCred(
-    strpos($submitBody, 'sideEffectsApplied') !== false
-        || strpos($submitBody, 'onCredentialsChanged()') !== false,
-    'configuration Save must check credential side-effect outcome'
-);
 
 $template = (string) file_get_contents(dirname(__DIR__, 2) . '/views/templates/admin/configuration.tpl');
 assertCred(

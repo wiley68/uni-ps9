@@ -84,9 +84,12 @@ class Unipayment extends PaymentModule
     public function getContent(): string
     {
         $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
+        $requestReader = new PrestaShop\Module\Unipayment\Configuration\AdminConfigurationRequestReader();
         $output = '';
+        $configurationSubmitted = $requestReader->isConfigurationSubmit();
+        $refreshSubmitted = $requestReader->isBankRefreshSubmit();
 
-        if (Tools::isSubmit('submitUnipaymentDownloadJournal')) {
+        if (array_key_exists('submitUnipaymentDownloadJournal', $_POST)) {
             $output .= $this->displayWarning(
                 $this->trans(
                     'Изтеглянето на журнал с операции ще бъде налично след имплементацията на SmartUCF диагностиката.',
@@ -96,20 +99,43 @@ class Unipayment extends PaymentModule
             );
         }
 
-        if (Tools::isSubmit('submitUnipaymentConfiguration')) {
-            $output .= $this->handleConfigurationSubmit($repository);
+        if ($configurationSubmitted) {
+            $output .= $this->handleConfigurationSubmit($repository, $requestReader);
         }
 
-        if (Tools::isSubmit('submitUnipaymentRefresh')) {
+        // Never treat a Save request as Refresh. Refresh is POST-only via request reader.
+        if ($refreshSubmitted && !$configurationSubmitted) {
             $output .= $this->handleBankDataRefresh();
         }
 
-        $configurationSubmitted = Tools::isSubmit('submitUnipaymentConfiguration');
+        $cache = new PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCache();
+        $cacheRowsAfterSubmit = $cache->countRows();
         $cacheMetadata = null;
+        $metadataTouchedCache = false;
+        $rowsBeforeMetadata = $cacheRowsAfterSubmit;
         try {
             $cacheMetadata = $this->createShopConfigurationService()->getMetadata();
+            $cacheRowsAfterMetadata = $cache->countRows();
+            $metadataTouchedCache = $cacheRowsAfterMetadata !== $rowsBeforeMetadata;
         } catch (Throwable $exception) {
             $cacheMetadata = null;
+            $cacheRowsAfterMetadata = $cache->countRows();
+        }
+
+        if (
+            PrestaShop\Module\Unipayment\Configuration\BoConfigurationDiag::enabled()
+            && ($configurationSubmitted || $refreshSubmitted)
+        ) {
+            PrestaShop\Module\Unipayment\Configuration\BoConfigurationDiag::write([
+                'phase' => 'getContent_after_handlers',
+                'configuration_submit' => $configurationSubmitted,
+                'refresh_submit' => $refreshSubmitted,
+                'both_submit_flags' => $configurationSubmitted && $refreshSubmitted,
+                'cache_rows_after_submit' => $cacheRowsAfterSubmit,
+                'cache_rows_after_metadata' => $cacheRowsAfterMetadata ?? $cache->countRows(),
+                'metadata_touched_cache' => $metadataTouchedCache,
+                'token_present' => (new PrestaShop\Module\Unipayment\Security\TokenRepository())->hasToken(),
+            ]);
         }
 
         $this->context->smarty->assign([
@@ -120,25 +146,25 @@ class Unipayment extends PaymentModule
                 ['configure' => $this->name]
             ),
             'unipayment_enabled' => $configurationSubmitted
-                ? (bool) Tools::getValue('UNIPAYMENT_ENABLED', false)
+                ? (bool) $requestReader->getField('UNIPAYMENT_ENABLED', false)
                 : $repository->isEnabled(),
             'unipayment_unicid' => $configurationSubmitted
-                ? trim((string) Tools::getValue('UNIPAYMENT_UNICID', ''))
+                ? $requestReader->getUnicid()
                 : $repository->getUnicid(),
             'unipayment_advertising_enabled' => $configurationSubmitted
-                ? (bool) Tools::getValue('UNIPAYMENT_ADVERTISING_ENABLED', false)
+                ? (bool) $requestReader->getField('UNIPAYMENT_ADVERTISING_ENABLED', false)
                 : $repository->isAdvertisingEnabled(),
             'unipayment_debug_enabled' => $configurationSubmitted
-                ? (bool) Tools::getValue('UNIPAYMENT_DEBUG_ENABLED', false)
+                ? (bool) $requestReader->getField('UNIPAYMENT_DEBUG_ENABLED', false)
                 : $repository->isDebugEnabled(),
             'unipayment_product_button_action' => $configurationSubmitted
-                ? (string) Tools::getValue(
+                ? (string) $requestReader->getField(
                     'UNIPAYMENT_PRODUCT_BUTTON_ACTION',
                     PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository::DEFAULT_PRODUCT_BUTTON_ACTION
                 )
                 : $repository->getProductButtonAction(),
             'unipayment_button_top_spacing' => $configurationSubmitted
-                ? (string) Tools::getValue('UNIPAYMENT_BUTTON_TOP_SPACING', '0')
+                ? (string) $requestReader->getField('UNIPAYMENT_BUTTON_TOP_SPACING', '0')
                 : (string) $repository->getButtonTopSpacing(),
             'unipayment_has_secret' => $repository->hasSecret(),
             'unipayment_secret_readable' => $repository->isSecretReadable(),
@@ -154,13 +180,25 @@ class Unipayment extends PaymentModule
     }
 
     private function handleConfigurationSubmit(
-        PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository $repository
+        PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository $repository,
+        ?PrestaShop\Module\Unipayment\Configuration\AdminConfigurationRequestReader $requestReader = null
     ): string {
+        $requestReader = $requestReader
+            ?? new PrestaShop\Module\Unipayment\Configuration\AdminConfigurationRequestReader();
         $validator = new PrestaShop\Module\Unipayment\Configuration\ConfigurationValidator();
-        $unicid = trim((string) Tools::getValue('UNIPAYMENT_UNICID', ''));
-        $secret = trim((string) Tools::getValue('UNIPAYMENT_SECRET', ''));
-        $buttonAction = (string) Tools::getValue('UNIPAYMENT_PRODUCT_BUTTON_ACTION', '');
-        $buttonTopSpacing = Tools::getValue('UNIPAYMENT_BUTTON_TOP_SPACING', '');
+        $tokens = new PrestaShop\Module\Unipayment\Security\TokenRepository();
+        $cache = new PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCache();
+
+        $unicid = $requestReader->getUnicid();
+        $secret = $requestReader->getSecret();
+        $buttonAction = (string) $requestReader->getField('UNIPAYMENT_PRODUCT_BUTTON_ACTION', '');
+        $buttonTopSpacing = $requestReader->getField('UNIPAYMENT_BUTTON_TOP_SPACING', '');
+        $oldSecretFingerprint = PrestaShop\Module\Unipayment\Configuration\BoConfigurationDiag::fingerprint(
+            $repository->getSecret()
+        );
+        $tokenPresentBefore = $tokens->hasToken();
+        $cacheRowsBefore = $cache->countRows();
+
         $errors = $validator->validate(
             $unicid,
             $secret,
@@ -170,6 +208,20 @@ class Unipayment extends PaymentModule
         );
 
         if ($errors !== []) {
+            if (PrestaShop\Module\Unipayment\Configuration\BoConfigurationDiag::enabled()) {
+                PrestaShop\Module\Unipayment\Configuration\BoConfigurationDiag::write([
+                    'phase' => 'configuration_submit_validation_failed',
+                    'configuration_submit' => true,
+                    'secret_field_present' => $requestReader->hasSecretField(),
+                    'secret_in_POST' => $requestReader->secretInPost(),
+                    'secret_in_REQUEST' => $requestReader->secretInRequestSuperglobal(),
+                    'secret_in_symfony_request' => $requestReader->secretInSymfonyRequest(),
+                    'secret_length' => strlen($secret),
+                    'tools_getValue_secret_length' => $requestReader->secretViaToolsGetValueLength(),
+                    'validation_error_count' => count($errors),
+                ]);
+            }
+
             return $this->displayError(array_map(function (string $error): string {
                 if ($error === PrestaShop\Module\Unipayment\Configuration\ConfigurationValidator::ERROR_UNICID_REQUIRED) {
                     return $this->trans('Полето „Уникален идентификационен код на магазина Ви“ е задължително.', [], 'Modules.Unipayment.Admin');
@@ -195,17 +247,24 @@ class Unipayment extends PaymentModule
             }, $errors));
         }
 
-        $credentialsChanged = $repository->getUnicid() !== $unicid || $secret !== '';
+        $unicidChanged = $repository->getUnicid() !== $unicid;
+        $secretNonEmpty = $secret !== '';
+        $credentialsChanged = $unicidChanged || $secretNonEmpty;
         $saved = $repository->save(
-            (bool) Tools::getValue('UNIPAYMENT_ENABLED', false),
+            (bool) $requestReader->getField('UNIPAYMENT_ENABLED', false),
             $unicid,
-            $secret !== '' ? $secret : null,
-            (bool) Tools::getValue('UNIPAYMENT_ADVERTISING_ENABLED', false),
-            (bool) Tools::getValue('UNIPAYMENT_DEBUG_ENABLED', false),
+            $secretNonEmpty ? $secret : null,
+            (bool) $requestReader->getField('UNIPAYMENT_ADVERTISING_ENABLED', false),
+            (bool) $requestReader->getField('UNIPAYMENT_DEBUG_ENABLED', false),
             $buttonAction,
             (int) $buttonTopSpacing,
             false
         );
+
+        $newSecretFingerprint = PrestaShop\Module\Unipayment\Configuration\BoConfigurationDiag::fingerprint(
+            $repository->getSecret()
+        );
+        $secretChangedInStorage = $oldSecretFingerprint !== $newSecretFingerprint;
 
         if (!$saved) {
             return $this->displayError(
@@ -213,18 +272,67 @@ class Unipayment extends PaymentModule
             );
         }
 
+        $handlerCalled = false;
+        $sideEffectsApplied = true;
+        $tokenInvalidateResult = null;
+        $cacheClearResult = null;
+        $cacheRowsAfter = $cacheRowsBefore;
+        $tokenPresentAfter = $tokenPresentBefore;
+
         if ($credentialsChanged) {
-            $sideEffectsApplied = (new PrestaShop\Module\Unipayment\Configuration\CredentialChangeSideEffectHandler())
-                ->onCredentialsChanged();
-            if (!$sideEffectsApplied) {
-                return $this->displayError(
-                    $this->trans(
-                        'Настройките са записани, но локалният кеш/токен не могат да бъдат инвалидирани. Моля, опитайте отново или изчистете кеша ръчно.',
-                        [],
-                        'Modules.Unipayment.Admin'
-                    )
-                );
+            $handlerCalled = true;
+            $sideEffectsApplied = (new PrestaShop\Module\Unipayment\Configuration\CredentialChangeSideEffectHandler(
+                $tokens,
+                $cache
+            ))->onCredentialsChanged();
+            $tokenPresentAfter = $tokens->hasToken();
+            $cacheRowsAfter = $cache->countRows();
+            $tokenInvalidateResult = !$tokenPresentAfter;
+            $cacheClearResult = $cacheRowsAfter === 0;
+            // Prefer explicit boolean from handler; row/token checks catch false positives.
+            if ($sideEffectsApplied && ($tokenPresentAfter || $cacheRowsAfter !== 0)) {
+                $sideEffectsApplied = false;
             }
+        }
+
+        if (PrestaShop\Module\Unipayment\Configuration\BoConfigurationDiag::enabled()) {
+            PrestaShop\Module\Unipayment\Configuration\BoConfigurationDiag::write([
+                'phase' => 'configuration_submit',
+                'configuration_submit' => true,
+                'secret_field_present' => $requestReader->hasSecretField(),
+                'unicid_field_present' => $requestReader->hasUnicidField(),
+                'secret_in_POST' => $requestReader->secretInPost(),
+                'secret_in_REQUEST' => $requestReader->secretInRequestSuperglobal(),
+                'secret_in_symfony_request' => $requestReader->secretInSymfonyRequest(),
+                'secret_length' => strlen($secret),
+                'tools_getValue_secret_length' => $requestReader->secretViaToolsGetValueLength(),
+                'secret_non_empty' => $secretNonEmpty,
+                'unicid_changed' => $unicidChanged,
+                'credentials_changed' => $credentialsChanged,
+                'old_secret_fingerprint' => $oldSecretFingerprint,
+                'new_secret_fingerprint' => $newSecretFingerprint,
+                'secret_changed_in_storage' => $secretChangedInStorage,
+                'fingerprint_method' => 'sha256(decrypted_secret)[:12]',
+                'handler_called' => $handlerCalled,
+                'token_present_before_save' => $tokenPresentBefore,
+                'token_invalidate_result' => $tokenInvalidateResult,
+                'token_present_after_save' => $tokenPresentAfter,
+                'cache_clear_called' => $handlerCalled,
+                'cache_clear_result' => $cacheClearResult,
+                'cache_rows_before' => $cacheRowsBefore,
+                'cache_rows_after' => $cacheRowsAfter,
+                'side_effects_applied' => $sideEffectsApplied,
+            ]);
+        }
+
+        if ($credentialsChanged && !$sideEffectsApplied) {
+            return $this->displayError(
+                $this->trans(
+                    'Настройките са записани, но локалният кеш/токен не могат да бъдат инвалидирани. Моля, опитайте отново или изчистете кеша ръчно.',
+                    [],
+                    'Modules.Unipayment.Admin'
+                )
+            );
         }
 
         return $this->displayConfirmation(

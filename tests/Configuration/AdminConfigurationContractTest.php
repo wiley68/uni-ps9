@@ -66,12 +66,24 @@ assertAdminConfiguration(
 
 assertAdminConfiguration(strpos($module, '$credentialsChanged =') !== false, 'credential-change detection missing');
 assertAdminConfiguration(
+    strpos($module, 'AdminConfigurationRequestReader') !== false
+        && strpos($module, 'isBankRefreshSubmit') !== false
+        && strpos($module, '!$configurationSubmitted') !== false,
+    'Save must not also run bank refresh; refresh is POST-only and gated'
+);
+assertAdminConfiguration(
     (bool) preg_match(
-        '/<form id="unipayment-settings-form"[\s\S]*name="submitUnipaymentConfiguration"[\s\S]*<\/form>/',
+        '/<form id="unipayment-settings-form"[\s\S]*name="UNIPAYMENT_SECRET"[\s\S]*name="submitUnipaymentConfiguration"[\s\S]*<\/form>/',
         $template
     ),
-    'Save button must be inside settings form so SECRET is posted'
+    'SECRET and Save must share the same settings form (DOM ownership contract)'
 );
+assertAdminConfiguration(
+    strpos($template, 'autocomplete="off"') !== false
+        || strpos($template, 'autocomplete="new-password"') !== false,
+    'SECRET input must set autocomplete to reduce manager interference'
+);
+
 assertAdminConfiguration(
     strpos($handler, 'invalidate()') !== false
         && strpos($handler, 'clear()') !== false

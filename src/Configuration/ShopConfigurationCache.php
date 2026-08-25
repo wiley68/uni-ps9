@@ -138,7 +138,22 @@ final class ShopConfigurationCache implements ShopConfigurationCacheInterface
     {
         // Db::delete() adds _DB_PREFIX_ when $add_prefix is true (default).
         // Pass the unprefixed TABLE constant — never tableName() — to avoid double-prefix.
-        return (bool) $this->database->delete(self::TABLE, '', 0, true, true);
+        if (!(bool) $this->database->delete(self::TABLE, '', 0, true, true)) {
+            return false;
+        }
+
+        $remaining = (int) $this->database->getValue(
+            'SELECT COUNT(*) FROM `' . $this->tableName() . '`'
+        );
+
+        return $remaining === 0;
+    }
+
+    public function countRows(): int
+    {
+        return (int) $this->database->getValue(
+            'SELECT COUNT(*) FROM `' . $this->tableName() . '`'
+        );
     }
 
     public function getMetadata(string $unicid): ?array

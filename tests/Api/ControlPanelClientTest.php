@@ -259,4 +259,29 @@ try {
     assertPhase2(!($exception instanceof TimeoutException), 'connection must not be timeout');
 }
 
+// Existing bearer token can GET /shop without re-login — do not treat refresh success as secret proof.
+$configuration->save(true, '123e4567-e89b-12d3-a456-426614174000', 'brand-new-secret');
+$tokens->save('lingering-token', 'Bearer', $now + 86400);
+$requestCountBeforeReuse = count($transport->requests);
+$transport->responses[] = jsonResponse(200, [
+    'success' => true,
+    'data' => ['unicid' => '123e4567-e89b-12d3-a456-426614174000'],
+]);
+$client->getShop();
+assertPhase2(count($transport->requests) === $requestCountBeforeReuse + 1, 'valid token must not trigger login');
+assertPhase2(
+    $transport->requests[array_key_last($transport->requests)]['url'] === 'https://cp.example/api/v1/shop',
+    'reuse path must call GET /shop only'
+);
+assertPhase2(
+    $transport->requests[array_key_last($transport->requests)]['headers']['Authorization'] === 'Bearer lingering-token',
+    'reuse path must keep the old bearer token'
+);
+foreach (array_slice($transport->requests, $requestCountBeforeReuse) as $request) {
+    assertPhase2(
+        strpos((string) $request['url'], '/auth/login') === false,
+        'GET /shop success with lingering token must not prove the newly stored secret'
+    );
+}
+
 fwrite(STDOUT, "OK (Phase 2 Control Panel API contract and token lifecycle)\n");
