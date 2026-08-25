@@ -214,8 +214,17 @@ class Unipayment extends PaymentModule
         }
 
         if ($credentialsChanged) {
-            (new PrestaShop\Module\Unipayment\Configuration\CredentialChangeSideEffectHandler())
+            $sideEffectsApplied = (new PrestaShop\Module\Unipayment\Configuration\CredentialChangeSideEffectHandler())
                 ->onCredentialsChanged();
+            if (!$sideEffectsApplied) {
+                return $this->displayError(
+                    $this->trans(
+                        'Настройките са записани, но локалният кеш/токен не могат да бъдат инвалидирани. Моля, опитайте отново или изчистете кеша ръчно.',
+                        [],
+                        'Modules.Unipayment.Admin'
+                    )
+                );
+            }
         }
 
         return $this->displayConfirmation(

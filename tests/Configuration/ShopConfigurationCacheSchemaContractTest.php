@@ -33,7 +33,15 @@ assertCacheSchema(strpos($cache, '`expires_at` DATETIME NOT NULL') !== false, 'e
 assertCacheSchema(strpos($cache, 'UNIQUE KEY `uniq_unipayment_cache_unicid` (`unicid`)') !== false, 'unicid unique key missing');
 assertCacheSchema(strpos($cache, 'ON DUPLICATE KEY UPDATE') !== false, 'full replace SQL missing');
 assertCacheSchema(strpos($cache, 'id_shop') === false, 'PS8 cache is unicid-scoped, not id_shop');
-
+assertCacheSchema(
+    (bool) preg_match("/database->delete\(\s*self::TABLE/", $cache),
+    'clear/delete must use Db::delete(self::TABLE) so PrestaShop adds _DB_PREFIX_ once'
+);
+assertCacheSchema(
+    strpos($cache, 'delete($this->tableName()') === false
+        && strpos($cache, "delete(self::TABLE .") === false,
+    'must not pass a pre-prefixed table name into Db::delete()'
+);
 preg_match_all("/CREATE TABLE IF NOT EXISTS[^;]+;/s", $cache, $matches);
 assertCacheSchema(count($matches[0]) === 1, 'exactly one CREATE TABLE expected');
 assertCacheSchema(

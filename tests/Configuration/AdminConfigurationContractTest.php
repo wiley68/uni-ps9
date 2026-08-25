@@ -66,11 +66,22 @@ assertAdminConfiguration(
 
 assertAdminConfiguration(strpos($module, '$credentialsChanged =') !== false, 'credential-change detection missing');
 assertAdminConfiguration(
-    strpos($handler, 'TokenRepository') !== false
-        && strpos($handler, 'invalidate()') !== false
-        && strpos($handler, 'ShopConfigurationCache') !== false
-        && strpos($handler, 'clear()') !== false,
-    'credential change must invalidate tokens and clear shop cache'
+    (bool) preg_match(
+        '/<form id="unipayment-settings-form"[\s\S]*name="submitUnipaymentConfiguration"[\s\S]*<\/form>/',
+        $template
+    ),
+    'Save button must be inside settings form so SECRET is posted'
+);
+assertAdminConfiguration(
+    strpos($handler, 'invalidate()') !== false
+        && strpos($handler, 'clear()') !== false
+        && strpos($handler, 'return $tokensInvalidated && $cacheCleared') !== false,
+    'credential change must invalidate tokens, clear cache, and return combined success'
+);
+assertAdminConfiguration(
+    strpos($module, 'sideEffectsApplied') !== false
+        || (bool) preg_match('/onCredentialsChanged\(\);\s*\n\s*if\s*\(!\$/', $module),
+    'BO save must not ignore credential side-effect failure'
 );
 
 assertAdminConfiguration(!preg_match('/\bregisterHook\s*\(/', $module), 'no functional hooks in Phase 3');

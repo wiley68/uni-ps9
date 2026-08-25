@@ -28,9 +28,14 @@ final class CredentialChangeSideEffectHandler
         $this->cache = $cache ?? new ShopConfigurationCache();
     }
 
-    public function onCredentialsChanged(): void
+    /**
+     * @return bool true only when both token invalidation and cache clear succeed
+     */
+    public function onCredentialsChanged(): bool
     {
-        $this->tokens->invalidate();
-        $this->cache->clear();
+        $tokensInvalidated = $this->tokens->invalidate();
+        $cacheCleared = $this->cache->clear();
+
+        return $tokensInvalidated && $cacheCleared;
     }
 }

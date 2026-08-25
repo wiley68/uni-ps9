@@ -256,7 +256,10 @@ assertPhase3($cache->getFresh($unicidB)['uni_zaglavie'] === 'shop-b', 'delete le
 
 $tokens->save('cred-token', 'Bearer', 2000000000);
 $cache->replace($unicid, $snapshotA);
-(new CredentialChangeSideEffectHandler($tokens, $cache))->onCredentialsChanged();
+assertPhase3(
+    (new CredentialChangeSideEffectHandler($tokens, $cache))->onCredentialsChanged() === true,
+    'credential change side effects must succeed'
+);
 assertPhase3(!$tokens->hasToken(), 'credential change must invalidate tokens');
 assertPhase3($cache->rows === [], 'credential change must clear shop cache');
 

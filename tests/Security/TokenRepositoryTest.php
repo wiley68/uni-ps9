@@ -144,7 +144,10 @@ assertTokenRepo(!isset(Configuration::$values[TokenRepository::EXPIRES_AT]), 'in
 
 assertTokenRepo($tokens->save('access-4', 'Bearer', 1700000300), 'token for credential-change check');
 $cache = new MemoryShopConfigurationCacheForTokenTest();
-(new CredentialChangeSideEffectHandler($tokens, $cache))->onCredentialsChanged();
+assertTokenRepo(
+    (new CredentialChangeSideEffectHandler($tokens, $cache))->onCredentialsChanged() === true,
+    'credential change side effects must succeed'
+);
 assertTokenRepo(!$tokens->hasToken(), 'credential change must invalidate tokens');
 assertTokenRepo($cache->clearCount === 1, 'credential change must clear shop configuration cache');
 

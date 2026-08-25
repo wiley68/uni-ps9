@@ -92,10 +92,14 @@
       </div>
     </div>
 
+    {* Submit must live inside the settings form so password/UNICID fields always post with Save.
+       Do not rely on the HTML5 form= attribute alone for credential fields. *}
+    <div class="panel-footer" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button type="submit" name="submitUnipaymentConfiguration" class="btn btn-primary"><i class="process-icon-save"></i> {l s='Запази настройките' d='Modules.Unipayment.Admin'}</button>
+    </div>
   </form>
 
-  <div class="panel-footer" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-    <button type="submit" name="submitUnipaymentConfiguration" form="unipayment-settings-form" class="btn btn-primary"><i class="process-icon-save"></i> {l s='Запази настройките' d='Modules.Unipayment.Admin'}</button>
+  <div class="panel-footer" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:0;border-top:none;padding-top:0;">
     {if $unipayment_bank_refresh_available}
       <form action="{$unipayment_form_action|escape:'htmlall':'UTF-8'}" method="post" style="margin:0;">
         <button type="submit" name="submitUnipaymentRefresh" class="btn btn-default"><i class="icon-refresh"></i> {l s='Обнови данните от банката' d='Modules.Unipayment.Admin'}</button>

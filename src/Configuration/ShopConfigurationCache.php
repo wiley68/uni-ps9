@@ -136,7 +136,9 @@ final class ShopConfigurationCache implements ShopConfigurationCacheInterface
 
     public function clear(): bool
     {
-        return (bool) $this->database->execute('DELETE FROM `' . $this->tableName() . '`');
+        // Db::delete() adds _DB_PREFIX_ when $add_prefix is true (default).
+        // Pass the unprefixed TABLE constant — never tableName() — to avoid double-prefix.
+        return (bool) $this->database->delete(self::TABLE, '', 0, true, true);
     }
 
     public function getMetadata(string $unicid): ?array
