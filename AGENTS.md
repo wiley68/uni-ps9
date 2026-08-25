@@ -277,15 +277,17 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 5 е **pure financing calculator domain** (PS8 parity, без FO).
+Phase 6 е **product-page financing presentation** (Hummingbird + Classic).
 
 Разрешено:
 
-- всичко от Phase 0–4;
-- `src/Calculator/*` (Calculator, resolvers, OfferFactory, PreferredOfferSelector, ProductContext DTO, currency display helpers);
-- calculator CLI тестове / golden vectors / PS8 parity harness.
+- всичко от Phase 0–5;
+- `src/Product/*` (ProductContextFactory, presenters, popup calculate);
+- `controllers/front/productcalculator.php` + `productpopup.php` (calculate-only);
+- `hookDisplayProductAdditionalInfo` + product-scoped assets;
+- vanilla `views/js/product-calculator.js` / CSS / template.
 
-Не въвеждай ProductContextFactory, product/cart hooks, PaymentOption, financing snapshot install, checkout lock, order attempts, popup submissions, SmartUCF outbound, emails, custom order states или frontend assets, докато съответната фаза не бъде изрично възложена.
+Не въвеждай popup submission persistence (`unipayment_popup_submission`), cart hooks, PaymentOption, financing snapshot install, checkout lock, order attempts, SmartUCF outbound, emails, custom order states или advertising FO, докато съответната фаза не бъде изрично възложена.
 
 ---
 

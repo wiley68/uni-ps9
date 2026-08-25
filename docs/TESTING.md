@@ -18,15 +18,25 @@ Safe default:
 composer test
 ```
 
-Phase 5 calculator coverage:
+Also useful for Phase 6 JS helpers:
 
-| Test                                            | What it checks                                                            |
-| ----------------------------------------------- | ------------------------------------------------------------------------- |
-| `tests/Calculator/CalculatorDomainTest.php`     | PS8 critical scenarios (filters, months, coeff, first installment, promo) |
-| `tests/Calculator/GoldenParityVectorsTest.php`  | Explicit numeric golden vectors                                           |
-| `tests/Calculator/Ps8ParityHarnessTest.php`     | Frozen oracle + live PS8 subprocess cross-run                             |
-| `tests/Calculator/WooReferenceParityTest.php`   | Optional Woo helper parity (SKIP if Woo bootstrap incomplete)             |
-| `tests/Calculator/CurrencyDisplayLabelTest.php` | Display suffixes + module catalog registration                            |
+```bash
+node tests/Product/ProductCalculatorJsTest.js
+```
+
+Phase 6 product coverage:
+
+| Test                                                        | What it checks                                     |
+| ----------------------------------------------------------- | -------------------------------------------------- |
+| `tests/Product/ProductContextFactoryTest.php`               | Server-side price × qty / combination              |
+| `tests/Product/ProductCalculatorPresenterTest.php`          | Offers / preferred / currency / visuals            |
+| `tests/Product/ProductPopupCalculatorTest.php`              | Modal calculate + presenter consents               |
+| `tests/Product/ProductCalculatorControllerContractTest.php` | Endpoint validation / safe errors / calculate-only |
+| `tests/Product/ProductButtonVisualContractTest.php`         | Template/CSS/JS visual contracts                   |
+| `tests/Frontend/ProductFrontendContractTest.php`            | Hooks, assets, no jQuery, lifecycle, envelopes     |
+| `tests/Frontend/ProductStaleRequestRaceContractTest.php`    | AbortController + sequence stale-response guard    |
+
+Phase 5 calculator coverage remains under `tests/Calculator/*`.
 
 Prior phases remain covered under `tests/Configuration`, `tests/Api`, `tests/Security`, `tests/Order`, `tests/SmartUcf`, `tests/Infrastructure`.
 
@@ -38,6 +48,6 @@ composer dump-autoload
 git diff --check
 ```
 
-## Manual STOP GATE 5
+## Manual STOP GATE 6
 
-Domain/parity gate (no FO UI). See Phase 5 implementation report. Do not start Phase 6 until accepted.
+Product-page FO gate (Hummingbird + Classic). See Phase 6 implementation report. Do not start Phase 7 until accepted.

@@ -2,13 +2,13 @@
 
 Native PrestaShop 9 module for **UniCredit financing** (credit calculator, checkout payment method, order lifecycle, Control Panel integration, and SmartUCF).
 
-| Item                  | Value                                          |
-| --------------------- | ---------------------------------------------- |
-| Module technical name | `unipayment`                                   |
-| Current version       | `2.0.1`                                        |
-| Repository            | `wiley68/uni-ps9`                              |
-| Repository root       | Module root (this directory)                   |
-| Current state         | **Phase 5 — pure financing calculator domain** |
+| Item                  | Value                                           |
+| --------------------- | ----------------------------------------------- |
+| Module technical name | `unipayment`                                    |
+| Current version       | `2.0.1`                                         |
+| Repository            | `wiley68/uni-ps9`                               |
+| Repository root       | Module root (this directory)                    |
+| Current state         | **Phase 6 — product-page financing calculator** |
 
 ## Purpose
 
@@ -28,20 +28,20 @@ Provide a PrestaShop 9-native adapter/port of the UniPayment product family:
 
 ## Current implementation status
 
-Phase 5 provides:
+Phase 6 provides:
 
-- Phases 0–4 (config, CP client, shop cache, inbound signed API);
-- pure calculator domain (`src/Calculator/*`) driven by shop snapshot + `ProductContext`;
-- PS8 behavioral parity tests and cross-run harness.
+- Phases 0–5 (config, CP client, shop cache, inbound signed API, calculator domain);
+- product-page context factory, presenters, hook, AJAX endpoints;
+- vanilla JS/CSS for Hummingbird + Classic combination lifecycle.
 
 Still **not** implemented:
 
-- `ProductContextFactory` / product hooks / product popup;
+- popup submission persistence / dedupe (Phase 7);
 - cart calculator / PaymentOption / checkout;
 - financing snapshots / checkout lock / order attempts;
-- SmartUCF outbound / emails / FO JS/CSS.
+- SmartUCF outbound / emails / advertising FO.
 
-Do not use this checkout as a working UniCredit financing integration yet.
+Product calculator presentation works; order/apply flows from the modal are deferred.
 
 ## Documentation
 

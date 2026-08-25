@@ -64,6 +64,7 @@ class Unipayment extends PaymentModule
             || !$apiNonce->install()
             || !$bankStatus->install()
             || !$debugLog->install()
+            || !$this->registerProductPageHooks()
         ) {
             $debugLog->uninstall();
             $bankStatus->uninstall();
@@ -106,7 +107,6 @@ class Unipayment extends PaymentModule
 
     /**
      * Display-only currency suffix for UI amounts (Woo: евро / лв. / лева).
-     * Catalog registration only in Phase 5 — no FO consumers yet.
      */
     public function getDisplayCurrencyLabel(string $iso): string
     {
@@ -129,6 +129,9 @@ class Unipayment extends PaymentModule
 
     public function getContent(): string
     {
+        // Idempotent: already-installed shops gain Phase 6 hooks without reinstall.
+        $this->registerProductPageHooks();
+
         $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
         $requestReader = new PrestaShop\Module\Unipayment\Configuration\AdminConfigurationRequestReader();
         $output = '';
@@ -429,9 +432,6 @@ class Unipayment extends PaymentModule
         }
     }
 
-    /**
-     * Outbound Control Panel client (auth + GET /shop). Not used for FO financing yet.
-     */
     public function getControlPanelClient(): PrestaShop\Module\Unipayment\Api\ControlPanelClient
     {
         return $this->createControlPanelClient();
@@ -440,6 +440,142 @@ class Unipayment extends PaymentModule
     public function getShopConfigurationService(): PrestaShop\Module\Unipayment\Configuration\ShopConfigurationService
     {
         return $this->createShopConfigurationService();
+    }
+
+    /** @param array<string, mixed> $params */
+    public function hookDisplayProductAdditionalInfo(array $params): string
+    {
+        $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
+        if (!$this->active || !$repository->isEnabled()) {
+            return '';
+        }
+
+        $productId = $this->resolveHookProductId($params);
+        $productAttributeId = max(0, (int) Tools::getValue('id_product_attribute', 0));
+        if ($productId <= 0) {
+            return '';
+        }
+
+        try {
+            $shop = $this->createShopConfigurationService()->get();
+            $product = (new PrestaShop\Module\Unipayment\Product\ProductContextFactory())
+                ->create($productId, $productAttributeId);
+            $calculator = (new PrestaShop\Module\Unipayment\Product\ProductCalculatorPresenter(
+                new PrestaShop\Module\Unipayment\Calculator\Calculator()
+            ))->present($shop, $product, (string) $this->context->currency->iso_code);
+        } catch (Throwable $exception) {
+            PrestaShopLogger::addLog('UniPayment product calculator could not be rendered: ' . get_class($exception), 2);
+
+            return '';
+        }
+
+        if ($calculator === null) {
+            return '';
+        }
+
+        $contextCustomer = $this->context->customer;
+        $isLogged = $contextCustomer instanceof Customer && $contextCustomer->isLogged();
+        $addresses = $isLogged ? $contextCustomer->getAddresses((int) $this->context->language->id) : [];
+        $cart = $this->context->cart;
+        $customerPrefill = (new PrestaShop\Module\Unipayment\Product\ProductPopupCustomerPrefill())->present(
+            $isLogged,
+            $isLogged ? [
+                'firstname' => (string) $contextCustomer->firstname,
+                'lastname' => (string) $contextCustomer->lastname,
+                'email' => (string) $contextCustomer->email,
+            ] : [],
+            is_array($addresses) ? $addresses : [],
+            $cart instanceof Cart ? (int) $cart->id_address_delivery : 0,
+            $cart instanceof Cart ? (int) $cart->id_address_invoice : 0
+        );
+
+        $this->context->smarty->assign([
+            'unipayment_calculator' => $calculator,
+            'unipayment_popup' => (new PrestaShop\Module\Unipayment\Product\ProductPopupPresenter())->present(
+                $shop,
+                $repository->getProductButtonAction(),
+                $customerPrefill
+            ),
+            'unipayment_button_top_spacing' => $repository->getButtonTopSpacing(),
+            'unipayment_logo_url' => $this->_path . 'views/img/product/uni_logo.svg',
+            'unipayment_logo_alternative_url' => $this->_path . 'views/img/product/uni_logo_red.svg',
+            'unipayment_popup_badge_url' => $this->_path . 'views/img/product/uni_mini_logo.png',
+            'unipayment_calculator_json' => json_encode(
+                $calculator,
+                JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+            ),
+            'unipayment_calculator_url' => $this->context->link->getModuleLink(
+                $this->name,
+                'productcalculator',
+                ['ajax' => 1],
+                true
+            ),
+            'unipayment_popup_url' => $this->context->link->getModuleLink($this->name, 'productpopup', ['ajax' => 1], true),
+            'unipayment_popup_token' => Tools::getToken(false),
+            'unipayment_checkout_url' => $this->context->link->getPageLink('order', true),
+            'unipayment_offer_types' => ['standard', 'promo'],
+            'unipayment_require_egn' => ((int) ($shop['uni_proces'] ?? 0)) === 1,
+        ]);
+
+        return $this->display(__FILE__, 'views/templates/hook/product_calculator.tpl');
+    }
+
+    public function hookActionFrontControllerSetMedia(): void
+    {
+        if (!$this->active || !isset($this->context->controller->php_self)) {
+            return;
+        }
+
+        // Phase 6: product-page assets only (no homepage / cart / checkout FO assets).
+        if ($this->context->controller->php_self !== 'product') {
+            return;
+        }
+
+        $this->context->controller->registerStylesheet(
+            'module-unipayment-product-calculator',
+            'modules/' . $this->name . '/views/css/product-calculator.css',
+            ['media' => 'all', 'priority' => 150]
+        );
+        $this->context->controller->registerJavascript(
+            'module-unipayment-product-calculator',
+            'modules/' . $this->name . '/views/js/product-calculator.js',
+            [
+                'position' => 'bottom',
+                'priority' => 150,
+                'version' => $this->assetVersion('views/js/product-calculator.js'),
+            ]
+        );
+    }
+
+    private function registerProductPageHooks(): bool
+    {
+        return $this->registerHook('displayProductAdditionalInfo')
+            && $this->registerHook('actionFrontControllerSetMedia');
+    }
+
+    /**
+     * Cache-bust front assets without bumping the module business version.
+     */
+    private function assetVersion(string $relativePath): string
+    {
+        $path = _PS_MODULE_DIR_ . $this->name . '/' . ltrim($relativePath, '/');
+        $mtime = is_file($path) ? (int) filemtime($path) : 0;
+
+        return $this->version . ($mtime > 0 ? '.' . $mtime : '');
+    }
+
+    /** @param array<string, mixed> $params */
+    private function resolveHookProductId(array $params): int
+    {
+        $product = $params['product'] ?? null;
+        if (is_object($product) && isset($product->id)) {
+            return (int) $product->id;
+        }
+        if (is_array($product)) {
+            return (int) ($product['id_product'] ?? $product['id'] ?? 0);
+        }
+
+        return max(0, (int) Tools::getValue('id_product', 0));
     }
 
     private function createControlPanelClient(): PrestaShop\Module\Unipayment\Api\ControlPanelClient

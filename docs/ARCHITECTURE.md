@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 5** state.
+This document describes **intended** high-level boundaries and the **implemented Phase 6** state.
 
 ---
 
@@ -25,7 +25,7 @@ Infrastructure
 
 ---
 
-## Implemented through Phase 5
+## Implemented through Phase 6
 
 | Area                        | State                                                                                 |
 | --------------------------- | ------------------------------------------------------------------------------------- |
@@ -37,14 +37,14 @@ Infrastructure
 | Shop snapshot cache         | `ShopConfigurationCache` table `unipayment_shop_cache`, TTL **86400** seconds         |
 | Snapshot validation         | `ShopConfigurationSnapshotValidator` + `ShopConfigurationSnapshotValidationException` |
 | Pull / forced refresh       | `ShopConfigurationService::get(false\|true)` via `ShopConfigurationProviderInterface` |
-| Flag helpers                | `ShopConfigurationFlags` — **not** wired to FO yet                                    |
+| Flag helpers                | `ShopConfigurationFlags`                                                              |
 | BO bank-data refresh        | enabled — `get(true)` with PS8 error mapping                                          |
 | Inbound signed API          | Phase 4 — `shopcache`, `orderbankstatus`, `smartucfdebuglog` + HMAC/nonce             |
 | Replay store                | `unipayment_api_nonce` (900s retention)                                               |
 | Bank status persistence     | `unipayment_order_bank_status` (no FO / order-state side effects yet)                 |
 | SmartUCF debug journal      | `unipayment_smartucf_log` + diagnostic journal (BO download deferred)                 |
-| Front office                | no functional hooks, product/cart UI, payment option, JS, or CSS                      |
-| Financing calculator domain | Phase 5 — pure snapshot-driven Calculator (no FO consumers)                           |
+| Financing calculator domain | Phase 5 — pure snapshot-driven Calculator                                             |
+| Product page FO             | Phase 6 — hook + AJAX + vanilla JS (Hummingbird + Classic)                            |
 
 ### Shop configuration cache flow
 
@@ -91,21 +91,34 @@ See [`SECURITY-OPERATIONS.md`](SECURITY-OPERATIONS.md) for HMAC/nonce details.
 
 ### Financing calculator domain (Phase 5)
 
-Pure domain only — validated shop snapshot + `ProductContext` → offers / calculation results.
+Pure domain — validated shop snapshot + `ProductContext` → offers / calculation results.
+
+### Product page (Phase 6)
 
 ```text
-ProductContext + shop snapshot
+PrestaShop product
         ↓
-SchemaFilterMatcher / MonthResolver
+ProductContextFactory (tax-incl unit × qty, categories, combination validation)
         ↓
-CoefficientResolver / FirstInstallmentResolver
+ShopConfigurationService::get()
         ↓
-FinancialCalculator / OfferFactory
+Calculator + ProductCalculatorPresenter
         ↓
-PreferredOfferSelector / Calculator facade
+hook displayProductAdditionalInfo → product_calculator.tpl
+        ↓
+AJAX productcalculator (refresh) / productpopup calculate-only (modal)
 ```
 
-No CP HTTP, no DB writes, no FO hooks. PS8 behavioral parity is the oracle (`tests/Calculator/*`).
+Theme lifecycle:
+
+| Theme           | Hook                           | Events                                                                |
+| --------------- | ------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------- |
+| Hummingbird 2.0 | `displayProductAdditionalInfo` | `prestashop.on('updatedProduct'                                       | 'updatedProductCombination')` + document listeners |
+| Classic 3.1.1   | same                           | same + quantity input/change + MutationObserver on `.product-actions` |
+
+Race protection: `AbortController` + `refreshSequence` (stale responses ignored).
+
+Phase 6 **does not** implement popup submission persistence, cart, checkout, or PaymentOption.
 
 ### Authentication lifecycle
 
@@ -142,11 +155,11 @@ UNIPAYMENT_CP_TOKEN_EXPIRES_AT
 
 ## Explicitly not implemented yet
 
-| Area                                                  | Phase |
-| ----------------------------------------------------- | ----- |
-| ProductContextFactory / product hooks / product popup | 6+    |
-| Cart calculator / cart popup                          | later |
-| PaymentOption / checkout / financing snapshots        | later |
-| SmartUCF outbound / emails / advertising FO           | later |
-| Checkout lock / order attempt / popup / FO JS/CSS     | later |
-| Custom order states / BO journal download             | later |
+| Area                                           | Phase |
+| ---------------------------------------------- | ----- |
+| Popup submission identity / dedupe table       | 7     |
+| Cart calculator / cart popup                   | 8+    |
+| PaymentOption / checkout / financing snapshots | 9+    |
+| SmartUCF outbound / emails / advertising FO    | later |
+| Checkout lock / order attempt                  | later |
+| Custom order states / BO journal download      | later |

@@ -66,8 +66,8 @@ assertAdminConfiguration(
 $frontFiles = array_values(array_diff(scandir($root . '/controllers/front') ?: [], ['.', '..', 'index.php']));
 sort($frontFiles);
 assertAdminConfiguration(
-    $frontFiles === ['orderbankstatus.php', 'shopcache.php', 'smartucfdebuglog.php'],
-    'Phase 4 inbound front controllers must be exactly shopcache/orderbankstatus/smartucfdebuglog'
+    $frontFiles === ['orderbankstatus.php', 'productcalculator.php', 'productpopup.php', 'shopcache.php', 'smartucfdebuglog.php'],
+    'Phase 6 front controllers must include inbound API + product calculator/popup'
 );
 
 assertAdminConfiguration(strpos($module, '$credentialsChanged =') !== false, 'credential-change detection missing');
@@ -102,8 +102,15 @@ assertAdminConfiguration(
     'BO save must not ignore credential side-effect failure'
 );
 
-assertAdminConfiguration(!preg_match('/\bregisterHook\s*\(/', $module), 'no functional FO hooks in Phase 5');
-assertAdminConfiguration(!preg_match('/\bfunction\s+hook[A-Z]\w*/', $module), 'no hook handlers in Phase 5');
+assertAdminConfiguration(
+    (bool) preg_match('/function\s+hookDisplayProductAdditionalInfo\b/', $module),
+    'Phase 6 product hook handler must exist'
+);
+assertAdminConfiguration(
+    !preg_match('/\bfunction\s+hookPaymentOptions\b/', $module)
+        && !preg_match('/\bfunction\s+hookDisplayShoppingCart\b/', $module),
+    'cart/checkout hooks remain Phase 8+'
+);
 assertAdminConfiguration(!preg_match('/\bnew\s+OrderState\b|\bOrderStateInstaller\b/', $module), 'no custom order states');
 assertAdminConfiguration(
     is_dir($root . '/src/Calculator')
@@ -111,8 +118,8 @@ assertAdminConfiguration(
     'Phase 5 calculator domain must exist'
 );
 assertAdminConfiguration(
-    !is_file($root . '/src/Product/ProductContextFactory.php'),
-    'ProductContextFactory remains Phase 6+'
+    is_file($root . '/src/Product/ProductContextFactory.php'),
+    'Phase 6 ProductContextFactory must exist'
 );
 
-fwrite(STDOUT, "OK (admin configuration Phase 5 contract)\n");
+fwrite(STDOUT, "OK (admin configuration Phase 6 contract)\n");

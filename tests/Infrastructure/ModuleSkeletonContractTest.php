@@ -76,6 +76,8 @@ $allowedFront = [
     'shopcache.php' => true,
     'orderbankstatus.php' => true,
     'smartucfdebuglog.php' => true,
+    'productcalculator.php' => true,
+    'productpopup.php' => true,
 ];
 foreach ($frontControllers as $file) {
     $base = basename($file);
@@ -87,27 +89,27 @@ foreach ($frontControllers as $file) {
 assertModuleSkeleton(
     is_file($root . '/controllers/front/shopcache.php')
         && is_file($root . '/controllers/front/orderbankstatus.php')
-        && is_file($root . '/controllers/front/smartucfdebuglog.php'),
-    'Phase 4 inbound controllers must exist'
+        && is_file($root . '/controllers/front/smartucfdebuglog.php')
+        && is_file($root . '/controllers/front/productcalculator.php')
+        && is_file($root . '/controllers/front/productpopup.php'),
+    'Phase 4 inbound + Phase 6 product controllers must exist'
 );
 
-$assetIterator = new RecursiveIteratorIterator(
-    new RecursiveDirectoryIterator($root . '/views', FilesystemIterator::SKIP_DOTS)
+assertModuleSkeleton(
+    is_file($root . '/views/js/product-calculator.js')
+        && is_file($root . '/views/css/product-calculator.css'),
+    'Phase 6 product assets must exist'
 );
-foreach ($assetIterator as $fileInfo) {
-    if (!$fileInfo instanceof SplFileInfo || !$fileInfo->isFile()) {
-        continue;
-    }
-    $extension = strtolower($fileInfo->getExtension());
-    assertModuleSkeleton(
-        !in_array($extension, ['js', 'css'], true),
-        'no functional JS/CSS files are allowed: ' . $fileInfo->getFilename()
-    );
-}
+assertModuleSkeleton(
+    !is_file($root . '/views/js/cart-calculator.js')
+        && !is_file($root . '/views/js/checkout-payment.js')
+        && !is_file($root . '/views/js/homepage-advertising.js'),
+    'cart/checkout/homepage FO assets must remain absent in Phase 6'
+);
 
 assertModuleSkeleton(
     !preg_match('/\bCREATE\s+TABLE\b/i', $module),
-    'module entry must not embed CREATE TABLE SQL (install via ShopConfigurationCache)'
+    'module entry must not embed CREATE TABLE SQL (install via repositories)'
 );
 assertModuleSkeleton(
     is_file($root . '/src/Configuration/ShopConfigurationCache.php'),
@@ -118,20 +120,30 @@ assertModuleSkeleton(
     'Phase 5 Calculator domain must exist'
 );
 assertModuleSkeleton(
-    !is_file($root . '/src/Product/ProductContextFactory.php'),
-    'ProductContextFactory must not exist yet'
+    is_file($root . '/src/Product/ProductContextFactory.php'),
+    'Phase 6 ProductContextFactory must exist'
 );
 assertModuleSkeleton(
     !preg_match('/\bnew\s+OrderState\b|\bOrderStateInstaller\b/i', $module),
     'module entry must not install custom order states'
 );
 assertModuleSkeleton(
-    !preg_match('/\bregisterHook\s*\(/', $module),
-    'module entry must not register functional hooks'
+    (bool) preg_match('/registerHook\s*\(\s*[\'"]displayProductAdditionalInfo[\'"]\s*\)/', $module),
+    'Phase 6 must register displayProductAdditionalInfo'
 );
 assertModuleSkeleton(
-    !preg_match('/\bfunction\s+hook[A-Z]\w*/', $module),
-    'module entry must not define functional hook handlers'
+    (bool) preg_match('/function\s+hookDisplayProductAdditionalInfo\b/', $module),
+    'Phase 6 must define hookDisplayProductAdditionalInfo'
+);
+assertModuleSkeleton(
+    !preg_match('/\bfunction\s+hookPaymentOptions\b/', $module)
+        && !preg_match('/\bfunction\s+hookDisplayShoppingCart\b/', $module),
+    'cart/checkout hooks must remain absent in Phase 6'
+);
+assertModuleSkeleton(
+    !preg_match('/unipayment_popup_submission/', $module)
+        && !is_file($root . '/src/Product/PopupSubmissionRepository.php'),
+    'Phase 7 popup submission persistence must remain absent'
 );
 
-fwrite(STDOUT, "OK (module skeleton contract)\n");
+fwrite(STDOUT, "OK (module skeleton Phase 6 contract)\n");
