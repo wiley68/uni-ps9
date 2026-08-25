@@ -277,17 +277,18 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 7 е **product popup identity / guarded submission** (Hummingbird + Classic).
+Phase 8 е **cart-page financing** (Hummingbird + Classic).
 
 Разрешено:
 
-- всичко от Phase 0–6;
-- `unipayment_popup_submission` + `PopupSubmissionRepository` / operation guard;
-- `productpopup` actions: `calculate`, `issue_submission_token`, `validate_step2`, `apply` (identity only), `preselect`.
+- всичко от Phase 0–7;
+- `displayShoppingCart` + `cartcalculator` / `cartpopup`;
+- `CartContextFactory` / `CartSchemeResolver` / presenters;
+- cart popup identity през същата `unipayment_popup_submission` таблица с `flow=cart_popup`.
 
-Не въвеждай cart hooks, PaymentOption, financing snapshot install, checkout lock, order attempts, SmartUCF outbound, emails, custom order states или advertising FO, докато съответната фаза не бъде изрично възложена.
+Не въвеждай PaymentOption, financing snapshot install, checkout lock, order attempts, SmartUCF outbound, emails, custom order states или advertising FO, докато съответната фаза не бъде изрично възложена.
 
-Apply в Phase 7 приключва на `identity_accepted`. Не създава PrestaShop/CP поръчка.
+Cart/product apply приключват на `identity_accepted`. Не създават PrestaShop/CP поръчка.
 
 ---
 

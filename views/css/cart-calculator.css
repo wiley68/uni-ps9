@@ -1,0 +1,23 @@
+/* Cart-specific layout. Popup UI reuses product-calculator.css (Woo cart_popup parity). */
+.unipayment-cart-calculator {
+  width: 100%;
+  margin: 1rem 0;
+}
+
+[data-unipayment-cart-calculator] .unipayment-product-calculator__heading {
+  text-align: center;
+}
+
+[data-unipayment-cart-calculator] .unipayment-product-calculator__buttons {
+  justify-content: center;
+  align-items: center;
+}
+
+[data-unipayment-cart-calculator].unipayment-product-calculator--stacked .unipayment-product-calculator__buttons {
+  align-items: center;
+}
+
+/* Woo hide_add_to_cart: Step 1 shows only Cancel + Apply */
+[data-unipayment-source="cart"] [data-unipayment-secondary] {
+  display: none !important;
+}

@@ -1144,11 +1144,6 @@
                 updateSubmitState(false);
             }
 
-            if (isCartSource) {
-                enterStep2();
-                return;
-            }
-
             ensurePopupSubmissionToken(true)
                 .then(function () {
                     enterStep2();
@@ -1162,9 +1157,6 @@
         }
 
         function ensurePopupSubmissionToken(forceIssue) {
-            if (isCartSource) {
-                return Promise.resolve("");
-            }
             if (!forceIssue && popupSubmissionToken) {
                 return Promise.resolve(popupSubmissionToken);
             }
@@ -1233,15 +1225,13 @@
                 .then(function (token) {
                     var payload = calculationPayload("apply");
                     if (!payload) throw new Error("selection");
-                    if (!isCartSource) {
-                        if (!token && !popupSubmissionToken) {
-                            throw new Error("token");
-                        }
-                        payload.set(
-                            "popup_submission_token",
-                            token || popupSubmissionToken,
-                        );
+                    if (!token && !popupSubmissionToken) {
+                        throw new Error("token");
                     }
+                    payload.set(
+                        "popup_submission_token",
+                        token || popupSubmissionToken,
+                    );
                     [
                         "first_name",
                         "last_name",
@@ -1594,6 +1584,11 @@
             config = next;
             root.setAttribute("data-calculator", JSON.stringify(next || {}));
             root.hidden = !next;
+            if (isCartSource) {
+                popupSubmissionToken = "";
+                root.unipaymentPopupSubmissionToken = "";
+                lastCalculation = null;
+            }
             if (next) applyVisualConfig(root, next);
             root.querySelectorAll("[data-unipayment-offer]").forEach(
                 function (button) {

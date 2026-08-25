@@ -82,15 +82,16 @@ assertAud002aContract(strpos($js, 'issue_submission_token') !== false, 'JS must 
 assertAud002aContract(strpos($js, 'popup_submission_token') !== false, 'JS must send submission token on apply');
 assertAud002aContract(strpos($js, 'body.step === "processing"') !== false, 'JS must handle processing without generic error');
 assertAud002aContract(strpos($js, 'body.step === "identity_accepted"') !== false, 'JS must handle Phase 7 identity accepted');
-assertAud002aContract(strpos($js, 'isCartSource') !== false && strpos($js, 'issue_submission_token') !== false, 'cart source must skip product token issue');
+assertAud002aContract(strpos($js, 'isCartSource') !== false && strpos($js, 'issue_submission_token') !== false, 'shared popup JS supports cart source and submission tokens');
 assertAud002aContract(strpos($js, 'preselectOperationToken = ""') !== false, 'stale popup must clear preselect token');
 
 assertAud002aContract(strpos($guest, 'customerExists') === false, 'AUD-001 must remain: no email customer lookup');
 assertAud002aContract(strpos($guest, 'createGuestCustomer') !== false, 'AUD-001 fresh guest path remains');
 assertAud002aContract((bool) preg_match('/json_encode\(\$canonical/', $hash), 'selection_hash must use structured JSON canonicalization');
+assertAud002aContract(strpos($hash, 'FLOW_CART_POPUP') !== false, 'selection hash must isolate cart_popup flow');
 
 assertAud002aContract(strpos($module, 'unipayment_checkout_lock') === false, 'no checkout lock table');
 assertAud002aContract(strpos($module, 'unipayment_order_attempt') === false, 'no order attempt table');
 assertAud002aContract(strpos($module, 'unipayment_financing_snapshot') === false, 'no financing snapshot table');
 
-fwrite(STDOUT, "OK (AUD-002A Phase 7 static contract)\n");
+fwrite(STDOUT, "OK (AUD-002A Phase 7/8 static contract)\n");

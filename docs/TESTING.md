@@ -64,4 +64,22 @@ git diff --check
 
 ## Manual STOP GATE 7
 
-Product popup identity/dedupe (Hummingbird + Classic). See Phase 7 implementation report. Do not start Phase 8 until accepted.
+Product popup identity/dedupe (Hummingbird + Classic). Passed.
+
+## Phase 8 cart coverage
+
+| Test                                                         | What it checks                                              |
+| ------------------------------------------------------------ | ----------------------------------------------------------- |
+| `tests/Cart/CartSchemeResolverTest.php`                      | Intersection, filter metadata, cart-total price parity      |
+| `tests/Cart/CartCalculatorPresenterTest.php`                 | Offers / currency / labels                                  |
+| `tests/Cart/CartPopupCalculatorTest.php`                     | Modal calc uses cart total                                  |
+| `tests/Cart/CartAmountSemanticsTest.php`                     | Qty vectors 100/300 + filter case                           |
+| `tests/Cart/CartFlowIsolationTest.php`                       | product↔cart hash isolation, drift, cross-session           |
+| `tests/Cart/CartPopupReplayGuardTest.php`                    | Atomic claim replay + cross-flow reject                     |
+| `tests/Cart/CartPopupContractTest.php`                       | Template/JS/controller Phase 8 contracts                    |
+| `tests/Cart/CartPopupControllerContractTest.php`             | Actions / no order / no preselect                           |
+| `tests/Frontend/CartFrontendLifecycleContractTest.php`       | `updatedCart`, AbortController, no jQuery                   |
+
+## Manual STOP GATE 8
+
+Cart-page financing (Hummingbird + Classic). See Phase 8 implementation report. Do not start Phase 9 until accepted.

@@ -78,6 +78,8 @@ $allowedFront = [
     'smartucfdebuglog.php' => true,
     'productcalculator.php' => true,
     'productpopup.php' => true,
+    'cartcalculator.php' => true,
+    'cartpopup.php' => true,
 ];
 foreach ($frontControllers as $file) {
     $base = basename($file);
@@ -91,8 +93,10 @@ assertModuleSkeleton(
         && is_file($root . '/controllers/front/orderbankstatus.php')
         && is_file($root . '/controllers/front/smartucfdebuglog.php')
         && is_file($root . '/controllers/front/productcalculator.php')
-        && is_file($root . '/controllers/front/productpopup.php'),
-    'Phase 4 inbound + Phase 6 product controllers must exist'
+        && is_file($root . '/controllers/front/productpopup.php')
+        && is_file($root . '/controllers/front/cartcalculator.php')
+        && is_file($root . '/controllers/front/cartpopup.php'),
+    'Phase 4 inbound + Phase 6–8 product/cart controllers must exist'
 );
 
 assertModuleSkeleton(
@@ -101,10 +105,11 @@ assertModuleSkeleton(
     'Phase 6 product assets must exist'
 );
 assertModuleSkeleton(
-    !is_file($root . '/views/js/cart-calculator.js')
+    is_file($root . '/views/js/cart-calculator.js')
+        && is_file($root . '/views/css/cart-calculator.css')
         && !is_file($root . '/views/js/checkout-payment.js')
         && !is_file($root . '/views/js/homepage-advertising.js'),
-    'cart/checkout/homepage FO assets must remain absent in Phase 6'
+    'Phase 8 cart assets must exist; checkout/homepage FO assets must remain absent'
 );
 
 assertModuleSkeleton(
@@ -136,9 +141,13 @@ assertModuleSkeleton(
     'Phase 6 must define hookDisplayProductAdditionalInfo'
 );
 assertModuleSkeleton(
-    !preg_match('/\bfunction\s+hookPaymentOptions\b/', $module)
-        && !preg_match('/\bfunction\s+hookDisplayShoppingCart\b/', $module),
-    'cart/checkout hooks must remain absent in Phase 7'
+    (bool) preg_match('/registerHook\s*\(\s*[\'"]displayShoppingCart[\'"]\s*\)/', $module)
+        && (bool) preg_match('/function\s+hookDisplayShoppingCart\b/', $module),
+    'Phase 8 must register displayShoppingCart'
+);
+assertModuleSkeleton(
+    !preg_match('/\bfunction\s+hookPaymentOptions\b/', $module),
+    'checkout PaymentOption hook must remain absent in Phase 8'
 );
 assertModuleSkeleton(
     is_file($root . '/src/Product/PopupSubmissionRepository.php')

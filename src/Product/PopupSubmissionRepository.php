@@ -72,12 +72,16 @@ final class PopupSubmissionRepository
         string $selectionHash,
         int $idGuest,
         int $idCustomer,
-        string $preferredToken = ''
+        string $preferredToken = '',
+        string $flow = PopupSubmissionSelectionHash::FLOW_PRODUCT_POPUP
     ): array {
         $this->purgeExpired();
 
         $now = gmdate('Y-m-d H:i:s');
         $preferredToken = trim($preferredToken);
+        $flow = $flow === PopupSubmissionSelectionHash::FLOW_CART_POPUP
+            ? PopupSubmissionSelectionHash::FLOW_CART_POPUP
+            : PopupSubmissionSelectionHash::FLOW_PRODUCT_POPUP;
 
         if ($preferredToken !== '') {
             $existing = $this->findByToken($preferredToken);
@@ -118,7 +122,7 @@ final class PopupSubmissionRepository
             $idShop,
             pSQL($token),
             pSQL($selectionHash),
-            pSQL(PopupSubmissionSelectionHash::FLOW_PRODUCT_POPUP),
+            pSQL($flow),
             pSQL(PopupSubmissionStates::ISSUED),
             $idGuest > 0 ? (string) (int) $idGuest : 'NULL',
             $idCustomer > 0 ? (string) (int) $idCustomer : 'NULL',

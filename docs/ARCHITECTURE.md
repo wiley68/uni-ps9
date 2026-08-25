@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 7** state.
+This document describes **intended** high-level boundaries and the **implemented Phase 8** state.
 
 ---
 
@@ -25,7 +25,7 @@ Infrastructure
 
 ---
 
-## Implemented through Phase 7
+## Implemented through Phase 8
 
 | Area                        | State                                                                                 |
 | --------------------------- | ------------------------------------------------------------------------------------- |
@@ -46,6 +46,7 @@ Infrastructure
 | Financing calculator domain | Phase 5 — pure snapshot-driven Calculator                                             |
 | Product page FO             | Phase 6 — hook + AJAX + vanilla JS (Hummingbird + Classic)                            |
 | Popup identity / dedupe     | Phase 7 — `unipayment_popup_submission`, operation guard, Step 2 identity             |
+| Cart page FO                | Phase 8 — `displayShoppingCart` + cartcalculator/cartpopup + Phase 7 flow isolation   |
 
 ### Shop configuration cache flow
 
@@ -141,7 +142,39 @@ apply
 
 Guest identity: `$context->cookie->id_guest`. Logged-in: `$context->customer->isLogged()` only (AUD-001: never email lookup). Address ownership: `id_customer` match, skip deleted. Apply does **not** create guests, addresses, carts, or orders.
 
-Phase 7 **does not** implement cart calculator, PaymentOption, financing snapshot, checkout lock, order attempts, CP orders, SmartUCF outbound, or emails.
+### Cart financing (Phase 8)
+
+```text
+native PrestaShop cart
+    ↓
+CartContextFactory (payable = Cart::getOrderTotal(true, Cart::BOTH))
+    ↓
+CartSchemeResolver (intersection of per-line schemes; each line priced at cart total)
+    ↓
+CartCalculatorPresenter → displayShoppingCart → cart_calculator.tpl
+    ↓
+AJAX cartcalculator (refresh) / cartpopup (calculate + Phase 7 identity/dedupe)
+```
+
+Amount semantics (PS8 / Woo cart oracle):
+
+| Item            | Source                                                                 |
+| --------------- | ---------------------------------------------------------------------- |
+| Financed amount | `Cart::getOrderTotal(true, Cart::BOTH)` — tax incl. products + shipping − vouchers |
+| Line `total_wt` | Stored on `CartLine` only; **not** used for eligibility/calculation    |
+| Qty influence   | Via cart payable total (qty changes change `BOTH` total)               |
+| Filter identity | Metadata only; intersection key is `type\|kop\|months`                 |
+
+Cart UI is **cart-wide** (one calculator for the whole cart), not per-line widgets.
+
+Cart popup reuses Phase 7 `PopupSubmissionRepository` / guard / identity services with `flow=cart_popup` and binding `{id_cart, cart_total, scheme…}`. Apply stops at `identity_accepted`. No `preselect` (does not re-add cart lines). No PaymentOption / orders / SmartUCF.
+
+Theme lifecycle (cart):
+
+| Theme           | Hook                 | Events                                      |
+| --------------- | -------------------- | ------------------------------------------- |
+| Hummingbird 2.0 | `displayShoppingCart` | `prestashop.on('updatedCart')` after AJAX   |
+| Classic 3.1.1   | same                 | same (`updateCart` → refresh → `updatedCart`) |
 
 ### Authentication lifecycle
 
@@ -180,7 +213,6 @@ UNIPAYMENT_CP_TOKEN_EXPIRES_AT
 
 | Area                                           | Phase |
 | ---------------------------------------------- | ----- |
-| Cart calculator / cart popup                   | 8+    |
 | PaymentOption / checkout / financing snapshots | 9+    |
 | SmartUCF outbound / emails / advertising FO    | later |
 | Checkout lock / order attempt                  | later |

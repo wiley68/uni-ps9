@@ -8,7 +8,7 @@ Native PrestaShop 9 module for **UniCredit financing** (credit calculator, check
 | Current version       | `2.0.1`                                                   |
 | Repository            | `wiley68/uni-ps9`                                         |
 | Repository root       | Module root (this directory)                              |
-| Current state         | **Phase 7 — product popup identity / guarded submission** |
+| Current state         | **Phase 8 — cart-page financing**                         |
 
 ## Purpose
 
@@ -28,15 +28,16 @@ Provide a PrestaShop 9-native adapter/port of the UniPayment product family:
 
 ## Current implementation status
 
-Phase 7 provides:
+Phase 8 provides:
 
-- Phases 0–6 (config, CP client, shop cache, inbound signed API, calculator domain, product-page FO);
-- popup submission table, selection hash, operation guard, Step 2 identity validation;
-- `issue_submission_token` / `apply` (identity_accepted) / `validate_step2` / `preselect`.
+- Phases 0–7 (config, CP client, shop cache, inbound API, calculator, product FO, popup identity);
+- cart calculator via `displayShoppingCart` + `cartcalculator` / `cartpopup`;
+- cart payable-total semantics (`Cart::getOrderTotal(true, Cart::BOTH)`);
+- cart popup identity via shared `unipayment_popup_submission` with `flow=cart_popup`.
 
 Still **not** implemented:
 
-- cart calculator / PaymentOption / checkout;
+- PaymentOption / checkout financing method;
 - financing snapshots / checkout lock / order attempts;
 - SmartUCF outbound / emails / advertising FO;
 - PrestaShop or Control Panel order creation from the popup.

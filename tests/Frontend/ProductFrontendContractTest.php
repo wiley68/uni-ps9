@@ -36,10 +36,14 @@ assertProductFrontend(
     'assets must be gated to product controller'
 );
 assertProductFrontend(
-    strpos($module, 'cart-calculator') === false
-        && strpos($module, 'checkout-payment') === false
+    strpos($module, 'checkout-payment') === false
         && strpos($module, 'homepage-advertising') === false,
-        'Phase 7 must not enqueue cart calculator / checkout / homepage assets'
+        'Phase 8 must not enqueue checkout / homepage FO assets'
+);
+assertProductFrontend(
+    strpos($module, "php_self === 'cart'") !== false
+        && strpos($module, 'cart-calculator') !== false,
+    'Phase 8 must enqueue cart calculator assets on cart page'
 );
 
 assertProductFrontend(
