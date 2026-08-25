@@ -138,12 +138,18 @@ assertModuleSkeleton(
 assertModuleSkeleton(
     !preg_match('/\bfunction\s+hookPaymentOptions\b/', $module)
         && !preg_match('/\bfunction\s+hookDisplayShoppingCart\b/', $module),
-    'cart/checkout hooks must remain absent in Phase 6'
+    'cart/checkout hooks must remain absent in Phase 7'
 );
 assertModuleSkeleton(
-    !preg_match('/unipayment_popup_submission/', $module)
-        && !is_file($root . '/src/Product/PopupSubmissionRepository.php'),
-    'Phase 7 popup submission persistence must remain absent'
+    is_file($root . '/src/Product/PopupSubmissionRepository.php')
+        && (bool) preg_match('/PopupSubmissionRepository/', $module),
+    'Phase 7 popup submission persistence must be installed'
+);
+assertModuleSkeleton(
+    !preg_match('/unipayment_financing_snapshot/', $module)
+        && !preg_match('/unipayment_checkout_lock/', $module)
+        && !preg_match('/unipayment_order_attempt/', $module),
+    'future order/checkout tables must remain absent'
 );
 
-fwrite(STDOUT, "OK (module skeleton Phase 6 contract)\n");
+fwrite(STDOUT, "OK (module skeleton Phase 7 contract)\n");

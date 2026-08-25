@@ -1084,6 +1084,8 @@
                 return;
             }
             redirectPending = true;
+            setSecondaryDisabled(true);
+            if (applyButton) applyButton.disabled = true;
             preselectOperationToken = createPreselectOperationToken();
             requestCalculation("preselect")
                 .then(function (body) {
@@ -1098,6 +1100,10 @@
                 })
                 .catch(function () {
                     redirectPending = false;
+                    if (lastCalculation) {
+                        if (applyButton) applyButton.disabled = false;
+                        setSecondaryDisabled(false);
+                    }
                 });
         }
 
@@ -1305,6 +1311,12 @@
                             setStep(3);
                             return;
                         }
+                        if (body.step === "identity_accepted") {
+                            setProcessingState(false);
+                            showIdentityAccepted();
+                            setStep(3);
+                            return;
+                        }
                         if (body.step === "outcome_unknown") {
                             setProcessingState(false);
                             showSmartUcfError(
@@ -1370,6 +1382,30 @@
                 processingMessage +
                 "</p>" +
                 "</div>";
+        }
+
+        function showIdentityAccepted() {
+            if (!step3) return;
+            var closeLabel = t("data-close-label", "Затвори");
+            var title = t("data-identity-accepted-title", "Данните са приети");
+            var message = t(
+                "data-identity-accepted-message",
+                "Личните данни и избраният план са приети. Поръчката ще бъде завършена на следваща стъпка.",
+            );
+            step3.innerHTML =
+                '<div class="unipayment-product-calculator__confirmation">' +
+                '<h2 class="unipayment-product-calculator__popup-title">' +
+                title +
+                "</h2>" +
+                "<p>" +
+                message +
+                "</p>" +
+                '<div class="unipayment-product-calculator__popup-actions">' +
+                '<button type="button" class="unipayment-product-calculator__popup-button unipayment-product-calculator__popup-button--primary" data-unipayment-close>' +
+                "<span><b>" +
+                closeLabel +
+                "</b></span></button></div></div>";
+            redirectPending = false;
         }
 
         function showSmartUcfError(errorMessage, options) {
@@ -1514,6 +1550,7 @@
             first.readOnly = false;
             lastCalculation = null;
             popupSubmissionToken = "";
+            preselectOperationToken = "";
             root.unipaymentPopupSubmissionToken = "";
             applyButton.disabled = true;
             setSecondaryDisabled(true);
@@ -1528,6 +1565,7 @@
             first.value = first.value.replace(/\D/g, "");
             lastCalculation = null;
             popupSubmissionToken = "";
+            preselectOperationToken = "";
             root.unipaymentPopupSubmissionToken = "";
             applyButton.disabled = true;
             setSecondaryDisabled(true);
@@ -1585,6 +1623,7 @@
             if (modal.hidden) return;
             lastCalculation = null;
             popupSubmissionToken = "";
+            preselectOperationToken = "";
             root.unipaymentPopupSubmissionToken = "";
             applyButton.disabled = true;
             setSecondaryDisabled(true);

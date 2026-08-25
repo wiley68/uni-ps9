@@ -39,7 +39,7 @@ assertProductFrontend(
     strpos($module, 'cart-calculator') === false
         && strpos($module, 'checkout-payment') === false
         && strpos($module, 'homepage-advertising') === false,
-    'Phase 6 must not enqueue cart/checkout/homepage assets'
+        'Phase 7 must not enqueue cart calculator / checkout / homepage assets'
 );
 
 assertProductFrontend(
@@ -86,12 +86,19 @@ assertProductFrontend(
 assertProductFrontend(
     strpos($popupController, "REQUEST_METHOD'] !== 'POST'") !== false
         && strpos($popupController, 'hash_equals') !== false
-        && strpos($popupController, "\$action !== 'calculate'") !== false,
-    'productpopup must be POST+token calculate-only in Phase 6'
+        && strpos($popupController, 'issue_submission_token') !== false
+        && strpos($popupController, 'ProductPopupOperationGuard') !== false,
+    'productpopup must be POST+token with Phase 7 identity actions'
 );
 assertProductFrontend(
-    !is_dir($root . '/src/Order') || !is_file($root . '/src/Product/PopupSubmissionRepository.php'),
-    'popup submission persistence must remain absent'
+    is_file($root . '/src/Product/PopupSubmissionRepository.php'),
+    'popup submission persistence must exist'
+);
+assertProductFrontend(
+    strpos($js, 'unipaymentInvalidatePopup') !== false
+        && strpos($js, 'preselectOperationToken = ""') !== false
+        && strpos($js, 'identity_accepted') !== false,
+    'JS must reset stale popup identity and handle identity_accepted'
 );
 
-fwrite(STDOUT, "OK (Phase 6 product frontend contract)\n");
+fwrite(STDOUT, "OK (Phase 7 product frontend contract)\n");

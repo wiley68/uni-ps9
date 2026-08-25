@@ -49,7 +49,7 @@ assertPhase4Tables(strpos($module, 'unipayment_financing_snapshot') === false, '
 assertPhase4Tables(strpos($module, 'FinancingSnapshotRepository') === false, 'module must not wire FinancingSnapshotRepository install');
 assertPhase4Tables(strpos($module, 'unipayment_checkout_lock') === false, 'no checkout lock');
 assertPhase4Tables(strpos($module, 'unipayment_order_attempt') === false, 'no order attempt');
-assertPhase4Tables(strpos($module, 'unipayment_popup_submission') === false, 'no popup');
+assertPhase4Tables(strpos($module, 'PopupSubmissionRepository') !== false, 'Phase 7 popup submission is installed');
 
 assertPhase4Tables(strpos($repo, 'financingSnapshotTableExists') !== false, 'missing-table gate present');
 assertPhase4Tables(strpos($repo, 'SHOW TABLES LIKE') !== false, 'existence uses SHOW TABLES');

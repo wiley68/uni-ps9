@@ -33,6 +33,8 @@
         data-order-number-label="{l s='Номер на поръчка:' d='Modules.Unipayment.Shop'}"
         data-order-confirmation-message="{l s='Очаквайте потвърждение от УниКредит.' d='Modules.Unipayment.Shop'}"
         data-order-success-title="{l s='Заявката е изпратена успешно' d='Modules.Unipayment.Shop'}"
+        data-identity-accepted-title="{l s='Данните са приети' d='Modules.Unipayment.Shop'}"
+        data-identity-accepted-message="{l s='Личните данни и избраният план са приети. Поръчката ще бъде завършена на следваща стъпка.' d='Modules.Unipayment.Shop'}"
         style="margin-top: {$unipayment_button_top_spacing|intval}px; --unipayment-button-width: {$unipayment_calculator.button_width|intval}px; --unipayment-button-height: {$unipayment_calculator.button_height|intval}px;">
         {if $unipayment_calculator.heading !== ''}<p class="unipayment-product-calculator__heading">
             {$unipayment_calculator.heading|escape:'htmlall':'UTF-8'}</p>{/if}

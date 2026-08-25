@@ -57,6 +57,7 @@ class Unipayment extends PaymentModule
         $apiNonce = new PrestaShop\Module\Unipayment\Security\ApiNonceRepository();
         $bankStatus = new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository();
         $debugLog = new PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository();
+        $popupSubmissions = new PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository();
 
         if (
             !$repository->install()
@@ -64,8 +65,10 @@ class Unipayment extends PaymentModule
             || !$apiNonce->install()
             || !$bankStatus->install()
             || !$debugLog->install()
+            || !$popupSubmissions->install()
             || !$this->registerProductPageHooks()
         ) {
+            $popupSubmissions->uninstall();
             $debugLog->uninstall();
             $bankStatus->uninstall();
             $apiNonce->uninstall();
@@ -81,6 +84,7 @@ class Unipayment extends PaymentModule
 
     public function uninstall(): bool
     {
+        $popupSubmissions = new PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository();
         $debugLog = new PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository();
         $bankStatus = new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository();
         $apiNonce = new PrestaShop\Module\Unipayment\Security\ApiNonceRepository();
@@ -88,7 +92,8 @@ class Unipayment extends PaymentModule
         $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
 
         if (
-            !$debugLog->uninstall()
+            !$popupSubmissions->uninstall()
+            || !$debugLog->uninstall()
             || !$bankStatus->uninstall()
             || !$apiNonce->uninstall()
             || !$cache->uninstall()
@@ -129,8 +134,9 @@ class Unipayment extends PaymentModule
 
     public function getContent(): string
     {
-        // Idempotent: already-installed shops gain Phase 6 hooks without reinstall.
+        // Idempotent: already-installed shops gain Phase 6 hooks and Phase 7 table without reinstall.
         $this->registerProductPageHooks();
+        (new PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository())->install();
 
         $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
         $requestReader = new PrestaShop\Module\Unipayment\Configuration\AdminConfigurationRequestReader();
@@ -449,6 +455,7 @@ class Unipayment extends PaymentModule
         if (!$this->active || !$repository->isEnabled()) {
             return '';
         }
+        (new PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository())->install();
 
         $productId = $this->resolveHookProductId($params);
         $productAttributeId = max(0, (int) Tools::getValue('id_product_attribute', 0));

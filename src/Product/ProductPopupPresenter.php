@@ -4,12 +4,21 @@ declare(strict_types=1);
 
 namespace PrestaShop\Module\Unipayment\Product;
 
+use PrestaShop\Module\Unipayment\Checkout\ConsentResolver;
+
 /**
  * Product popup presentation DTO (banner, button action, consents, customer prefill).
- * Consent normalization is inlined here so Phase 6 does not depend on Checkout\ConsentResolver.
  */
 final class ProductPopupPresenter
 {
+    /** @var ConsentResolver */
+    private $consents;
+
+    public function __construct(?ConsentResolver $consents = null)
+    {
+        $this->consents = $consents ?? new ConsentResolver();
+    }
+
     /** @param array<string, mixed> $shop @return array<string, mixed> */
     public function present(array $shop, string $buttonAction, array $customer = []): array
     {
@@ -33,44 +42,8 @@ final class ProductPopupPresenter
                 'email' => '',
                 'is_logged' => false,
             ], $customer),
-            'consents' => $this->normalizeConsents($shop),
+            'consents' => $this->consents->normalize($shop),
         ];
-    }
-
-    /**
-     * @param array<string, mixed> $shop
-     * @return array<int, array{id:int,name:string,url:string,mandatory:bool,has_checkbox:bool}>
-     */
-    private function normalizeConsents(array $shop): array
-    {
-        $raw = $shop['consents'] ?? [];
-        if (is_string($raw)) {
-            $decoded = json_decode($raw, true);
-            $raw = is_array($decoded) ? $decoded : [];
-        }
-        $result = [];
-        foreach (is_array($raw) ? $raw : [] as $index => $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-            $name = trim(strip_tags((string) ($item['name'] ?? '')));
-            if ($name === '') {
-                continue;
-            }
-            $mandatory = in_array($item['mandatory'] ?? 0, [1, '1', true, 'yes', 'on', 'true'], true);
-            $result[] = [
-                'id' => max(1, (int) ($item['id'] ?? $index + 1)),
-                'name' => $name,
-                'url' => filter_var((string) ($item['url'] ?? ''), FILTER_VALIDATE_URL) ?: '',
-                'mandatory' => $mandatory,
-                'has_checkbox' => $mandatory,
-            ];
-        }
-        usort($result, static function (array $a, array $b): int {
-            return $a['id'] <=> $b['id'];
-        });
-
-        return $result;
     }
 
     /** @param mixed $value */

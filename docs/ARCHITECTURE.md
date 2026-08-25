@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 6** state.
+This document describes **intended** high-level boundaries and the **implemented Phase 7** state.
 
 ---
 
@@ -25,7 +25,7 @@ Infrastructure
 
 ---
 
-## Implemented through Phase 6
+## Implemented through Phase 7
 
 | Area                        | State                                                                                 |
 | --------------------------- | ------------------------------------------------------------------------------------- |
@@ -45,6 +45,7 @@ Infrastructure
 | SmartUCF debug journal      | `unipayment_smartucf_log` + diagnostic journal (BO download deferred)                 |
 | Financing calculator domain | Phase 5 — pure snapshot-driven Calculator                                             |
 | Product page FO             | Phase 6 — hook + AJAX + vanilla JS (Hummingbird + Classic)                            |
+| Popup identity / dedupe     | Phase 7 — `unipayment_popup_submission`, operation guard, Step 2 identity             |
 
 ### Shop configuration cache flow
 
@@ -106,7 +107,7 @@ Calculator + ProductCalculatorPresenter
         ↓
 hook displayProductAdditionalInfo → product_calculator.tpl
         ↓
-AJAX productcalculator (refresh) / productpopup calculate-only (modal)
+AJAX productcalculator (refresh) / productpopup (calculate + identity/dedupe)
 ```
 
 Theme lifecycle:
@@ -118,7 +119,29 @@ Theme lifecycle:
 
 Race protection: `AbortController` + `refreshSequence` (stale responses ignored).
 
-Phase 6 **does not** implement popup submission persistence, cart, checkout, or PaymentOption.
+### Product popup identity (Phase 7)
+
+```text
+calculate (authoritative ProductContext + Calculator)
+    ↓
+issue_submission_token  → unipayment_popup_submission (issued, TTL 1800s)
+    ↓
+apply
+    → selection_hash match (product/combination/qty/scheme/guest/customer/shop)
+    → atomic UPDATE issued → processing
+    → validate customer + consents + address ownership
+    → identity_accepted (no PS/CP order yet)
+```
+
+| Token                       | Role                                                                | Authoritative?                          |
+| --------------------------- | ------------------------------------------------------------------- | --------------------------------------- |
+| `popup_submission_token`    | Server `bin2hex(random_bytes(32))`, UNIQUE, bound to selection hash | Yes                                     |
+| `preselect_operation_token` | Client 16-byte hex, cookie idempotency for Silent Buy               | Correlation / cart-mutation dedupe only |
+| CSRF `token`                | `Tools::getToken(false)`                                            | Yes, separate from submission identity  |
+
+Guest identity: `$context->cookie->id_guest`. Logged-in: `$context->customer->isLogged()` only (AUD-001: never email lookup). Address ownership: `id_customer` match, skip deleted. Apply does **not** create guests, addresses, carts, or orders.
+
+Phase 7 **does not** implement cart calculator, PaymentOption, financing snapshot, checkout lock, order attempts, CP orders, SmartUCF outbound, or emails.
 
 ### Authentication lifecycle
 
@@ -157,7 +180,6 @@ UNIPAYMENT_CP_TOKEN_EXPIRES_AT
 
 | Area                                           | Phase |
 | ---------------------------------------------- | ----- |
-| Popup submission identity / dedupe table       | 7     |
 | Cart calculator / cart popup                   | 8+    |
 | PaymentOption / checkout / financing snapshots | 9+    |
 | SmartUCF outbound / emails / advertising FO    | later |

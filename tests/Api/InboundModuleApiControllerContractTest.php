@@ -59,7 +59,7 @@ assertCtrl(strpos($module, 'OrderBankStatusRepository') !== false, 'install wire
 assertCtrl(strpos($module, 'SmartUcfDebugLogRepository') !== false, 'install wires smartucf log');
 assertCtrl(strpos($module, 'unipayment_checkout_lock') === false, 'no checkout lock table');
 assertCtrl(strpos($module, 'unipayment_order_attempt') === false, 'no order attempt table');
-assertCtrl(strpos($module, 'unipayment_financing_snapshot') === false, 'financing snapshot not installed in Phase 4');
-assertCtrl(strpos($module, 'unipayment_popup_submission') === false, 'no popup table');
+assertCtrl(strpos($module, 'unipayment_financing_snapshot') === false, 'financing snapshot not installed');
+assertCtrl(strpos($module, 'PopupSubmissionRepository') !== false, 'Phase 7 popup table is installed');
 
 fwrite(STDOUT, "OK (inbound ModuleFrontController contracts)\n");

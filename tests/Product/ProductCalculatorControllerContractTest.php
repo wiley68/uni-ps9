@@ -63,9 +63,9 @@ assertProductCalculatorController(
     'productpopup must require CSRF token'
 );
 assertProductCalculatorController(
-    strpos($popup, "\$action !== 'calculate'") !== false
-        && strpos($popup, 'error(501') !== false,
-    'non-calculate popup actions must degrade safely in Phase 6'
+    strpos($popup, 'issue_submission_token') !== false
+        && strpos($popup, 'error(501') === false,
+    'Phase 7 implements identity popup actions instead of 501'
 );
 assertProductCalculatorController(
     strpos($popup, 'ProductPopupCalculator') !== false

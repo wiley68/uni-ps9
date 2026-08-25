@@ -277,17 +277,17 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 6 е **product-page financing presentation** (Hummingbird + Classic).
+Phase 7 е **product popup identity / guarded submission** (Hummingbird + Classic).
 
 Разрешено:
 
-- всичко от Phase 0–5;
-- `src/Product/*` (ProductContextFactory, presenters, popup calculate);
-- `controllers/front/productcalculator.php` + `productpopup.php` (calculate-only);
-- `hookDisplayProductAdditionalInfo` + product-scoped assets;
-- vanilla `views/js/product-calculator.js` / CSS / template.
+- всичко от Phase 0–6;
+- `unipayment_popup_submission` + `PopupSubmissionRepository` / operation guard;
+- `productpopup` actions: `calculate`, `issue_submission_token`, `validate_step2`, `apply` (identity only), `preselect`.
 
-Не въвеждай popup submission persistence (`unipayment_popup_submission`), cart hooks, PaymentOption, financing snapshot install, checkout lock, order attempts, SmartUCF outbound, emails, custom order states или advertising FO, докато съответната фаза не бъде изрично възложена.
+Не въвеждай cart hooks, PaymentOption, financing snapshot install, checkout lock, order attempts, SmartUCF outbound, emails, custom order states или advertising FO, докато съответната фаза не бъде изрично възложена.
+
+Apply в Phase 7 приключва на `identity_accepted`. Не създава PrestaShop/CP поръчка.
 
 ---
 

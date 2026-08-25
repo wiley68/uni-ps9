@@ -1,6 +1,6 @@
 # Security operations
 
-Operational security reference for UniPayment PrestaShop 9 (Phase 4 inbound API).
+Operational security reference for UniPayment PrestaShop 9 (Phase 4 inbound API + Phase 7 popup identity).
 
 Related: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`TESTING.md`](TESTING.md)
 
@@ -147,3 +147,27 @@ php bin/signed-module-request.php --post \
 ```
 
 Does not bypass authentication. Never prints the secret.
+
+---
+
+## 7. Popup submission identity (Phase 7)
+
+Distinct from Phase 4 HMAC nonce replay (CP → module). Protects **customer popup operations**.
+
+| Item                               | Value                                                                                                 |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Table                              | `{prefix}unipayment_popup_submission`                                                                 |
+| Token                              | `bin2hex(random_bytes(32))` — 64 hex chars, UNIQUE                                                    |
+| Issued TTL                         | **1800** seconds                                                                                      |
+| Claim                              | Atomic `UPDATE … WHERE state=issued AND expires_at > now`                                             |
+| Binding                            | SHA-256 JSON of shop, product, combination, qty, scheme, first installment, `id_guest`, `id_customer` |
+| Logged-in identity                 | `Customer::isLogged()` from Context — never POST `id_customer` / email                                |
+| Guest identity                     | `$cookie->id_guest` — not transferable to another session                                             |
+| CSRF                               | PrestaShop `Tools::getToken(false)` remains required in addition to the submission token              |
+| Client `preselect_operation_token` | Non-authoritative correlation ID for Silent Buy cookie idempotency                                    |
+
+Do not log: raw `popup_submission_token`, EGN, session cookie, secrets.
+
+Expired / replayed / wrong-shop / wrong-identity operations return safe customer-facing JSON (no SQL, no token hash, no stack traces).
+
+Cleanup: opportunistic `DELETE` of expired `issued` / `failed` / `identity_accepted` rows (1/20 of issue attempts). `processing` and `order_created` are never purged here.

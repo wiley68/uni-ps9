@@ -2,13 +2,13 @@
 
 Native PrestaShop 9 module for **UniCredit financing** (credit calculator, checkout payment method, order lifecycle, Control Panel integration, and SmartUCF).
 
-| Item                  | Value                                           |
-| --------------------- | ----------------------------------------------- |
-| Module technical name | `unipayment`                                    |
-| Current version       | `2.0.1`                                         |
-| Repository            | `wiley68/uni-ps9`                               |
-| Repository root       | Module root (this directory)                    |
-| Current state         | **Phase 6 — product-page financing calculator** |
+| Item                  | Value                                                     |
+| --------------------- | --------------------------------------------------------- |
+| Module technical name | `unipayment`                                              |
+| Current version       | `2.0.1`                                                   |
+| Repository            | `wiley68/uni-ps9`                                         |
+| Repository root       | Module root (this directory)                              |
+| Current state         | **Phase 7 — product popup identity / guarded submission** |
 
 ## Purpose
 
@@ -28,20 +28,18 @@ Provide a PrestaShop 9-native adapter/port of the UniPayment product family:
 
 ## Current implementation status
 
-Phase 6 provides:
+Phase 7 provides:
 
-- Phases 0–5 (config, CP client, shop cache, inbound signed API, calculator domain);
-- product-page context factory, presenters, hook, AJAX endpoints;
-- vanilla JS/CSS for Hummingbird + Classic combination lifecycle.
+- Phases 0–6 (config, CP client, shop cache, inbound signed API, calculator domain, product-page FO);
+- popup submission table, selection hash, operation guard, Step 2 identity validation;
+- `issue_submission_token` / `apply` (identity_accepted) / `validate_step2` / `preselect`.
 
 Still **not** implemented:
 
-- popup submission persistence / dedupe (Phase 7);
 - cart calculator / PaymentOption / checkout;
 - financing snapshots / checkout lock / order attempts;
-- SmartUCF outbound / emails / advertising FO.
-
-Product calculator presentation works; order/apply flows from the modal are deferred.
+- SmartUCF outbound / emails / advertising FO;
+- PrestaShop or Control Panel order creation from the popup.
 
 ## Documentation
 

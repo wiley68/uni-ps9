@@ -40,6 +40,20 @@ Phase 5 calculator coverage remains under `tests/Calculator/*`.
 
 Prior phases remain covered under `tests/Configuration`, `tests/Api`, `tests/Security`, `tests/Order`, `tests/SmartUcf`, `tests/Infrastructure`.
 
+Phase 7 identity/dedupe:
+
+| Test                                                        | What it checks                                                       |
+| ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| `tests/Product/PopupSubmissionRepositoryTest.php`           | Hash stability, issue/reuse, atomic claim, expiry, identity_accepted |
+| `tests/Product/ProductPopupOperationGuardTest.php`          | Missing/expired/replay/shop/identity/selection/concurrency           |
+| `tests/Product/PopupSubmissionBindingFactoryTest.php`       | Context guest/customer identity, no POST trust                       |
+| `tests/Product/ProductPopupCustomerTest.php`                | Prefill + Step 2 validator (BG messages, Process 2 EGN)              |
+| `tests/Product/ProductPopupApplyIdentityTest.php`           | Consents, EGN stripped from response                                 |
+| `tests/Product/ProductPopupPreselectOperationGuardTest.php` | Client operation token idempotency                                   |
+| `tests/Product/Aud010PopupAddressContractTest.php`          | Preferred address + ownership                                        |
+| `tests/Security/Aud002aPopupSubmissionContractTest.php`     | Static AUD-002A / Phase 7 boundary                                   |
+| `tests/Security/Aud001GuestIdentityContractTest.php`        | No email customer lookup                                             |
+
 Other useful commands:
 
 ```bash
@@ -48,6 +62,6 @@ composer dump-autoload
 git diff --check
 ```
 
-## Manual STOP GATE 6
+## Manual STOP GATE 7
 
-Product-page FO gate (Hummingbird + Classic). See Phase 6 implementation report. Do not start Phase 7 until accepted.
+Product popup identity/dedupe (Hummingbird + Classic). See Phase 7 implementation report. Do not start Phase 8 until accepted.
