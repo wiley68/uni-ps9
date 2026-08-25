@@ -18,21 +18,21 @@ final class UnipaymentShopcacheModuleFrontController extends ModuleApiController
     {
         $data = $payload['data'] ?? null;
         if (!is_array($data) || $data === []) {
-            throw new ModuleApiException('The data field must contain a complete shop configuration.', 400);
+            throw new ModuleApiException('Полето data трябва да съдържа пълна конфигурация на магазина.', 400);
         }
 
         if (isset($data['unicid']) && (!is_string($data['unicid']) || !hash_equals($unicid, $data['unicid']))) {
-            throw new ModuleApiException('The configuration UNICID does not match the authenticated shop.', 400);
+            throw new ModuleApiException('UNICID в конфигурацията не съвпада с този на магазина.', 400);
         }
 
         $service = $this->createShopConfigurationService();
         try {
             if (!$service->replaceSnapshot($unicid, $data)) {
-                throw new ModuleApiException('The shop configuration cache could not be replaced.', 500);
+                throw new ModuleApiException('Кешът на shop данни не можа да бъде заменен.', 500);
             }
         } catch (ShopConfigurationSnapshotValidationException $exception) {
             throw new ModuleApiException(
-                'The shop configuration snapshot is invalid.',
+                'Конфигурацията на магазина е невалидна.',
                 422,
                 $exception->errorCode(),
                 $exception->responseData()
@@ -41,7 +41,7 @@ final class UnipaymentShopcacheModuleFrontController extends ModuleApiController
 
         return [
             'success' => true,
-            'message' => 'The shop configuration cache was updated successfully.',
+            'message' => 'Кешът на shop данни е обновен успешно.',
             'data' => $service->getMetadata(),
         ];
     }

@@ -18,7 +18,7 @@ final class ModuleRequestSignatureProtocol
 
     public const NONCE_RETENTION_SECONDS = 900;
 
-    public const AUTH_FAILURE_MESSAGE = 'Invalid or expired module request.';
+    public const AUTH_FAILURE_MESSAGE = 'Невалидна или изтекла заявка към модула.';
 
     public const CONTRACT_SECRET = 'test_shared_secret_123';
 

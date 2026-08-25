@@ -18,7 +18,7 @@ final class ShopConfigurationSnapshotValidationException extends \RuntimeExcepti
     /**
      * @param list<array{path: string, code: string}> $violations
      */
-    public function __construct(array $violations, string $message = 'The shop configuration snapshot is invalid.')
+    public function __construct(array $violations, string $message = 'Конфигурацията на магазина е невалидна.')
     {
         parent::__construct($message);
         $this->violations = array_values($violations);

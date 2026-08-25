@@ -13,14 +13,14 @@ final class UnipaymentOrderbankstatusModuleFrontController extends ModuleApiCont
         unset($unicid);
         $idShop = (int) ($this->context->shop->id ?? 0);
         if ($idShop <= 0) {
-            throw new ModuleApiException('The shop context is invalid.', 400);
+            throw new ModuleApiException('Контекстът на магазина е невалиден.', 400);
         }
 
         $orderId = $this->requiredString($payload, 'order_id', 64);
         $statusId = $this->requiredString($payload, 'status_id', 255);
         $status = $payload['status'] ?? '';
         if (!is_string($status) || strlen($status) > 255) {
-            throw new ModuleApiException('The status field is invalid.', 400);
+            throw new ModuleApiException('Полето status е невалидно.', 400);
         }
 
         $result = (new OrderBankStatusRepository())->updateByOrderIdentifier(
@@ -30,14 +30,14 @@ final class UnipaymentOrderbankstatusModuleFrontController extends ModuleApiCont
             trim($status)
         );
         if ($result === null) {
-            throw new ModuleApiException('The order was not found in the shop.', 404);
+            throw new ModuleApiException('Поръчката не е намерена в магазина.', 404);
         }
 
         $result['ps_order_state_changed'] = false;
 
         return [
             'success' => true,
-            'message' => 'The bank status was updated successfully.',
+            'message' => 'Банковият статус е обновен успешно.',
             'data' => $result,
         ];
     }
@@ -47,12 +47,12 @@ final class UnipaymentOrderbankstatusModuleFrontController extends ModuleApiCont
     {
         $value = $payload[$key] ?? null;
         if (!is_string($value) && !is_int($value)) {
-            throw new ModuleApiException(sprintf('The %s field is required.', $key), 400);
+            throw new ModuleApiException(sprintf('Полето %s е задължително.', $key), 400);
         }
 
         $value = trim((string) $value);
         if ($value === '' || strlen($value) > $maxLength) {
-            throw new ModuleApiException(sprintf('The %s field is invalid.', $key), 400);
+            throw new ModuleApiException(sprintf('Полето %s е невалидно.', $key), 400);
         }
 
         return $value;

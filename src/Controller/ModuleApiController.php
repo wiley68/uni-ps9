@@ -23,7 +23,7 @@ abstract class ModuleApiController extends \ModuleFrontController
     {
         try {
             if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
-                throw new ModuleApiException('Only POST requests are allowed.', 405);
+                throw new ModuleApiException('Разрешени са само POST заявки.', 405);
             }
 
             [$payload, $rawBody] = $this->readJsonRequest();
@@ -52,7 +52,7 @@ abstract class ModuleApiController extends \ModuleFrontController
             }
             $this->sendJson([
                 'success' => false,
-                'message' => 'The module could not process the request.',
+                'message' => 'Модулът не можа да обработи заявката.',
             ], 500);
         }
     }
@@ -71,17 +71,17 @@ abstract class ModuleApiController extends \ModuleFrontController
     {
         $rawBody = file_get_contents('php://input');
         if (!is_string($rawBody) || $rawBody === '') {
-            throw new ModuleApiException('A JSON request body is required.', 400);
+            throw new ModuleApiException('Изисква се JSON тяло на заявката.', 400);
         }
 
         try {
             $payload = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $exception) {
-            throw new ModuleApiException('The JSON request body is invalid.', 400);
+            throw new ModuleApiException('JSON тялото на заявката е невалидно.', 400);
         }
 
         if (!is_array($payload)) {
-            throw new ModuleApiException('The JSON request body must be an object.', 400);
+            throw new ModuleApiException('JSON тялото на заявката трябва да бъде обект.', 400);
         }
 
         return [$payload, $rawBody];
@@ -127,7 +127,7 @@ abstract class ModuleApiController extends \ModuleFrontController
             echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         } catch (\JsonException $exception) {
             http_response_code(500);
-            echo '{"success":false,"message":"The module could not encode its response."}';
+            echo '{"success":false,"message":"Модулът не можа да кодира отговора."}';
         }
 
         exit;

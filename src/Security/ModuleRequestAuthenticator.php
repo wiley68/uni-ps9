@@ -40,13 +40,13 @@ final class ModuleRequestAuthenticator
     public function authenticate(array $payload, string $rawBody, array $headers): string
     {
         if (!$this->configuration->isEnabled()) {
-            throw new ModuleApiException('The module is disabled.', 403);
+            throw new ModuleApiException('Модулът е изключен.', 403);
         }
 
         $storedUnicid = $this->configuration->getUnicid();
         $storedSecret = $this->configuration->getSecret();
         if ($storedUnicid === '' || $storedSecret === null) {
-            throw new ModuleApiException('The module is not configured.', 401);
+            throw new ModuleApiException('Модулът не е конфигуриран.', 401);
         }
 
         $unicid = $payload['unicid'] ?? null;

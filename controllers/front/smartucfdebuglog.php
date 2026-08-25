@@ -15,12 +15,12 @@ final class UnipaymentSmartucfdebuglogModuleFrontController extends ModuleApiCon
         unset($unicid);
         $orderId = $payload['order_id'] ?? null;
         if (!is_string($orderId) && !is_int($orderId)) {
-            throw new ModuleApiException('The order_id field is required.', 400);
+            throw new ModuleApiException('Полето order_id е задължително.', 400);
         }
 
         $orderId = trim((string) $orderId);
         if ($orderId === '' || strlen($orderId) > 64) {
-            throw new ModuleApiException('The order_id field is invalid.', 400);
+            throw new ModuleApiException('Полето order_id е невалидно.', 400);
         }
 
         $log = (new SmartUcfDiagnosticJournal(
@@ -28,7 +28,7 @@ final class UnipaymentSmartucfdebuglogModuleFrontController extends ModuleApiCon
             new SmartUcfDebugLogRepository()
         ))->findLatestByOrderId($orderId);
         if ($log === null) {
-            throw new ModuleApiException('No SmartUCF diagnostic record was found for this order.', 404);
+            throw new ModuleApiException('Не е намерен SmartUCF диагностичен запис за тази поръчка.', 404);
         }
 
         return [

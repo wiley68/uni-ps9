@@ -73,7 +73,7 @@ Invalid signature **must not** consume a nonce.
 
 ### Auth failure
 
-HTTP **401**, message: `Invalid or expired module request.` (generic; no oracle for guessing).
+HTTP **401**, message: `Невалидна или изтекла заявка към модула.` (generic; no oracle for guessing).
 
 Disabled module: **403**. Not configured: **401**.
 
