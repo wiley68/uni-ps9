@@ -1,0 +1,11 @@
+services:
+  _defaults:
+    public: false
+    autowire: true
+    autoconfigure: true
+
+  PrestaShop\Module\Unipayment\:
+    resource: '../src/'
+    exclude:
+      - '../src/index.php'
+      - '../src/**/index.php'

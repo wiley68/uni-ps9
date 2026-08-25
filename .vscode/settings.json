@@ -1,0 +1,33 @@
+{
+    // Workspace is modules/unipayment; documentRoot is the PrestaShop 9.1 shop
+    // so Intelephense can resolve core types used by the module entry point.
+    "intelephense.environment.documentRoot": "/var/www/presta9.avalonbg.com",
+    "intelephense.environment.phpVersion": "8.1.0",
+    "intelephense.environment.includePaths": [
+        // _PS_VERSION_, helpers such as pSQL(), bootstrap constants
+        "/var/www/presta9.avalonbg.com/config",
+        // *Core classes (PaymentModuleCore, ModuleCore, ToolsCore, ...)
+        "/var/www/presta9.avalonbg.com/classes",
+        // PrestaShop\\PrestaShop\\* (PaymentOption, Symfony adapters, ...)
+        "/var/www/presta9.avalonbg.com/src",
+        // Symfony 6.4 / shop Composer packages
+        "/var/www/presta9.avalonbg.com/vendor",
+        // var/class_stub.php: abstract class PaymentModule extends PaymentModuleCore
+        "/var/www/presta9.avalonbg.com/var",
+        // PhpCsFixer\\Finder / Config for .php-cs-fixer.dist.php (tool is not a module dependency)
+        "/var/www/presta9.avalonbg.com/modules/unipayment/.vscode/intelephense-stubs"
+    ],
+    "intelephense.files.exclude": [
+        "**/var/cache/**",
+        "**/var/logs/**",
+        "**/var/sessions/**",
+        "**/var/modules/**"
+    ],
+    "files.associations": {
+        "*.tpl": "smarty"
+    },
+    "[smarty]": {
+        "editor.formatOnSave": false,
+        "editor.defaultFormatter": null
+    }
+}
