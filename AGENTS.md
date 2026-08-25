@@ -265,17 +265,28 @@ Deleted files трябва да бъдат изрично обяснени.
 
 ---
 
+# CLI тестове и Intelephense
+
+Локалните test doubles (`Configuration`, `PhpEncryption`, fake transports) трябва да имат **explicit PHP 8.1 type hints** на параметри и return types.
+
+Иначе Intelephense докладва шум като `Parameter $key has no type information available`.
+
+Виж също: `.cursor/rules/php-test-stubs.mdc`.
+
+---
+
 # Текущо състояние
 
-Phase 1 е **local configuration layer**.
+Phase 2 е **Control Panel client + authentication lifecycle**.
 
 Разрешено:
 
-- локални Configuration ключове;
-- `ConfigurationRepository` / `ConfigurationValidator`;
-- Back Office configuration page (`getContent()` + Smarty).
+- локални Configuration ключове и BO configuration page;
+- `ControlPanelClient`, `TokenRepository`, HTTP transport, API exceptions;
+- `GET /shop` fetch без локален cache;
+- token invalidation при смяна на credentials.
 
-Не въвеждай Control Panel client, shop cache, calculator, hooks, module tables, payment method, frontend assets или financing functionality, докато съответната фаза не бъде изрично възложена.
+Не въвеждай shop cache, inbound signed API, calculator, hooks, module tables, payment method, frontend assets или financing functionality, докато съответната фаза не бъде изрично възложена.
 
 ---
 

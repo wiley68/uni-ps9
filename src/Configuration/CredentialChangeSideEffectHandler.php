@@ -4,20 +4,27 @@ declare(strict_types=1);
 
 namespace PrestaShop\Module\Unipayment\Configuration;
 
+use PrestaShop\Module\Unipayment\Security\TokenRepository;
+
 /**
  * Boundary for side effects after UNICID/secret change.
  *
- * Phase 1 keeps detection of credential changes but does not invalidate tokens
- * or clear shop configuration cache until those components exist:
- *
- * - Phase 2: TokenRepository::invalidate()
- * - Phase 3: ShopConfigurationCache::clear()
+ * Phase 2: invalidate Control Panel auth tokens.
+ * Phase 3 will also clear the local shop configuration cache here.
  */
 final class CredentialChangeSideEffectHandler
 {
+    /** @var TokenRepository */
+    private $tokens;
+
+    public function __construct(?TokenRepository $tokens = null)
+    {
+        $this->tokens = $tokens ?? new TokenRepository();
+    }
+
     public function onCredentialsChanged(): void
     {
-        // Intentionally no-op in Phase 1.
-        // Token and shop-cache invalidation activate with Phase 2 / Phase 3.
+        $this->tokens->invalidate();
+        // Phase 3: clear local shop configuration cache.
     }
 }

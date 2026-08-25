@@ -1,0 +1,53 @@
+---
+description: PHP test doubles must use explicit PHP 8.1 types for Intelephense
+globs: tests/**/*.php
+alwaysApply: false
+---
+
+# PHP test stubs / doubles
+
+When a CLI test defines local PrestaShop doubles (`Configuration`, `PhpEncryption`, fake transports, etc.), give every parameter and return value an explicit PHP 8.1 type.
+
+Intelephense analyzes these stubs statically. Untyped parameters produce editor noise such as `Parameter $key has no type information available`.
+
+## Required pattern
+
+```php
+final class Configuration
+{
+    /** @var array<string, mixed> */
+    public static $values = [];
+
+    public static function updateValue(string $key, mixed $value): bool
+    {
+        self::$values[$key] = $value;
+
+        return true;
+    }
+
+    public static function get(
+        string $key,
+        ?int $idLang = null,
+        ?int $idShopGroup = null,
+        ?int $idShop = null,
+        mixed $default = false
+    ): mixed {
+        return self::$values[$key] ?? $default;
+    }
+
+    public static function deleteByName(string $key): bool
+    {
+        unset(self::$values[$key]);
+
+        return true;
+    }
+}
+```
+
+## Rules
+
+- Prefer native types (`string`, `int`, `bool`, `mixed`, nullable `?int`) over bare untyped params.
+- Use `mixed` when the real PrestaShop API accepts heterogeneous values.
+- Keep PHPDoc only when it adds array shape detail beyond `mixed`.
+- Do not leave `public static function updateValue($key, $value)` style signatures in new or edited tests.
+- Production code under `src/` and `unipayment.php` already follows typed style; this rule is specifically for test doubles that mimic core globals.

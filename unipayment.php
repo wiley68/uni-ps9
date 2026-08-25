@@ -99,7 +99,7 @@ class Unipayment extends PaymentModule
         if (Tools::isSubmit('submitUnipaymentRefresh')) {
             $output .= $this->displayWarning(
                 $this->trans(
-                    'Обновяването на данни от банката ще бъде налично след връзката с Control Panel (Phase 2).',
+                    'Обновяването на данни от банката ще бъде налично след локалния shop cache (Phase 3).',
                     [],
                     'Modules.Unipayment.Admin'
                 )
@@ -210,6 +210,26 @@ class Unipayment extends PaymentModule
 
         return $this->displayConfirmation(
             $this->trans('Настройките са записани успешно.', [], 'Modules.Unipayment.Admin')
+        );
+    }
+
+    /**
+     * Outbound Control Panel client (auth + GET /shop). Not used for FO financing yet.
+     */
+    public function getControlPanelClient(): PrestaShop\Module\Unipayment\Api\ControlPanelClient
+    {
+        return $this->createControlPanelClient();
+    }
+
+    private function createControlPanelClient(): PrestaShop\Module\Unipayment\Api\ControlPanelClient
+    {
+        $shopUrl = rtrim(Tools::getShopDomainSsl(true) . __PS_BASE_URI__, '/');
+
+        return new PrestaShop\Module\Unipayment\Api\ControlPanelClient(
+            new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository(),
+            new PrestaShop\Module\Unipayment\Security\TokenRepository(),
+            new PrestaShop\Module\Unipayment\Api\CurlHttpTransport(),
+            $shopUrl
         );
     }
 }

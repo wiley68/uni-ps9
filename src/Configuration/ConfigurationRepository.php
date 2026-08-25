@@ -8,7 +8,7 @@ namespace PrestaShop\Module\Unipayment\Configuration;
  * Local UniPayment configuration stored in PrestaShop Configuration.
  *
  * Ported from uni-ps8 ConfigurationRepository. Control Panel token keys are
- * cleaned on uninstall by name only; TokenRepository itself belongs to Phase 2.
+ * cleaned on uninstall by name (see TokenRepository constants).
  */
 final class ConfigurationRepository
 {
@@ -32,7 +32,7 @@ final class ConfigurationRepository
 
     private const ENCRYPTED_PREFIX = 'enc:v1:';
 
-    /** Future Phase 2 token keys (string cleanup only until TokenRepository exists). */
+    /** Control Panel token keys (cleaned on uninstall; owned by TokenRepository). */
     private const CP_ACCESS_TOKEN = 'UNIPAYMENT_CP_ACCESS_TOKEN';
     private const CP_TOKEN_TYPE = 'UNIPAYMENT_CP_TOKEN_TYPE';
     private const CP_TOKEN_EXPIRES_AT = 'UNIPAYMENT_CP_TOKEN_EXPIRES_AT';

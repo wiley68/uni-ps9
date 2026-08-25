@@ -2,13 +2,13 @@
 
 Native PrestaShop 9 module for **UniCredit financing** (credit calculator, checkout payment method, order lifecycle, Control Panel integration, and SmartUCF).
 
-| Item                  | Value                                   |
-| --------------------- | --------------------------------------- |
-| Module technical name | `unipayment`                            |
-| Current version       | `2.0.1`                                 |
-| Repository            | `wiley68/uni-ps9`                       |
-| Repository root       | Module root (this directory)            |
-| Current state         | **Phase 1 — local configuration layer** |
+| Item                  | Value                                               |
+| --------------------- | --------------------------------------------------- |
+| Module technical name | `unipayment`                                        |
+| Current version       | `2.0.1`                                             |
+| Repository            | `wiley68/uni-ps9`                                   |
+| Repository root       | Module root (this directory)                        |
+| Current state         | **Phase 2 — Control Panel client + authentication** |
 
 ## Purpose
 
@@ -26,37 +26,36 @@ Provide a PrestaShop 9-native adapter/port of the UniPayment product family:
 | Front themes | Hummingbird and Classic                      |
 | Module type  | Payment module (`payments_gateways`)         |
 
-The development shop currently runs **PrestaShop 9.1 / PHP 8.4**. Production code must still parse and run on **PHP 8.1**.
-
 ## Current implementation status
 
-Phase 1 provides:
+Phase 2 provides:
 
-- Module Manager discovery and install/enable/disable/uninstall/reinstall;
-- Back Office local configuration page (`getContent()` + Smarty template);
-- encrypted secret storage, UNICID validation, local flags and product-button settings;
-- no Control Panel HTTP calls;
-- no financing UI, payment option, calculators, FO hooks, module tables, custom order states, or JS/CSS behavior.
+- Back Office local configuration (Phase 1);
+- outbound Control Panel client (`login`, `refreshToken`, `logout`, `getShop`, plus unused `createOrder` / `updateOrderStatus` / SSL methods on the same client);
+- encrypted local access-token storage;
+- controlled 401 recovery (invalidate → re-login → one retry);
+- credential-change token invalidation.
+
+Still **not** implemented:
+
+- shop configuration cache / persistence of `GET /shop`;
+- inbound signed CP callbacks;
+- financing UI, payment option, calculators, FO hooks, module tables, order states, JS/CSS.
 
 Do not use this checkout as a working UniCredit financing integration yet.
 
-## Local configuration (Phase 1)
+## Control Panel (Phase 2)
 
-Merchant-facing settings (Back Office → Modules → UniPayment → Configure):
+| Item                        | Status                                |
+| --------------------------- | ------------------------------------- |
+| `POST /api/v1/auth/login`   | implemented                           |
+| `POST /api/v1/auth/refresh` | implemented                           |
+| `POST /api/v1/auth/logout`  | implemented                           |
+| `GET /api/v1/shop`          | fetch only — **not cached**           |
+| Token storage               | encrypted in PrestaShop Configuration |
+| Bank-data refresh BO button | still disabled until Phase 3          |
 
-| Setting               | Purpose                                      |
-| --------------------- | -------------------------------------------- |
-| Enable module         | Master on/off (`UNIPAYMENT_ENABLED`)         |
-| UNICID                | Shop identifier for future CP authentication |
-| Shared secret         | CP/module shared secret; stored encrypted    |
-| Advertising enabled   | Homepage promotional content gate (stored)   |
-| Debug enabled         | Diagnostic flag (stored; no FO effect yet)   |
-| Product button action | `add_to_cart` / `buy` (stored only)          |
-| Button top spacing    | 0–200 px (stored only)                       |
-
-Business financing rules remain owned by the Control Panel and are **not** duplicated locally.
-
-CP-dependent actions on the configuration page (**Refresh bank data**, **Download journal**) are visible but **disabled** until later phases.
+Login payload (parity with PS8/CP): `unicid`, `name` (shop URL), `secret`.
 
 ## Reference repositories
 
@@ -78,5 +77,5 @@ Then install the module from the PrestaShop Back Office (Modules → Module Mana
 
 ## Documentation
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — intended boundaries vs implemented state
-- [`docs/TESTING.md`](docs/TESTING.md) — automated checks and STOP GATE 1
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- [`docs/TESTING.md`](docs/TESTING.md)

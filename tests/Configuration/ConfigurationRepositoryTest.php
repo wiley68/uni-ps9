@@ -17,24 +17,20 @@ final class Configuration
     /**
      * @param string|array<string, string> $value
      */
-    public static function updateValue(string $key, $value): bool
+    public static function updateValue(string $key, mixed $value): bool
     {
         self::$values[$key] = $value;
 
         return true;
     }
 
-    /**
-     * @param mixed $default
-     * @return mixed
-     */
     public static function get(
         string $key,
         ?int $idLang = null,
         ?int $idShopGroup = null,
         ?int $idShop = null,
-        $default = false
-    ) {
+        mixed $default = false
+    ): mixed {
         return self::$values[$key] ?? $default;
     }
 

@@ -10,8 +10,6 @@ UniPayment CLI tests run against the module checkout in the PrestaShop test shop
 | CLI / FPM PHP           | **8.4**            |
 | Production PHP baseline | **8.1**            |
 
-PHP 8.4 is acceptable for local development. Production code must still parse and run on PHP 8.1.
-
 ## Automated checks
 
 Safe default:
@@ -20,93 +18,85 @@ Safe default:
 composer test
 ```
 
-Equivalent:
+Current coverage includes:
 
-```bash
-php tests/run.php
-php tests/run.php safe
-```
-
-Current coverage:
-
-| Test                                                      | What it checks                                                                                                                   |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/Infrastructure/ModuleSkeletonContractTest.php`     | Module identity, PS9-only compliancy, Composer namespace, no overrides / FO controllers / assets / tables / order states / hooks |
-| `tests/Infrastructure/Php81CompatibilityContractTest.php` | Composer PHP constraint, `php -l` on production files, static rejection of a small set of PHP 8.2+ tokens                        |
-| `tests/Configuration/ConfigurationRepositoryTest.php`     | Defaults, save/load, secret encryption/preservation, normalization, uninstall cleanup                                            |
-| `tests/Configuration/ConfigurationValidatorTest.php`      | UNICID/secret/button action/spacing validation parity with PS8                                                                   |
-| `tests/Configuration/AdminConfigurationContractTest.php`  | Real BO template, no Phase 0 placeholder, no secret leak, deferred CP actions, no Phase 2+ deps                                  |
+| Test                                     | What it checks                                                       |
+| ---------------------------------------- | -------------------------------------------------------------------- |
+| `tests/Infrastructure/*`                 | Phase 0 skeleton / PHP 8.1 contract                                  |
+| `tests/Configuration/*`                  | Phase 1 config + Phase 2 admin contract                              |
+| `tests/Security/TokenRepositoryTest.php` | token save/load/invalidate/malformed + credential-change             |
+| `tests/Api/ControlPanelClientTest.php`   | login/refresh/getShop/401-once/logout/error classes (fake transport) |
 
 Other useful commands:
 
 ```bash
-composer validate
+composer validate --no-check-publish
 composer dump-autoload
 git diff --check
 ```
 
-## PHP 8.1 runtime requirement
+## Optional live CP smoke
 
-The PHP 8.1 compatibility test is a **contract/static guard**, not a substitute for an actual PHP 8.1 execution lane.
+Safe suite skips live CP by default.
 
-- Syntax is checked with the **current interpreter** (`php -l`).
-- A regex scan rejects known PHP 8.2+ constructs that can be detected safely.
-- It does **not** execute the module on PHP 8.1.
+```bash
+UNIPAYMENT_LIVE_CP_TEST=1 \
+UNIPAYMENT_LIVE_UNICID='...' \
+UNIPAYMENT_LIVE_SECRET='...' \
+UNIPAYMENT_LIVE_SHOP_NAME='https://presta9.avalonbg.com' \
+php tests/Api/LiveControlPanelSmokeTest.php
+```
 
-## Manual STOP GATE 1
+Optional: `UNIPAYMENT_LIVE_BASE_URL` (default `https://uni.avalonbg.com/api/v1`).
 
-After Phase 1 code work, verify in the Back Office / storefront:
+Uses in-memory Configuration stubs (does not write the shop DB). Never prints secrets/tokens.
 
-### Fresh configuration
+Sequence: login → GET /shop → refresh → GET /shop → logout → re-login → GET /shop → logout.
 
-1. Open Module Manager → UniPayment → Configure.
-2. Real configuration page loads.
-3. No fatal/error.
-4. No Phase 0 placeholder remains.
+## Manual STOP GATE 2
 
-### Validation
+### Configuration regression
 
-5. Save with missing UNICID → proper validation error.
-6. Save invalid UNICID → proper validation error.
-7. Save without secret on initial configuration → proper error.
-8. Save valid UNICID + valid secret → success.
-9. Reload configuration page.
-10. Secret is NOT displayed back.
-11. Existing-secret indication is correct.
-12. Save again with blank secret → existing secret is preserved.
-13. Invalid product button action is rejected.
-14. Valid product button action is saved.
-15. Invalid top spacing is rejected.
-16. Boundary spacing values behave according to PS8 rules.
+1. Module Configure page loads.
+2. Phase 1 settings remain intact.
+3. Secret is not displayed.
+4. Blank secret update preserves current secret.
+5. Credential change invalidates current token state.
 
-### Flags
+### Authentication
 
-17. Enable/disable local UniPayment configuration flag.
-18. Advertising flag persists.
-19. Debug flag persists.
+6. Login with valid credentials succeeds.
+7. Local token state is created.
+8. Access token is not exposed in UI/logs.
+9. `GET /shop` succeeds.
+10. Refresh succeeds.
+11. `GET /shop` succeeds after refresh.
+12. Logout succeeds/best-effort according to PS8 semantics.
+13. Local token state is invalid after logout.
+14. Login again succeeds.
+15. `GET /shop` succeeds again.
 
-### Lifecycle
+### Negative paths
 
-20. Disable/enable module in Module Manager.
-21. Configuration remains correct.
-22. Uninstall.
-23. Confirm module local configuration cleanup is correct.
-24. Reinstall.
-25. Confirm clean defaults.
+16. Invalid secret produces authentication failure.
+17. Invalid UNICID produces authentication failure or local validation failure as appropriate.
+18. Simulated/controlled 401 triggers only one recovery retry.
+19. Terminal auth failure clears local token state.
+20. Timeout is classified distinctly.
+21. Connection failure is classified distinctly.
+22. Malformed JSON is classified distinctly.
 
 ### Regression
 
-26. Homepage unchanged.
-27. Product page unchanged.
-28. Cart unchanged.
-29. Checkout unchanged.
-30. No UniPayment frontend JS/CSS loaded.
-31. No `unipayment_*` financing tables created.
-32. No custom UniPayment order states created.
-33. Check PHP/PrestaShop logs.
+23. No shop-cache table exists.
+24. No inbound API endpoint was added.
+25. No financing tables exist.
+26. No custom order states exist.
+27. Homepage unchanged.
+28. Product unchanged.
+29. Cart unchanged.
+30. Checkout unchanged.
+31. No UniPayment FO JS/CSS.
+32. Check PHP/PrestaShop logs.
 
-Do not start Phase 2 until this gate is accepted.
-
-## Later suites
-
-Runtime and destructive suites from uni-ps8 are **not** present yet. Do not invent them ahead of the corresponding implementation phase.
+Do not start Phase 3 until this gate is accepted.
