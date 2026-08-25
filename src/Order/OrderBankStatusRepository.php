@@ -8,12 +8,12 @@ final class OrderBankStatusRepository implements BankStatusPersistencePort, Bank
 {
     public const TABLE = 'unipayment_order_bank_status';
 
-    /** @var \Db|object */
+    /** @var \Db */
     private $database;
 
-    public function __construct($database = null)
+    public function __construct(?\Db $database = null)
     {
-        $this->database = $database ?? \Db::getInstance();
+        $this->database = $database ?? \DbCore::getInstance();
     }
 
     public function install(): bool
@@ -109,8 +109,9 @@ final class OrderBankStatusRepository implements BankStatusPersistencePort, Bank
      * Incoming order_id from Control Panel is always ps_orders.reference, never id_order,
      * even when the reference consists only of digits (AUD-011).
      *
-     * Phase 4: financing_snapshot table is not installed yet. The JOIN is still present so
-     * authorization semantics match PS8; until that table exists, lookups return null.
+     * Phase 4 does not install unipayment_financing_snapshot. If that table is absent,
+     * return null (controller → 404) without querying it. When a later phase creates the
+     * table, the audited JOIN below becomes active automatically.
      *
      * @return array{id_order: int, id_shop: int, order_reference: string}|null
      */
@@ -122,6 +123,10 @@ final class OrderBankStatusRepository implements BankStatusPersistencePort, Bank
 
         $orderReference = trim($orderReference);
         if ($orderReference === '') {
+            return null;
+        }
+
+        if (!$this->financingSnapshotTableExists()) {
             return null;
         }
 
@@ -145,6 +150,14 @@ final class OrderBankStatusRepository implements BankStatusPersistencePort, Bank
             'id_shop' => (int) $row['id_shop'],
             'order_reference' => (string) $row['reference'],
         ];
+    }
+
+    private function financingSnapshotTableExists(): bool
+    {
+        $table = _DB_PREFIX_ . FinancingSnapshotRepository::TABLE;
+        $rows = $this->database->executeS('SHOW TABLES LIKE "' . pSQL($table) . '"');
+
+        return is_array($rows) && $rows !== [];
     }
 
     private function tableName(): string

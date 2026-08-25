@@ -8,11 +8,11 @@ Related: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`TESTING.md`](TESTING.md)
 
 ## 1. Secrets
 
-| Secret            | Role                                                                 |
-| ----------------- | -------------------------------------------------------------------- |
-| **UNICID**        | Shop identity in Control Panel                                       |
-| **Shared secret** | HMAC for CP → module signed requests; CP auth login                  |
-| **CP access token** | Bearer for outbound CP calls (`TokenRepository`, encrypted)        |
+| Secret              | Role                                                        |
+| ------------------- | ----------------------------------------------------------- |
+| **UNICID**          | Shop identity in Control Panel                              |
+| **Shared secret**   | HMAC for CP → module signed requests; CP auth login         |
+| **CP access token** | Bearer for outbound CP calls (`TokenRepository`, encrypted) |
 
 Never log secrets, tokens, Authorization headers, or decrypted SECRET.
 
@@ -81,10 +81,10 @@ Disabled module: **403**. Not configured: **401**.
 
 ## 3. Inbound endpoints (Phase 4)
 
-| Path | Role |
-| ---- | ---- |
-| `/module/unipayment/shopcache` | CP pushes full shop snapshot → `replaceSnapshot` |
-| `/module/unipayment/orderbankstatus` | Persist bank status for financing order (AUD-011) |
+| Path                                  | Role                                                  |
+| ------------------------------------- | ----------------------------------------------------- |
+| `/module/unipayment/shopcache`        | CP pushes full shop snapshot → `replaceSnapshot`      |
+| `/module/unipayment/orderbankstatus`  | Persist bank status for financing order (AUD-011)     |
 | `/module/unipayment/smartucfdebuglog` | CP **reads** latest SmartUCF diagnostic journal entry |
 
 All: **POST** only, JSON body, signed headers.
@@ -98,7 +98,7 @@ All: **POST** only, JSON body, signed headers.
 ### orderbankstatus
 
 - Lookup: `orders.reference` + `id_shop` + INNER JOIN `unipayment_financing_snapshot` (AUD-011)
-- Phase 4 does **not** install `unipayment_financing_snapshot`; until a later phase creates financing rows, authorized updates return **404**
+- Phase 4 does **not** install `unipayment_financing_snapshot`. Before the JOIN, the repository checks table existence with `SHOW TABLES LIKE`; if absent → `null` → HTTP **404** (no SQL error / 500). When a later phase creates the table, the audited JOIN activates automatically.
 - No customer-facing order-state changes in Phase 4 (`ps_order_state_changed: false`)
 
 ### smartucfdebuglog

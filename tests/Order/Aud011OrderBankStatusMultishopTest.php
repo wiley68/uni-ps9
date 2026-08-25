@@ -40,6 +40,14 @@ class Aud011DbStub
 
         return true;
     }
+
+    /** @return list<array<string, mixed>>|false */
+    public function executeS(string $sql)
+    {
+        unset($sql);
+
+        return [];
+    }
 }
 
 final class Aud011FakeDb extends Aud011DbStub
@@ -55,6 +63,9 @@ final class Aud011FakeDb extends Aud011DbStub
 
     /** @var list<string> */
     public array $queries = [];
+
+    /** @var bool Phase 4 default for AUD-011 path when table is present later */
+    public bool $financingSnapshotTableExists = true;
 
     /** @return array<string, string>|false */
     public function getRow(string $sql)
@@ -90,6 +101,21 @@ final class Aud011FakeDb extends Aud011DbStub
         }
 
         return false;
+    }
+
+    /** @return list<array<string, mixed>>|false */
+    public function executeS(string $sql)
+    {
+        $this->queries[] = $sql;
+        if (strpos($sql, 'SHOW TABLES LIKE') === false) {
+            return [];
+        }
+
+        if (!$this->financingSnapshotTableExists) {
+            return [];
+        }
+
+        return [['Tables_in_db' => _DB_PREFIX_ . 'unipayment_financing_snapshot']];
     }
 
     public function execute(string $sql): bool
@@ -144,6 +170,7 @@ assertAud011(
         && strpos($repoSrc, 'INNER JOIN') !== false,
     'financing snapshot join required'
 );
+assertAud011(strpos($repoSrc, 'financingSnapshotTableExists') !== false, 'Phase 4 table-existence gate present');
 assertAud011(strpos($repoSrc, 'o.`reference`') !== false, 'lookup always uses reference');
 assertAud011(strpos($ctrlSrc, '$this->context->shop->id') !== false, 'controller passes authorized id_shop');
 assertAud011(strpos($ctrlSrc, 'updateByOrderIdentifier(') !== false, 'controller uses repository');
@@ -154,7 +181,25 @@ assertAud011(
 
 function makeAud011Repo(Aud011FakeDb $db): OrderBankStatusRepository
 {
-    return new OrderBankStatusRepository($db);
+    $reflection = new ReflectionClass(OrderBankStatusRepository::class);
+    /** @var OrderBankStatusRepository $repo */
+    $repo = $reflection->newInstanceWithoutConstructor();
+    $property = $reflection->getProperty('database');
+    $property->setAccessible(true);
+    $property->setValue($repo, $db);
+
+    return $repo;
+}
+
+function aud011JoinQuery(Aud011FakeDb $db): ?string
+{
+    foreach ($db->queries as $sql) {
+        if (strpos($sql, 'INNER JOIN') !== false && strpos($sql, 'unipayment_financing_snapshot') !== false) {
+            return $sql;
+        }
+    }
+
+    return null;
 }
 
 // Test A — valid current-shop reference
@@ -167,7 +212,8 @@ $repoA = makeAud011Repo($dbA);
 $resultA = $repoA->updateByOrderIdentifier(1, 'ABC123', 'bank_ok', 'OK');
 assertAud011($resultA !== null && $resultA['ps_order_id'] === 101, 'A: current shop reference resolves');
 assertAud011($dbA->bankRows !== [] && $dbA->bankRows[0]['id_order'] === '101', 'A: bank row stored');
-assertAud011(strpos($dbA->queries[0], 'unipayment_financing_snapshot') !== false, 'A: snapshot join used');
+$joinA = aud011JoinQuery($dbA);
+assertAud011($joinA !== null, 'A: snapshot join used when table exists');
 
 // Test B — same reference in two shops, only current shop updated
 $dbB = new Aud011FakeDb();
@@ -202,10 +248,11 @@ $dbD->snapshotOrderIds = [500, 12345];
 $repoD = makeAud011Repo($dbD);
 $resultD = $repoD->updateByOrderIdentifier(1, '12345', 'bank_ok', 'OK');
 assertAud011($resultD !== null && $resultD['ps_order_id'] === 500, 'D: resolves reference=12345 not id_order=12345');
-assertAud011(strpos($dbD->queries[0], 'o.`reference` = \'12345\'') !== false, 'D: SQL uses reference equality');
-assertAud011(strpos($dbD->queries[0], '`id_order` = 12345') === false, 'D: SQL never uses id_order lookup');
+$joinD = aud011JoinQuery($dbD);
+assertAud011($joinD !== null && strpos($joinD, 'o.`reference` = \'12345\'') !== false, 'D: SQL uses reference equality');
+assertAud011($joinD !== null && strpos($joinD, '`id_order` = 12345') === false, 'D: SQL never uses id_order lookup');
 
-// Test E — no financing snapshot
+// Test E — no financing snapshot row (table present)
 $dbE = new Aud011FakeDb();
 $dbE->orders = [
     ['id_order' => 601, 'id_shop' => 1, 'reference' => 'NOSNAP'],
@@ -214,6 +261,7 @@ $dbE->snapshotOrderIds = [];
 $repoE = makeAud011Repo($dbE);
 assertAud011($repoE->updateByOrderIdentifier(1, 'NOSNAP', 'bank_ok', 'OK') === null, 'E: no snapshot → not found');
 assertAud011($dbE->bankRows === [], 'E: no bank status stored');
+assertAud011(aud011JoinQuery($dbE) !== null, 'E: JOIN still attempted when table exists');
 
 // Test F — stored shop identity on success
 $dbF = new Aud011FakeDb();
@@ -231,6 +279,30 @@ assertAud011(
     strpos($ctrlSrc, 'BankStatusOrderStateMapper') === false
         && strpos($ctrlSrc, 'if ($result === null)') !== false,
     'G: callback preserves authorization without native order-state mapping'
+);
+
+// Test H — financing snapshot table absent (Phase 4): null without JOIN / no SQL against missing table
+$dbH = new Aud011FakeDb();
+$dbH->financingSnapshotTableExists = false;
+$dbH->orders = [
+    ['id_order' => 801, 'id_shop' => 1, 'reference' => 'PHASE4'],
+];
+$dbH->snapshotOrderIds = [801];
+$repoH = makeAud011Repo($dbH);
+assertAud011($repoH->updateByOrderIdentifier(1, 'PHASE4', 'bank_ok', 'OK') === null, 'H: missing table → null');
+assertAud011($dbH->bankRows === [], 'H: no bank status stored');
+assertAud011(aud011JoinQuery($dbH) === null, 'H: no JOIN against missing financing_snapshot table');
+foreach ($dbH->queries as $sql) {
+    assertAud011(
+        strpos($sql, 'FROM `ps_orders`') === false && strpos($sql, 'INNER JOIN') === false,
+        'H: must not query orders/JOIN when table absent'
+    );
+}
+assertAud011(
+    count(array_filter($dbH->queries, static function (string $sql): bool {
+        return strpos($sql, 'SHOW TABLES LIKE') !== false;
+    })) === 1,
+    'H: existence checked via SHOW TABLES only'
 );
 
 fwrite(STDOUT, "OK (AUD-011 order-bank-status multishop authorization)\n");
