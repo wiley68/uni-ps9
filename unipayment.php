@@ -54,7 +54,20 @@ class Unipayment extends PaymentModule
 
         $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
         $cache = new PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCache();
-        if (!$repository->install() || !$cache->install()) {
+        $apiNonce = new PrestaShop\Module\Unipayment\Security\ApiNonceRepository();
+        $bankStatus = new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository();
+        $debugLog = new PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository();
+
+        if (
+            !$repository->install()
+            || !$cache->install()
+            || !$apiNonce->install()
+            || !$bankStatus->install()
+            || !$debugLog->install()
+        ) {
+            $debugLog->uninstall();
+            $bankStatus->uninstall();
+            $apiNonce->uninstall();
             $cache->uninstall();
             $repository->uninstall();
             parent::uninstall();
@@ -67,9 +80,19 @@ class Unipayment extends PaymentModule
 
     public function uninstall(): bool
     {
+        $debugLog = new PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository();
+        $bankStatus = new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository();
+        $apiNonce = new PrestaShop\Module\Unipayment\Security\ApiNonceRepository();
         $cache = new PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCache();
         $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
-        if (!$cache->uninstall() || !$repository->uninstall()) {
+
+        if (
+            !$debugLog->uninstall()
+            || !$bankStatus->uninstall()
+            || !$apiNonce->uninstall()
+            || !$cache->uninstall()
+            || !$repository->uninstall()
+        ) {
             return false;
         }
 

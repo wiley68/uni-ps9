@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 3** state.
+This document describes **intended** high-level boundaries and the **implemented Phase 4** state.
 
 ---
 
@@ -25,9 +25,9 @@ Infrastructure
 
 ---
 
-## Implemented in Phase 3
+## Implemented through Phase 4
 
-| Area                       | Phase 3 state                                                                                     |
+| Area                       | State                                                                                             |
 | -------------------------- | ------------------------------------------------------------------------------------------------- |
 | Local configuration        | Phase 1 repository/validator/UI                                                                   |
 | Credential-change boundary | `TokenRepository::invalidate()` **and** `ShopConfigurationCache::clear()`                         |
@@ -37,10 +37,13 @@ Infrastructure
 | Shop snapshot cache        | `ShopConfigurationCache` table `unipayment_shop_cache`, TTL **86400** seconds                     |
 | Snapshot validation        | `ShopConfigurationSnapshotValidator` + `ShopConfigurationSnapshotValidationException`             |
 | Pull / forced refresh      | `ShopConfigurationService::get(false\|true)` via `ShopConfigurationProviderInterface`             |
-| Flag helpers               | `ShopConfigurationFlags` (Process 1/2, test env, yes-flag, certificate) — **not** wired to FO yet |
+| Flag helpers               | `ShopConfigurationFlags` — **not** wired to FO yet                                                |
 | BO bank-data refresh       | enabled — `get(true)` with PS8 error mapping                                                      |
-| Front office               | no functional hooks, controllers, JS, or CSS                                                      |
-| Inbound CP callbacks       | **not** implemented (Phase 4)                                                                     |
+| Inbound signed API         | Phase 4 — `shopcache`, `orderbankstatus`, `smartucfdebuglog` + HMAC/nonce                         |
+| Replay store               | `unipayment_api_nonce` (900s retention)                                                           |
+| Bank status persistence    | `unipayment_order_bank_status` (no FO / order-state side effects yet)                             |
+| SmartUCF debug journal     | `unipayment_smartucf_log` + diagnostic journal (BO download deferred)                             |
+| Front office               | no functional hooks, calculators, payment option, JS, or CSS                                      |
 
 ### Shop configuration cache flow
 
@@ -68,7 +71,22 @@ Transient failures (timeout / connection / 5xx): keep cache; rethrow.
 
 Cache scope key is **`unicid`** (UNIQUE), not PrestaShop `id_shop` — same as audited PS8.
 
-`replaceSnapshot()` exists for Phase 4 CP push full-replacement without redesign.
+`replaceSnapshot()` is used by inbound `shopcache` for full CP push replacement (no merge).
+
+### Inbound CP → module flow (Phase 4)
+
+```text
+POST /module/unipayment/{shopcache|orderbankstatus|smartucfdebuglog}
+        ↓
+raw body (php://input) + signature headers
+        ↓
+ModuleRequestAuthenticator
+  (unicid match → HMAC on raw body → atomic nonce claim)
+        ↓
+endpoint handler
+```
+
+See [`SECURITY-OPERATIONS.md`](SECURITY-OPERATIONS.md) for HMAC/nonce details.
 
 ### Authentication lifecycle
 
@@ -107,8 +125,8 @@ UNIPAYMENT_CP_TOKEN_EXPIRES_AT
 
 | Area                                                  | Phase |
 | ----------------------------------------------------- | ----- |
-| CP push / `shopcache` inbound + HMAC/nonce            | 4     |
 | Calculator / product / cart                           | 5+    |
-| PaymentOption / checkout / orders                     | later |
-| SmartUCF / emails / advertising FO                    | later |
-| Other module tables / custom order states / FO JS/CSS | later |
+| PaymentOption / checkout / financing snapshots        | later |
+| SmartUCF outbound / emails / advertising FO           | later |
+| Checkout lock / order attempt / popup / FO JS/CSS     | later |
+| Custom order states / BO journal download             | later |

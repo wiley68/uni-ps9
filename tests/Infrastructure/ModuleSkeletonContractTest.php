@@ -71,12 +71,25 @@ assertModuleSkeleton(
 assertModuleSkeleton(!is_dir($root . '/override'), 'override/ directory must not exist');
 
 $frontControllers = glob($root . '/controllers/front/*.php') ?: [];
+$allowedFront = [
+    'index.php' => true,
+    'shopcache.php' => true,
+    'orderbankstatus.php' => true,
+    'smartucfdebuglog.php' => true,
+];
 foreach ($frontControllers as $file) {
+    $base = basename($file);
     assertModuleSkeleton(
-        basename($file) === 'index.php',
-        'no functional front controllers are allowed: ' . basename($file)
+        isset($allowedFront[$base]),
+        'unexpected front controller: ' . $base
     );
 }
+assertModuleSkeleton(
+    is_file($root . '/controllers/front/shopcache.php')
+        && is_file($root . '/controllers/front/orderbankstatus.php')
+        && is_file($root . '/controllers/front/smartucfdebuglog.php'),
+    'Phase 4 inbound controllers must exist'
+);
 
 $assetIterator = new RecursiveIteratorIterator(
     new RecursiveDirectoryIterator($root . '/views', FilesystemIterator::SKIP_DOTS)

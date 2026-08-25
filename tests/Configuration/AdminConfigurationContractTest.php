@@ -57,11 +57,17 @@ assertAdminConfiguration(
 assertAdminConfiguration(strpos($module, 'ShopConfigurationService') !== false, 'ShopConfigurationService required');
 assertAdminConfiguration(strpos($module, 'ShopConfigurationCache') !== false, 'ShopConfigurationCache required');
 assertAdminConfiguration(strpos($module, 'createShopConfigurationService') !== false, 'service factory missing');
-assertAdminConfiguration(strpos($module, 'SmartUcfDiagnosticJournal') === false, 'SmartUCF journal must remain deferred');
 assertAdminConfiguration(
-    !is_dir($root . '/controllers/front')
-        || count(array_diff(scandir($root . '/controllers/front') ?: [], ['.', '..', 'index.php'])) === 0,
-    'no inbound front controllers in Phase 3'
+    strpos($module, 'SmartUcfDiagnosticJournal') === false
+        && strpos($template, 'unipayment_journal_available') !== false
+        && (bool) preg_match('/unipayment_journal_available[\'"]\s*=>\s*false/', $module),
+    'BO journal download remains deferred in Phase 4'
+);
+$frontFiles = array_values(array_diff(scandir($root . '/controllers/front') ?: [], ['.', '..', 'index.php']));
+sort($frontFiles);
+assertAdminConfiguration(
+    $frontFiles === ['orderbankstatus.php', 'shopcache.php', 'smartucfdebuglog.php'],
+    'Phase 4 inbound front controllers must be exactly shopcache/orderbankstatus/smartucfdebuglog'
 );
 
 assertAdminConfiguration(strpos($module, '$credentialsChanged =') !== false, 'credential-change detection missing');
@@ -96,8 +102,8 @@ assertAdminConfiguration(
     'BO save must not ignore credential side-effect failure'
 );
 
-assertAdminConfiguration(!preg_match('/\bregisterHook\s*\(/', $module), 'no functional hooks in Phase 3');
-assertAdminConfiguration(!preg_match('/\bfunction\s+hook[A-Z]\w*/', $module), 'no hook handlers in Phase 3');
+assertAdminConfiguration(!preg_match('/\bregisterHook\s*\(/', $module), 'no functional FO hooks in Phase 4');
+assertAdminConfiguration(!preg_match('/\bfunction\s+hook[A-Z]\w*/', $module), 'no hook handlers in Phase 4');
 assertAdminConfiguration(!preg_match('/\bnew\s+OrderState\b|\bOrderStateInstaller\b/', $module), 'no custom order states');
 
-fwrite(STDOUT, "OK (admin configuration Phase 3 contract)\n");
+fwrite(STDOUT, "OK (admin configuration Phase 4 contract)\n");

@@ -8,7 +8,7 @@ Native PrestaShop 9 module for **UniCredit financing** (credit calculator, check
 | Current version       | `2.0.1`                                           |
 | Repository            | `wiley68/uni-ps9`                                 |
 | Repository root       | Module root (this directory)                      |
-| Current state         | **Phase 3 — persistent shop configuration cache** |
+| Current state         | **Phase 4 — inbound signed CP → module API**      |
 
 ## Purpose
 
@@ -28,35 +28,33 @@ Provide a PrestaShop 9-native adapter/port of the UniPayment product family:
 
 ## Current implementation status
 
-Phase 3 provides:
+Phase 4 provides:
 
 - Back Office local configuration (Phase 1);
 - outbound Control Panel client + auth (Phase 2);
-- persistent local shop snapshot cache (`unipayment_shop_cache`, 24h TTL);
-- `GET /shop` pull on miss / forced refresh with snapshot validation;
-- stale-good protection (invalid CP payload does not overwrite valid cache);
-- full snapshot replacement (no partial merge);
-- credential-change clears tokens **and** shop cache;
-- BO „Обнови данните от банката“ via `ShopConfigurationService::get(true)`.
+- persistent shop snapshot cache + BO bank refresh (Phase 3);
+- inbound signed endpoints: `shopcache`, `orderbankstatus`, `smartucfdebuglog`;
+- HMAC-SHA256 + timestamp ±300s + nonce replay store (900s);
+- tables: `unipayment_shop_cache`, `unipayment_api_nonce`, `unipayment_order_bank_status`, `unipayment_smartucf_log`.
 
 Still **not** implemented:
 
-- CP → module inbound push (`shopcache`, HMAC, nonces) — Phase 4;
-- financing UI, payment option, calculators, FO hooks, other module tables, order states, JS/CSS.
+- calculator / product / cart / PaymentOption;
+- financing snapshots / checkout lock / order attempts;
+- SmartUCF outbound / leasing emails / Thank You;
+- FO JS/CSS / custom order states / BO journal download.
 
 Do not use this checkout as a working UniCredit financing integration yet.
 
-## Control Panel (Phase 3)
+## Inbound endpoints
 
-| Item                          | Status                                              |
-| ----------------------------- | --------------------------------------------------- |
-| Auth login / refresh / logout | implemented                                         |
-| `GET /api/v1/shop`            | fetch + validate + persist local snapshot           |
-| Local cache                   | `unipayment_shop_cache` keyed by UNICID, TTL 86400s |
-| Bank-data refresh BO button   | enabled                                             |
-| CP push / shop-cache inbound  | **not** implemented (Phase 4)                       |
+| URL | Purpose |
+| --- | ------- |
+| `/module/unipayment/shopcache` | CP push full shop snapshot |
+| `/module/unipayment/orderbankstatus` | Persist bank status (AUD-011) |
+| `/module/unipayment/smartucfdebuglog` | CP read diagnostic journal entry |
 
-Login payload (parity with PS8/CP): `unicid`, `name` (shop URL), `secret`.
+Signing details: [`docs/SECURITY-OPERATIONS.md`](docs/SECURITY-OPERATIONS.md).
 
 ## Reference repositories
 
@@ -74,9 +72,11 @@ cd modules/unipayment
 composer install
 ```
 
-Then install (or reinstall) the module from the PrestaShop Back Office so `unipayment_shop_cache` is created.
+Then install (or reinstall) the module from the PrestaShop Back Office so Phase 3–4 tables are created.
 
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- [`docs/SECURITY-OPERATIONS.md`](docs/SECURITY-OPERATIONS.md)
 - [`docs/TESTING.md`](docs/TESTING.md)
+- [`AGENTS.md`](AGENTS.md)

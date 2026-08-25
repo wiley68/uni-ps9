@@ -277,18 +277,17 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 3 е **persistent shop configuration cache** (pull path).
+Phase 4 е **inbound signed Control Panel → module API** (replay protection).
 
 Разрешено:
 
-- локални Configuration ключове и BO configuration page;
-- `ControlPanelClient`, `TokenRepository`, HTTP transport, API exceptions;
-- `ShopConfigurationCache` / `ShopConfigurationService` / snapshot validation / flags;
-- таблица `unipayment_shop_cache` (24h TTL, ключ `unicid`);
-- BO „Обнови данните от банката“ (`get(true)`);
-- credential change → invalidate tokens + clear shop cache.
+- всичко от Phase 0–3;
+- `ModuleRequestAuthenticator` / signature protocol / `ApiNonceRepository`;
+- front controllers: `shopcache`, `orderbankstatus`, `smartucfdebuglog`;
+- таблици `unipayment_api_nonce`, `unipayment_order_bank_status`, `unipayment_smartucf_log`;
+- `SmartUcfDiagnosticJournal` (read endpoint; BO journal download deferred).
 
-Не въвеждай inbound signed API (`shopcache` / HMAC / nonce), calculator, FO hooks, други module tables, payment method, frontend assets или financing UI, докато съответната фаза не бъде изрично възложена.
+Не въвеждай calculator, FO hooks, PaymentOption, financing snapshot install, checkout lock, order attempts, popup submissions, SmartUCF outbound, emails, custom order states или frontend assets, докато съответната фаза не бъде изрично възложена.
 
 ---
 
