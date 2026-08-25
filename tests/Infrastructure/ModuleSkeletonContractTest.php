@@ -114,6 +114,14 @@ assertModuleSkeleton(
     'Phase 3 ShopConfigurationCache must exist'
 );
 assertModuleSkeleton(
+    is_file($root . '/src/Calculator/Calculator.php'),
+    'Phase 5 Calculator domain must exist'
+);
+assertModuleSkeleton(
+    !is_file($root . '/src/Product/ProductContextFactory.php'),
+    'ProductContextFactory must not exist yet'
+);
+assertModuleSkeleton(
     !preg_match('/\bnew\s+OrderState\b|\bOrderStateInstaller\b/i', $module),
     'module entry must not install custom order states'
 );

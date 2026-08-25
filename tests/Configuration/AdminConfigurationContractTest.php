@@ -102,8 +102,17 @@ assertAdminConfiguration(
     'BO save must not ignore credential side-effect failure'
 );
 
-assertAdminConfiguration(!preg_match('/\bregisterHook\s*\(/', $module), 'no functional FO hooks in Phase 4');
-assertAdminConfiguration(!preg_match('/\bfunction\s+hook[A-Z]\w*/', $module), 'no hook handlers in Phase 4');
+assertAdminConfiguration(!preg_match('/\bregisterHook\s*\(/', $module), 'no functional FO hooks in Phase 5');
+assertAdminConfiguration(!preg_match('/\bfunction\s+hook[A-Z]\w*/', $module), 'no hook handlers in Phase 5');
 assertAdminConfiguration(!preg_match('/\bnew\s+OrderState\b|\bOrderStateInstaller\b/', $module), 'no custom order states');
+assertAdminConfiguration(
+    is_dir($root . '/src/Calculator')
+        && is_file($root . '/src/Calculator/Calculator.php'),
+    'Phase 5 calculator domain must exist'
+);
+assertAdminConfiguration(
+    !is_file($root . '/src/Product/ProductContextFactory.php'),
+    'ProductContextFactory remains Phase 6+'
+);
 
-fwrite(STDOUT, "OK (admin configuration Phase 4 contract)\n");
+fwrite(STDOUT, "OK (admin configuration Phase 5 contract)\n");

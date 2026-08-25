@@ -277,17 +277,15 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 4 е **inbound signed Control Panel → module API** (replay protection).
+Phase 5 е **pure financing calculator domain** (PS8 parity, без FO).
 
 Разрешено:
 
-- всичко от Phase 0–3;
-- `ModuleRequestAuthenticator` / signature protocol / `ApiNonceRepository`;
-- front controllers: `shopcache`, `orderbankstatus`, `smartucfdebuglog`;
-- таблици `unipayment_api_nonce`, `unipayment_order_bank_status`, `unipayment_smartucf_log`;
-- `SmartUcfDiagnosticJournal` (read endpoint; BO journal download deferred).
+- всичко от Phase 0–4;
+- `src/Calculator/*` (Calculator, resolvers, OfferFactory, PreferredOfferSelector, ProductContext DTO, currency display helpers);
+- calculator CLI тестове / golden vectors / PS8 parity harness.
 
-Не въвеждай calculator, FO hooks, PaymentOption, financing snapshot install, checkout lock, order attempts, popup submissions, SmartUCF outbound, emails, custom order states или frontend assets, докато съответната фаза не бъде изрично възложена.
+Не въвеждай ProductContextFactory, product/cart hooks, PaymentOption, financing snapshot install, checkout lock, order attempts, popup submissions, SmartUCF outbound, emails, custom order states или frontend assets, докато съответната фаза не бъде изрично възложена.
 
 ---
 
