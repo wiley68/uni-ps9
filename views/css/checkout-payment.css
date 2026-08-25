@@ -1,0 +1,280 @@
+/**
+ * Checkout payment UI — Woo visual parity, scoped under PrestaShop payment option form.
+ */
+.unipayment-checkout {
+  --unipayment-checkout-red: #ed1c24;
+  --unipayment-checkout-border: #d4d4d8;
+  --unipayment-checkout-shadow: #f4f4f5;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-top: 12px;
+  font-family: "Unipayment Roboto Condensed", "Roboto Condensed", sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: #000;
+  -webkit-font-smoothing: antialiased;
+}
+
+.unipayment-checkout *,
+.unipayment-checkout *::before,
+.unipayment-checkout *::after {
+  box-sizing: border-box;
+}
+
+.unipayment-checkout__panel {
+  display: flex;
+  flex-direction: column;
+  row-gap: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.unipayment-checkout__intro {
+  margin: 0;
+  padding: 0;
+  color: var(--unipayment-checkout-red);
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.unipayment-checkout__notice {
+  margin: 0;
+  color: #b32d2e;
+  font-size: 0.875rem;
+}
+
+.unipayment-checkout__calc-fields {
+  width: 100%;
+  margin: 0;
+  padding: 10px 14px;
+  border: 2px solid var(--unipayment-checkout-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 1px 1px 1px 1px var(--unipayment-checkout-shadow);
+}
+
+.unipayment-checkout__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 32px;
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.unipayment-checkout__row--hidden {
+  display: none;
+}
+
+.unipayment-checkout__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  color: #000;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+/* Theme <label> rules often shrink nested labels — keep parity with plain label rows. */
+.unipayment-checkout__label label {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  text-transform: none;
+}
+
+.unipayment-checkout__required {
+  color: var(--unipayment-checkout-red);
+}
+
+.unipayment-checkout__value {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 55%;
+  margin: 0;
+  color: #000;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.unipayment-checkout__amount-primary,
+.unipayment-checkout__amount-secondary,
+.unipayment-checkout__percent {
+  color: var(--unipayment-checkout-red);
+}
+
+.unipayment-checkout__amount-secondary {
+  display: none;
+  margin-left: 6px;
+  font-size: 70%;
+}
+
+.unipayment-checkout__value--dual .unipayment-checkout__amount-secondary {
+  display: inline;
+}
+
+/* Product / cart / Woo popup controls: red text, bottom border only. */
+.unipayment-checkout__select,
+.unipayment-checkout__input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0 0 0 auto;
+  padding: 0 0 0 16px;
+  border: 0;
+  border-bottom: 1px solid #b0b0b0;
+  border-radius: 0;
+  outline: none;
+  background-color: #fff;
+  box-shadow: none;
+  color: var(--unipayment-checkout-red);
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: right;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.unipayment-checkout__select {
+  padding-left: 8px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23b0b0b0' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0 center;
+  background-size: 10px 6px;
+}
+
+.unipayment-checkout__select option {
+  text-align: right;
+  color: #000;
+}
+
+.unipayment-checkout__select:focus,
+.unipayment-checkout__select:focus-visible,
+.unipayment-checkout__input:focus,
+.unipayment-checkout__input:focus-visible {
+  outline: none;
+  border-color: transparent;
+  border-bottom-color: #b0b0b0;
+  background-color: #fff;
+  box-shadow: none;
+}
+
+.unipayment-checkout__input[readonly] {
+  border-bottom: 0;
+  opacity: 0.85;
+}
+
+.unipayment-checkout__consents {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.unipayment-checkout__consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.unipayment-checkout__consent--info {
+  display: block;
+}
+
+.unipayment-checkout__consent-checkbox {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.unipayment-checkout__consent-label,
+.unipayment-checkout__consent-text {
+  margin: 0;
+  color: #000;
+}
+
+.unipayment-checkout__consent-label a,
+.unipayment-checkout__consent-text a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.unipayment-checkout__error {
+  margin: 0;
+  color: #b32d2e;
+  font-size: 0.875rem;
+}
+
+.unipayment-checkout__error[hidden] {
+  display: none;
+}
+
+.unipayment-checkout-place-order-tooltip {
+  position: absolute;
+  z-index: 20;
+  max-width: 260px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #111;
+  color: #fff;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+@media (max-width: 575px) {
+  .unipayment-checkout__row {
+    flex-direction: column;
+    align-items: stretch;
+    row-gap: 4px;
+    column-gap: 0;
+  }
+
+  .unipayment-checkout__label {
+    white-space: normal;
+  }
+
+  .unipayment-checkout__value {
+    max-width: none;
+    text-align: left;
+  }
+
+  .unipayment-checkout__select,
+  .unipayment-checkout__input {
+    max-width: none;
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .unipayment-checkout__select {
+    background-position: right 0 center;
+  }
+}

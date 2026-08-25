@@ -277,18 +277,18 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 8 е **cart-page financing** (Hummingbird + Classic).
+Phase 9 е **checkout PaymentOption / financing selection** (Hummingbird + Classic).
 
 Разрешено:
 
-- всичко от Phase 0–7;
-- `displayShoppingCart` + `cartcalculator` / `cartpopup`;
-- `CartContextFactory` / `CartSchemeResolver` / presenters;
-- cart popup identity през същата `unipayment_popup_submission` таблица с `flow=cart_popup`.
+- всичко от Phase 0–8;
+- `paymentOptions` + `checkoutcalculate` / `validatecheckout` (Phase 9 boundary);
+- `CartSnapshot` fingerprint + `CheckoutPreferenceStore` handoff;
+- Silent Buy product preselect → checkout preference restore.
 
-Не въвеждай PaymentOption, financing snapshot install, checkout lock, order attempts, SmartUCF outbound, emails, custom order states или advertising FO, докато съответната фаза не бъде изрично възложена.
+Не въвеждай checkout lock, order attempt, financing snapshot, `validateOrder`, CP order, SmartUCF, emails, custom order states или advertising FO, докато съответната фаза не бъде изрично възложена.
 
-Cart/product apply приключват на `identity_accepted`. Не създават PrestaShop/CP поръчка.
+`validatecheckout` валидира избора и спира без създаване на поръчка.
 
 ---
 

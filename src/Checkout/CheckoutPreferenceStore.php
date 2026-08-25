@@ -9,8 +9,8 @@ final class CheckoutPreferenceStore
     private const COOKIE_NAME = 'unipayment_checkout_preference';
     private const TTL_SECONDS = 1800;
 
-    /** @param array<string, mixed> $preference */
-    public function save(\Cookie $cookie, array $preference, int $cartId, int $customerId): void
+    /** @param object $cookie PrestaShop Cookie or test double with write() */
+    public function save($cookie, array $preference, int $cartId, int $customerId): void
     {
         $preference['cart_id'] = $cartId;
         $preference['customer_id'] = $customerId;
@@ -19,8 +19,13 @@ final class CheckoutPreferenceStore
         $cookie->write();
     }
 
-    /** @return array<string, mixed>|null */
-    public function load(\Cookie $cookie, int $cartId, int $customerId): ?array
+    /**
+     * @param object $cookie PrestaShop Cookie or test double with write()
+     * @param string|null $expectedFingerprint When provided, preference is cleared if stored
+     *                                         cart_fingerprint is present and does not match.
+     * @return array<string, mixed>|null
+     */
+    public function load($cookie, int $cartId, int $customerId, ?string $expectedFingerprint = null): ?array
     {
         $raw = (string) $cookie->{self::COOKIE_NAME};
         $preference = json_decode($raw, true);
@@ -34,10 +39,22 @@ final class CheckoutPreferenceStore
             return null;
         }
 
+        $storedFingerprint = trim((string) ($preference['cart_fingerprint'] ?? ''));
+        if (
+            $expectedFingerprint !== null
+            && $storedFingerprint !== ''
+            && !hash_equals($storedFingerprint, $expectedFingerprint)
+        ) {
+            $this->clear($cookie);
+
+            return null;
+        }
+
         return $preference;
     }
 
-    public function clear(\Cookie $cookie): void
+    /** @param object $cookie PrestaShop Cookie or test double with write() */
+    public function clear($cookie): void
     {
         unset($cookie->{self::COOKIE_NAME});
         $cookie->write();

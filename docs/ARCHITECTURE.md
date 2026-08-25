@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 8** state.
+This document describes **intended** high-level boundaries and the **implemented Phase 9** state.
 
 ---
 
@@ -47,6 +47,7 @@ Infrastructure
 | Product page FO             | Phase 6 — hook + AJAX + vanilla JS (Hummingbird + Classic)                            |
 | Popup identity / dedupe     | Phase 7 — `unipayment_popup_submission`, operation guard, Step 2 identity             |
 | Cart page FO                | Phase 8 — `displayShoppingCart` + cartcalculator/cartpopup + Phase 7 flow isolation   |
+| Checkout PaymentOption      | Phase 9 — `paymentOptions` + checkoutcalculate + preference/fingerprint handoff       |
 
 ### Shop configuration cache flow
 
@@ -176,6 +177,33 @@ Theme lifecycle (cart):
 | Hummingbird 2.0 | `displayShoppingCart` | `prestashop.on('updatedCart')` after AJAX   |
 | Classic 3.1.1   | same                 | same (`updateCart` → refresh → `updatedCart`) |
 
+### Checkout financing (Phase 9)
+
+```text
+native checkout cart
+    ↓
+CartContextFactory::createForCheckout()  (lines + payable BOTH + carrier/shipping/cart_rules)
+    ↓
+CartSnapshot fingerprint (HMAC-signed cart_snapshot in PaymentOption form)
+    ↓
+CheckoutPaymentPresenter → hookPaymentOptions → checkout_payment.tpl
+    ↓
+AJAX checkoutcalculate (recalc + refresh preference)
+    ↓
+validatecheckout validates selection then STOPS (no Order / CP / SmartUCF)
+```
+
+Checkout fingerprint canonical payload (non-PII):
+
+```text
+currency, total, lines[{product_id, product_attribute_id, quantity, line_total}],
+checkout_state{id_cart, carrier_id, delivery_option, shipping_total, cart_rules[]}
+```
+
+Lines sorted by product/attribute; cart_rules sorted by `id_cart_rule`.
+
+Deferred **v2.0.2** (Woo + PS8 + PS9 coordinated): standard popup/list should expose eligible promo schemes inside standard selection. Phase 9 preserves audited v2.0.1 aggregation via `CartSchemeResolver` / `unifiedSchemes` — **do not change** here.
+
 ### Authentication lifecycle
 
 ```text
@@ -213,7 +241,10 @@ UNIPAYMENT_CP_TOKEN_EXPIRES_AT
 
 | Area                                           | Phase |
 | ---------------------------------------------- | ----- |
-| PaymentOption / checkout / financing snapshots | 9+    |
-| SmartUCF outbound / emails / advertising FO    | later |
-| Checkout lock / order attempt                  | later |
+| Checkout lock / order attempt / financing snapshot | 10+ |
+| validateOrder / CP order / SmartUCF / emails   | 10+   |
+| Thank You / bank status workflow               | 10+   |
+| Advertising FO                                 | later |
 | Custom order states / BO journal download      | later |
+
+**Carry-forward:** `PopupSubmissionRepository::markOrderCreated()` still lacks a strict state-transition guard before Phase 10 use.

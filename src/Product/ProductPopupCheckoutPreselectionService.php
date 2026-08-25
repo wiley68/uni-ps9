@@ -79,6 +79,15 @@ final class ProductPopupCheckoutPreselectionService
         $context->cart = $cart;
         $context->cookie->id_cart = $cartId;
 
+        $currencyIso = $context->currency instanceof \Currency
+            ? (string) $context->currency->iso_code
+            : '';
+        $cartContext = (new \PrestaShop\Module\Unipayment\Cart\CartContextFactory())->createForCheckout($cart);
+        $fingerprint = (new \PrestaShop\Module\Unipayment\Checkout\CartSnapshot())->fingerprint(
+            $cartContext,
+            $currencyIso
+        );
+
         $this->preferences->save($context->cookie, [
             'product_id' => $productId,
             'product_attribute_id' => $productAttributeId,
@@ -89,6 +98,8 @@ final class ProductPopupCheckoutPreselectionService
             'filter_id' => (int) ($calculation['filter_id'] ?? 0),
             'first_installment' => $calculation['first_installment'] ?? 0,
             'product_amount' => $calculation['price'] ?? 0,
+            'cart_fingerprint' => $fingerprint,
+            'flow' => 'product_preselect',
         ], $cartId, (int) $context->customer->id);
 
         return [

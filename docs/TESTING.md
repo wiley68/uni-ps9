@@ -82,4 +82,21 @@ Product popup identity/dedupe (Hummingbird + Classic). Passed.
 
 ## Manual STOP GATE 8
 
-Cart-page financing (Hummingbird + Classic). See Phase 8 implementation report. Do not start Phase 9 until accepted.
+Cart-page financing (Hummingbird + Classic). Passed.
+
+## Phase 9 checkout coverage
+
+| Test                                                           | What it checks                                         |
+| -------------------------------------------------------------- | ------------------------------------------------------ |
+| `tests/Checkout/CartSnapshotFingerprintTest.php`               | Same-total drift, carrier, voucher, determinism        |
+| `tests/Checkout/CheckoutPaymentPresenterTest.php`              | Payment view / preference / currency / consents        |
+| `tests/Checkout/CheckoutPaymentCalculatorTest.php`             | Eligible / promo / shipping / voucher / invalids       |
+| `tests/Checkout/CheckoutPaymentValidatorTest.php`              | Fingerprint + scheme + consent server authority        |
+| `tests/Checkout/CheckoutPreferenceStoreTest.php`               | Cookie-safe preference TTL / cart scope                |
+| `tests/Checkout/PaymentOptionContractTest.php`                 | Hook / action / Phase 9 order boundary                 |
+| `tests/Checkout/DeferredV202PromoAggregationContractTest.php`  | Documents deferred standard/promo v2.0.2               |
+| `tests/Frontend/CheckoutFrontendLifecycleContractTest.php`     | Events, AbortController, no jQuery                     |
+
+## Manual STOP GATE 9
+
+Checkout PaymentOption + financing selection. See Phase 9 implementation report. Do not start Phase 10 until accepted.

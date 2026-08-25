@@ -80,6 +80,8 @@ $allowedFront = [
     'productpopup.php' => true,
     'cartcalculator.php' => true,
     'cartpopup.php' => true,
+    'checkoutcalculate.php' => true,
+    'validatecheckout.php' => true,
 ];
 foreach ($frontControllers as $file) {
     $base = basename($file);
@@ -95,8 +97,10 @@ assertModuleSkeleton(
         && is_file($root . '/controllers/front/productcalculator.php')
         && is_file($root . '/controllers/front/productpopup.php')
         && is_file($root . '/controllers/front/cartcalculator.php')
-        && is_file($root . '/controllers/front/cartpopup.php'),
-    'Phase 4 inbound + Phase 6–8 product/cart controllers must exist'
+        && is_file($root . '/controllers/front/cartpopup.php')
+        && is_file($root . '/controllers/front/checkoutcalculate.php')
+        && is_file($root . '/controllers/front/validatecheckout.php'),
+    'Phase 4 inbound + Phase 6–9 product/cart/checkout controllers must exist'
 );
 
 assertModuleSkeleton(
@@ -107,9 +111,10 @@ assertModuleSkeleton(
 assertModuleSkeleton(
     is_file($root . '/views/js/cart-calculator.js')
         && is_file($root . '/views/css/cart-calculator.css')
-        && !is_file($root . '/views/js/checkout-payment.js')
+        && is_file($root . '/views/js/checkout-payment.js')
+        && is_file($root . '/views/css/checkout-payment.css')
         && !is_file($root . '/views/js/homepage-advertising.js'),
-    'Phase 8 cart assets must exist; checkout/homepage FO assets must remain absent'
+    'Phase 8–9 cart/checkout assets must exist; homepage FO assets must remain absent'
 );
 
 assertModuleSkeleton(
@@ -146,8 +151,15 @@ assertModuleSkeleton(
     'Phase 8 must register displayShoppingCart'
 );
 assertModuleSkeleton(
-    !preg_match('/\bfunction\s+hookPaymentOptions\b/', $module),
-    'checkout PaymentOption hook must remain absent in Phase 8'
+    (bool) preg_match('/registerHook\s*\(\s*[\'"]paymentOptions[\'"]\s*\)/', $module)
+        && (bool) preg_match('/function\s+hookPaymentOptions\b/', $module),
+    'Phase 9 must register paymentOptions'
+);
+assertModuleSkeleton(
+    !preg_match('/unipayment_checkout_lock/', $module)
+        && !preg_match('/unipayment_order_attempt/', $module)
+        && !preg_match('/unipayment_financing_snapshot/', $module),
+    'Phase 9 must not install checkout lock / order attempt / financing snapshot'
 );
 assertModuleSkeleton(
     is_file($root . '/src/Product/PopupSubmissionRepository.php')

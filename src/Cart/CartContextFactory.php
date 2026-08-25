@@ -41,6 +41,7 @@ final class CartContextFactory
             return $a['id_cart_rule'] <=> $b['id_cart_rule'];
         });
         $checkoutState = [
+            'id_cart' => (int) $cart->id,
             'carrier_id' => (int) $cart->id_carrier,
             'delivery_option' => $cart->getDeliveryOption(null, false, false),
             'shipping_total' => number_format((float) $cart->getOrderTotal(true, \Cart::ONLY_SHIPPING), 2, '.', ''),

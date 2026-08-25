@@ -66,8 +66,8 @@ assertAdminConfiguration(
 $frontFiles = array_values(array_diff(scandir($root . '/controllers/front') ?: [], ['.', '..', 'index.php']));
 sort($frontFiles);
 assertAdminConfiguration(
-    $frontFiles === ['cartcalculator.php', 'cartpopup.php', 'orderbankstatus.php', 'productcalculator.php', 'productpopup.php', 'shopcache.php', 'smartucfdebuglog.php'],
-    'Phase 8 front controllers must include inbound API + product/cart calculator/popup'
+    $frontFiles === ['cartcalculator.php', 'cartpopup.php', 'checkoutcalculate.php', 'orderbankstatus.php', 'productcalculator.php', 'productpopup.php', 'shopcache.php', 'smartucfdebuglog.php', 'validatecheckout.php'],
+    'Phase 9 front controllers must include inbound API + product/cart/checkout endpoints'
 );
 
 assertAdminConfiguration(strpos($module, '$credentialsChanged =') !== false, 'credential-change detection missing');
@@ -108,8 +108,8 @@ assertAdminConfiguration(
 );
 assertAdminConfiguration(
     (bool) preg_match('/function\s+hookDisplayShoppingCart\b/', $module)
-        && !preg_match('/\bfunction\s+hookPaymentOptions\b/', $module),
-    'Phase 8 cart hook present; PaymentOption remains Phase 9+'
+        && (bool) preg_match('/function\s+hookPaymentOptions\b/', $module),
+    'Phase 8–9 cart + PaymentOption hooks present'
 );
 assertAdminConfiguration(!preg_match('/\bnew\s+OrderState\b|\bOrderStateInstaller\b/', $module), 'no custom order states');
 assertAdminConfiguration(
