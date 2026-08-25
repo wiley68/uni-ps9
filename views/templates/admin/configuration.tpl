@@ -72,14 +72,40 @@
       </div>
     </div>
 
+    <div class="form-group">
+      <label class="control-label col-lg-3">{l s='Локален кеш на конфигурацията' d='Modules.Unipayment.Admin'}</label>
+      <div class="col-lg-9">
+        {if $unipayment_cache_present}
+          <p class="help-block">
+            {l s='Кешът е наличен.' d='Modules.Unipayment.Admin'}
+            {if $unipayment_cache_is_fresh}{l s='Състояние: свеж.' d='Modules.Unipayment.Admin'}{else}{l s='Състояние: изтекъл.' d='Modules.Unipayment.Admin'}{/if}
+          </p>
+          {if $unipayment_cache_fetched_at !== ''}
+            <p class="help-block">{l s='Последно обновяване:' d='Modules.Unipayment.Admin'} {$unipayment_cache_fetched_at|escape:'htmlall':'UTF-8'} UTC</p>
+          {/if}
+          {if $unipayment_cache_expires_at !== ''}
+            <p class="help-block">{l s='Валиден до:' d='Modules.Unipayment.Admin'} {$unipayment_cache_expires_at|escape:'htmlall':'UTF-8'} UTC</p>
+          {/if}
+        {else}
+          <p class="help-block">{l s='Все още няма локален кеш. Използвайте „Обнови данните от банката“.' d='Modules.Unipayment.Admin'}</p>
+        {/if}
+      </div>
+    </div>
+
   </form>
 
   <div class="panel-footer" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     <button type="submit" name="submitUnipaymentConfiguration" form="unipayment-settings-form" class="btn btn-primary"><i class="process-icon-save"></i> {l s='Запази настройките' d='Modules.Unipayment.Admin'}</button>
-    <button type="button" name="submitUnipaymentRefresh" class="btn btn-default" disabled="disabled" title="{l s='Ще бъде налично след локалния shop cache (Phase 3).' d='Modules.Unipayment.Admin'}"><i class="icon-refresh"></i> {l s='Обнови данните от банката' d='Modules.Unipayment.Admin'}</button>
+    {if $unipayment_bank_refresh_available}
+      <form action="{$unipayment_form_action|escape:'htmlall':'UTF-8'}" method="post" style="margin:0;">
+        <button type="submit" name="submitUnipaymentRefresh" class="btn btn-default"><i class="icon-refresh"></i> {l s='Обнови данните от банката' d='Modules.Unipayment.Admin'}</button>
+      </form>
+    {else}
+      <button type="button" name="submitUnipaymentRefresh" class="btn btn-default" disabled="disabled"><i class="icon-refresh"></i> {l s='Обнови данните от банката' d='Modules.Unipayment.Admin'}</button>
+    {/if}
     <button type="button" name="submitUnipaymentDownloadJournal" class="btn btn-default" disabled="disabled" title="{l s='Ще бъде налично след SmartUCF диагностиката.' d='Modules.Unipayment.Admin'}"><i class="icon-download"></i> {l s='Изтегли журнал операции' d='Modules.Unipayment.Admin'}</button>
   </div>
-  {if !$unipayment_cp_actions_available}
-    <p class="help-block" style="margin-top:10px;">{l s='„Обнови данните от банката“ изисква Phase 3 shop cache. „Изтегли журнал операции“ изисква по-късна SmartUCF диагностика. Control Panel authentication client е наличен в Phase 2, но тези бутони остават деактивирани.' d='Modules.Unipayment.Admin'}</p>
+  {if !$unipayment_journal_available}
+    <p class="help-block" style="margin-top:10px;">{l s='„Изтегли журнал операции“ остава деактивирано до SmartUCF диагностиката. CP push (shop-cache inbound) е Phase 4.' d='Modules.Unipayment.Admin'}</p>
   {/if}
 </div>

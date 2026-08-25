@@ -10,21 +10,27 @@ use PrestaShop\Module\Unipayment\Security\TokenRepository;
  * Boundary for side effects after UNICID/secret change.
  *
  * Phase 2: invalidate Control Panel auth tokens.
- * Phase 3 will also clear the local shop configuration cache here.
+ * Phase 3: clear local shop configuration cache.
  */
 final class CredentialChangeSideEffectHandler
 {
     /** @var TokenRepository */
     private $tokens;
 
-    public function __construct(?TokenRepository $tokens = null)
-    {
+    /** @var ShopConfigurationCacheInterface */
+    private $cache;
+
+    public function __construct(
+        ?TokenRepository $tokens = null,
+        ?ShopConfigurationCacheInterface $cache = null
+    ) {
         $this->tokens = $tokens ?? new TokenRepository();
+        $this->cache = $cache ?? new ShopConfigurationCache();
     }
 
     public function onCredentialsChanged(): void
     {
         $this->tokens->invalidate();
-        // Phase 3: clear local shop configuration cache.
+        $this->cache->clear();
     }
 }

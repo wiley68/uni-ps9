@@ -94,7 +94,11 @@ foreach ($assetIterator as $fileInfo) {
 
 assertModuleSkeleton(
     !preg_match('/\bCREATE\s+TABLE\b/i', $module),
-    'module entry must not install database tables'
+    'module entry must not embed CREATE TABLE SQL (install via ShopConfigurationCache)'
+);
+assertModuleSkeleton(
+    is_file($root . '/src/Configuration/ShopConfigurationCache.php'),
+    'Phase 3 ShopConfigurationCache must exist'
 );
 assertModuleSkeleton(
     !preg_match('/\bnew\s+OrderState\b|\bOrderStateInstaller\b/i', $module),

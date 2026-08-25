@@ -62,7 +62,41 @@ final class PhpEncryption
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 use PrestaShop\Module\Unipayment\Configuration\CredentialChangeSideEffectHandler;
+use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCacheInterface;
 use PrestaShop\Module\Unipayment\Security\TokenRepository;
+
+final class MemoryShopConfigurationCacheForTokenTest implements ShopConfigurationCacheInterface
+{
+    /** @var int */
+    public $clearCount = 0;
+
+    public function getFresh(string $unicid): ?array
+    {
+        return null;
+    }
+
+    public function replace(string $unicid, array $shopData): bool
+    {
+        return true;
+    }
+
+    public function delete(string $unicid): bool
+    {
+        return true;
+    }
+
+    public function clear(): bool
+    {
+        ++$this->clearCount;
+
+        return true;
+    }
+
+    public function getMetadata(string $unicid): ?array
+    {
+        return null;
+    }
+}
 
 function assertTokenRepo(bool $condition, string $message): void
 {
@@ -109,7 +143,9 @@ assertTokenRepo(!isset(Configuration::$values[TokenRepository::TOKEN_TYPE]), 'in
 assertTokenRepo(!isset(Configuration::$values[TokenRepository::EXPIRES_AT]), 'invalidate must delete expiry key');
 
 assertTokenRepo($tokens->save('access-4', 'Bearer', 1700000300), 'token for credential-change check');
-(new CredentialChangeSideEffectHandler($tokens))->onCredentialsChanged();
+$cache = new MemoryShopConfigurationCacheForTokenTest();
+(new CredentialChangeSideEffectHandler($tokens, $cache))->onCredentialsChanged();
 assertTokenRepo(!$tokens->hasToken(), 'credential change must invalidate tokens');
+assertTokenRepo($cache->clearCount === 1, 'credential change must clear shop configuration cache');
 
 fwrite(STDOUT, "OK (TokenRepository lifecycle and credential-change invalidation)\n");

@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * UniPayment CLI test runner.
  *
- * Phase 0–2 provide static, configuration, and API/auth contract tests.
+ * Phase 0–3 provide static, configuration, API/auth, and shop-cache contract tests.
  * The optional suite argument is accepted so later phases can reuse the same entry point.
  *
  * Usage:

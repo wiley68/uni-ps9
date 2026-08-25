@@ -53,7 +53,10 @@ class Unipayment extends PaymentModule
         }
 
         $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
-        if (!$repository->install()) {
+        $cache = new PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCache();
+        if (!$repository->install() || !$cache->install()) {
+            $cache->uninstall();
+            $repository->uninstall();
             parent::uninstall();
 
             return false;
@@ -64,8 +67,9 @@ class Unipayment extends PaymentModule
 
     public function uninstall(): bool
     {
+        $cache = new PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCache();
         $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
-        if (!$repository->uninstall()) {
+        if (!$cache->uninstall() || !$repository->uninstall()) {
             return false;
         }
 
@@ -97,16 +101,17 @@ class Unipayment extends PaymentModule
         }
 
         if (Tools::isSubmit('submitUnipaymentRefresh')) {
-            $output .= $this->displayWarning(
-                $this->trans(
-                    'Обновяването на данни от банката ще бъде налично след локалния shop cache (Phase 3).',
-                    [],
-                    'Modules.Unipayment.Admin'
-                )
-            );
+            $output .= $this->handleBankDataRefresh();
         }
 
         $configurationSubmitted = Tools::isSubmit('submitUnipaymentConfiguration');
+        $cacheMetadata = null;
+        try {
+            $cacheMetadata = $this->createShopConfigurationService()->getMetadata();
+        } catch (Throwable $exception) {
+            $cacheMetadata = null;
+        }
+
         $this->context->smarty->assign([
             'unipayment_form_action' => $this->context->link->getAdminLink(
                 'AdminModules',
@@ -137,7 +142,12 @@ class Unipayment extends PaymentModule
                 : (string) $repository->getButtonTopSpacing(),
             'unipayment_has_secret' => $repository->hasSecret(),
             'unipayment_secret_readable' => $repository->isSecretReadable(),
-            'unipayment_cp_actions_available' => false,
+            'unipayment_bank_refresh_available' => true,
+            'unipayment_journal_available' => false,
+            'unipayment_cache_present' => is_array($cacheMetadata),
+            'unipayment_cache_is_fresh' => is_array($cacheMetadata) ? (bool) ($cacheMetadata['is_fresh'] ?? false) : false,
+            'unipayment_cache_fetched_at' => is_array($cacheMetadata) ? (string) ($cacheMetadata['fetched_at'] ?? '') : '',
+            'unipayment_cache_expires_at' => is_array($cacheMetadata) ? (string) ($cacheMetadata['expires_at'] ?? '') : '',
         ]);
 
         return $output . $this->display(__FILE__, 'views/templates/admin/configuration.tpl');
@@ -213,12 +223,60 @@ class Unipayment extends PaymentModule
         );
     }
 
+    private function handleBankDataRefresh(): string
+    {
+        try {
+            $this->createShopConfigurationService()->get(true);
+
+            return $this->displayConfirmation(
+                $this->trans('Данните от банката са обновени успешно.', [], 'Modules.Unipayment.Admin')
+            );
+        } catch (PrestaShop\Module\Unipayment\Configuration\Exception\ShopConfigurationSnapshotValidationException $exception) {
+            return $this->displayError(
+                $this->trans(
+                    'Данните от банката са невалидни и не бяха приложени. Предишната конфигурация е запазена.',
+                    [],
+                    'Modules.Unipayment.Admin'
+                )
+            );
+        } catch (PrestaShop\Module\Unipayment\Api\Exception\TimeoutException $exception) {
+            return $this->displayError(
+                $this->trans('Връзката с банката изтече. Моля, опитайте отново.', [], 'Modules.Unipayment.Admin')
+            );
+        } catch (PrestaShop\Module\Unipayment\Api\Exception\ConnectionException $exception) {
+            return $this->displayError(
+                $this->trans('Неуспешна връзка с банката. Моля, опитайте отново.', [], 'Modules.Unipayment.Admin')
+            );
+        } catch (PrestaShop\Module\Unipayment\Api\Exception\AuthenticationException $exception) {
+            return $this->displayError(
+                $this->trans('Удостоверенията към банката бяха отхвърлени.', [], 'Modules.Unipayment.Admin')
+            );
+        } catch (PrestaShop\Module\Unipayment\Api\Exception\MalformedJsonException $exception) {
+            return $this->displayError(
+                $this->trans('Банката върна нечетим отговор.', [], 'Modules.Unipayment.Admin')
+            );
+        } catch (PrestaShop\Module\Unipayment\Api\Exception\InvalidPayloadException $exception) {
+            return $this->displayError(
+                $this->trans('Банката върна невалиден отговор.', [], 'Modules.Unipayment.Admin')
+            );
+        } catch (PrestaShop\Module\Unipayment\Api\Exception\HttpException $exception) {
+            return $this->displayError(
+                $this->trans('Данните не могат да бъдат обновени. Проверете настройките и опитайте отново.', [], 'Modules.Unipayment.Admin')
+            );
+        }
+    }
+
     /**
      * Outbound Control Panel client (auth + GET /shop). Not used for FO financing yet.
      */
     public function getControlPanelClient(): PrestaShop\Module\Unipayment\Api\ControlPanelClient
     {
         return $this->createControlPanelClient();
+    }
+
+    public function getShopConfigurationService(): PrestaShop\Module\Unipayment\Configuration\ShopConfigurationService
+    {
+        return $this->createShopConfigurationService();
     }
 
     private function createControlPanelClient(): PrestaShop\Module\Unipayment\Api\ControlPanelClient
@@ -230,6 +288,20 @@ class Unipayment extends PaymentModule
             new PrestaShop\Module\Unipayment\Security\TokenRepository(),
             new PrestaShop\Module\Unipayment\Api\CurlHttpTransport(),
             $shopUrl
+        );
+    }
+
+    private function createShopConfigurationService(
+        ?PrestaShop\Module\Unipayment\Api\ControlPanelClient $client = null
+    ): PrestaShop\Module\Unipayment\Configuration\ShopConfigurationService {
+        $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
+        $tokens = new PrestaShop\Module\Unipayment\Security\TokenRepository();
+
+        return new PrestaShop\Module\Unipayment\Configuration\ShopConfigurationService(
+            $repository,
+            new PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCache(),
+            $client ?? $this->createControlPanelClient(),
+            $tokens
         );
     }
 }

@@ -277,16 +277,18 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 2 е **Control Panel client + authentication lifecycle**.
+Phase 3 е **persistent shop configuration cache** (pull path).
 
 Разрешено:
 
 - локални Configuration ключове и BO configuration page;
 - `ControlPanelClient`, `TokenRepository`, HTTP transport, API exceptions;
-- `GET /shop` fetch без локален cache;
-- token invalidation при смяна на credentials.
+- `ShopConfigurationCache` / `ShopConfigurationService` / snapshot validation / flags;
+- таблица `unipayment_shop_cache` (24h TTL, ключ `unicid`);
+- BO „Обнови данните от банката“ (`get(true)`);
+- credential change → invalidate tokens + clear shop cache.
 
-Не въвеждай shop cache, inbound signed API, calculator, hooks, module tables, payment method, frontend assets или financing functionality, докато съответната фаза не бъде изрично възложена.
+Не въвеждай inbound signed API (`shopcache` / HMAC / nonce), calculator, FO hooks, други module tables, payment method, frontend assets или financing UI, докато съответната фаза не бъде изрично възложена.
 
 ---
 

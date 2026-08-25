@@ -2,13 +2,13 @@
 
 Native PrestaShop 9 module for **UniCredit financing** (credit calculator, checkout payment method, order lifecycle, Control Panel integration, and SmartUCF).
 
-| Item                  | Value                                               |
-| --------------------- | --------------------------------------------------- |
-| Module technical name | `unipayment`                                        |
-| Current version       | `2.0.1`                                             |
-| Repository            | `wiley68/uni-ps9`                                   |
-| Repository root       | Module root (this directory)                        |
-| Current state         | **Phase 2 — Control Panel client + authentication** |
+| Item                  | Value                                             |
+| --------------------- | ------------------------------------------------- |
+| Module technical name | `unipayment`                                      |
+| Current version       | `2.0.1`                                           |
+| Repository            | `wiley68/uni-ps9`                                 |
+| Repository root       | Module root (this directory)                      |
+| Current state         | **Phase 3 — persistent shop configuration cache** |
 
 ## Purpose
 
@@ -28,32 +28,33 @@ Provide a PrestaShop 9-native adapter/port of the UniPayment product family:
 
 ## Current implementation status
 
-Phase 2 provides:
+Phase 3 provides:
 
 - Back Office local configuration (Phase 1);
-- outbound Control Panel client (`login`, `refreshToken`, `logout`, `getShop`, plus unused `createOrder` / `updateOrderStatus` / SSL methods on the same client);
-- encrypted local access-token storage;
-- controlled 401 recovery (invalidate → re-login → one retry);
-- credential-change token invalidation.
+- outbound Control Panel client + auth (Phase 2);
+- persistent local shop snapshot cache (`unipayment_shop_cache`, 24h TTL);
+- `GET /shop` pull on miss / forced refresh with snapshot validation;
+- stale-good protection (invalid CP payload does not overwrite valid cache);
+- full snapshot replacement (no partial merge);
+- credential-change clears tokens **and** shop cache;
+- BO „Обнови данните от банката“ via `ShopConfigurationService::get(true)`.
 
 Still **not** implemented:
 
-- shop configuration cache / persistence of `GET /shop`;
-- inbound signed CP callbacks;
-- financing UI, payment option, calculators, FO hooks, module tables, order states, JS/CSS.
+- CP → module inbound push (`shopcache`, HMAC, nonces) — Phase 4;
+- financing UI, payment option, calculators, FO hooks, other module tables, order states, JS/CSS.
 
 Do not use this checkout as a working UniCredit financing integration yet.
 
-## Control Panel (Phase 2)
+## Control Panel (Phase 3)
 
-| Item                        | Status                                |
-| --------------------------- | ------------------------------------- |
-| `POST /api/v1/auth/login`   | implemented                           |
-| `POST /api/v1/auth/refresh` | implemented                           |
-| `POST /api/v1/auth/logout`  | implemented                           |
-| `GET /api/v1/shop`          | fetch only — **not cached**           |
-| Token storage               | encrypted in PrestaShop Configuration |
-| Bank-data refresh BO button | still disabled until Phase 3          |
+| Item                          | Status                                              |
+| ----------------------------- | --------------------------------------------------- |
+| Auth login / refresh / logout | implemented                                         |
+| `GET /api/v1/shop`            | fetch + validate + persist local snapshot           |
+| Local cache                   | `unipayment_shop_cache` keyed by UNICID, TTL 86400s |
+| Bank-data refresh BO button   | enabled                                             |
+| CP push / shop-cache inbound  | **not** implemented (Phase 4)                       |
 
 Login payload (parity with PS8/CP): `unicid`, `name` (shop URL), `secret`.
 
@@ -73,7 +74,7 @@ cd modules/unipayment
 composer install
 ```
 
-Then install the module from the PrestaShop Back Office (Modules → Module Manager).
+Then install (or reinstall) the module from the PrestaShop Back Office so `unipayment_shop_cache` is created.
 
 ## Documentation
 
