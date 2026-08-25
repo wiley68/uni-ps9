@@ -50,7 +50,10 @@ final class ProductPopupOperationGuard
             return ['response' => ['success' => false, 'message' => 'Невалиден token за popup заявката.']];
         }
 
-        if (!$this->identityMatches($row, $idGuest, $idCustomer) || !hash_equals((string) $row['selection_hash'], $selectionHash)) {
+        if (
+            !PopupSubmissionRepository::identityMatches($row, $idGuest, $idCustomer)
+            || !hash_equals((string) $row['selection_hash'], $selectionHash)
+        ) {
             http_response_code(409);
 
             return [
@@ -197,14 +200,4 @@ final class ProductPopupOperationGuard
         ];
     }
 
-    /**
-     * @param array<string, mixed> $row
-     */
-    private function identityMatches(array $row, int $idGuest, int $idCustomer): bool
-    {
-        $rowGuest = (int) ($row['id_guest'] ?? 0);
-        $rowCustomer = (int) ($row['id_customer'] ?? 0);
-
-        return $rowGuest === $idGuest && $rowCustomer === $idCustomer;
-    }
 }

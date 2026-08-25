@@ -37,6 +37,18 @@ assertAud002aContract(strpos($repo, 'ORDER_CREATED_TTL_SECONDS = 2592000') !== f
 assertAud002aContract(strpos($repo, 'ISSUED_TTL_SECONDS = 1800') !== false, 'issued TTL 1800s');
 assertAud002aContract(strpos($repo, 'bin2hex(random_bytes(32))') !== false, 'cryptographic token entropy');
 assertAud002aContract(
+    strpos($repo, 'identityMatches($existing, $idGuest, $idCustomer)') !== false,
+    'preferredToken reuse must verify guest/customer identity'
+);
+assertAud002aContract(
+    strpos($repo, 'public static function identityMatches') !== false,
+    'shared identityMatches helper required'
+);
+assertAud002aContract(
+    strpos($guard, 'PopupSubmissionRepository::identityMatches') !== false,
+    'operation guard must use the same identity helper'
+);
+assertAud002aContract(
     strpos($repo, 'function claimForProcessing') !== false
         && strpos($repo, 'UPDATE `%s%s` SET `state`') !== false
         && strpos($repo, 'AND `state` =') !== false

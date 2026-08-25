@@ -121,12 +121,19 @@ final class FakePopupDb
             if (preg_match('/`id_customer` = (\d+)/', $sql, $c)) {
                 $customerId = (int) $c[1];
             }
+            $expiresAfter = null;
+            if (preg_match("/expires_at` > '([^']+)'/", $sql, $expiresMatch)) {
+                $expiresAfter = $expiresMatch[1];
+            }
             $found = null;
             foreach ($this->rows as $row) {
                 if ((string) $row['selection_hash'] !== $m[1]
                     || (int) $row['id_shop'] !== $shop
                     || (string) $row['state'] !== PopupSubmissionStates::ISSUED
                 ) {
+                    continue;
+                }
+                if ($expiresAfter !== null && (string) $row['expires_at'] <= $expiresAfter) {
                     continue;
                 }
                 $rowGuest = (int) ($row['id_guest'] ?? 0);

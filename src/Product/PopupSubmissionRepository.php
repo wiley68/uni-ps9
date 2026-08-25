@@ -81,11 +81,13 @@ final class PopupSubmissionRepository
 
         if ($preferredToken !== '') {
             $existing = $this->findByToken($preferredToken);
+            // Foreign preferred tokens are ignored silently (no existence oracle / no log).
             if (
                 is_array($existing)
                 && (string) $existing['state'] === PopupSubmissionStates::ISSUED
                 && (string) $existing['selection_hash'] === $selectionHash
                 && (int) $existing['id_shop'] === $idShop
+                && self::identityMatches($existing, $idGuest, $idCustomer)
                 && !$this->isExpired($existing, $now)
             ) {
                 $this->touchIssuedExpiry((int) $existing['id_submission']);
@@ -308,6 +310,20 @@ final class PopupSubmissionRepository
         }
 
         return $row;
+    }
+
+    /**
+     * Shared guest/customer identity check for issue reuse and apply gate.
+     * NULL DB identity columns are treated as 0 (same as findReusableIssued).
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function identityMatches(array $row, int $idGuest, int $idCustomer): bool
+    {
+        $rowGuest = (int) ($row['id_guest'] ?? 0);
+        $rowCustomer = (int) ($row['id_customer'] ?? 0);
+
+        return $rowGuest === $idGuest && $rowCustomer === $idCustomer;
     }
 
     /**
