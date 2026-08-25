@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 0** state. It does not claim that later-phase components already exist.
+This document describes **intended** high-level boundaries and the **implemented Phase 1** state. It does not claim that later-phase components already exist.
 
 ---
 
@@ -33,35 +33,56 @@ Infrastructure
 
 Business rules should stay out of templates and hooks. PrestaShop types should stay out of domain services where practical.
 
-This layering is a target for later phases. It is **not** implemented in Phase 0.
-
 ---
 
-## Implemented in Phase 0
+## Implemented in Phase 1
 
-Phase 0 is foundation only:
+| Area                       | Phase 1 state                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------------- |
+| Module entry               | `unipayment.php` extends `PaymentModule`, PS9-only compliancy, new translation system     |
+| Autoload                   | Composer PSR-4 `PrestaShop\Module\Unipayment\` → `src/`                                   |
+| Symfony services           | Minimal `config/services.yml` resource registration                                       |
+| Local configuration        | `ConfigurationRepository`, `ConfigurationValidator`, encrypted secret via `PhpEncryption` |
+| Credential-change boundary | `CredentialChangeSideEffectHandler` (no-op until Phase 2/3 token + shop cache)            |
+| Configuration UI           | `getContent()` + `views/templates/admin/configuration.tpl`                                |
+| CP-dependent BO actions    | Refresh / journal controls visible but disabled; no remote calls                          |
+| Front office               | No functional hooks, controllers, JS, or CSS                                              |
+| Persistence                | PrestaShop `Configuration` keys only; no module-owned tables                              |
+| Orders                     | No custom order states                                                                    |
+| Control Panel / SmartUCF   | Not connected                                                                             |
 
-| Area                     | Phase 0 state                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------------- |
-| Module entry             | `unipayment.php` extends `PaymentModule`, PS9-only compliancy, new translation system |
-| Autoload                 | Composer PSR-4 `PrestaShop\Module\Unipayment\` → `src/`                               |
-| Symfony services         | Minimal `config/services.yml` resource registration; no application services          |
-| `src/`                   | Protective `index.php` only; no domain/infrastructure classes                         |
-| Configuration UI         | Placeholder `getContent()` message; no form, no persisted settings                    |
-| Front office             | No functional hooks, controllers, JS, or CSS                                          |
-| Persistence              | No module-owned tables                                                                |
-| Orders                   | No custom order states                                                                |
-| Control Panel / SmartUCF | Not connected                                                                         |
+### Local configuration keys
+
+```text
+UNIPAYMENT_ENABLED
+UNIPAYMENT_UNICID
+UNIPAYMENT_SECRET          (enc:v1:… via PhpEncryption / _NEW_COOKIE_KEY_)
+UNIPAYMENT_ADVERTISING_ENABLED
+UNIPAYMENT_DEBUG_ENABLED
+UNIPAYMENT_PRODUCT_BUTTON_ACTION
+UNIPAYMENT_BUTTON_TOP_SPACING
+UNIPAYMENT_SYNC_BANK_REJECTION_STATE   (stored; not exposed in UI — PS8 parity)
+```
+
+Multishop scoping matches PS8: `Configuration::updateValue` / `Configuration::get` without explicit shop overrides (PrestaShop context defaults).
+
+### Credential change invalidation
+
+When UNICID changes or a new secret is submitted, Phase 1 detects `$credentialsChanged` and calls `CredentialChangeSideEffectHandler::onCredentialsChanged()`.
+
+That handler is intentionally empty until:
+
+- Phase 2 — `TokenRepository::invalidate()`
+- Phase 3 — `ShopConfigurationCache::clear()`
 
 ---
 
 ## Explicitly not implemented yet
 
-Do not treat these as present:
-
+- ControlPanelClient / authentication tokens / `/shop` pull;
+- shop configuration cache and signed inbound API;
 - calculator / product / cart / checkout / payment option;
-- Control Panel credentials, token storage, replay protection;
-- module database tables and uninstall purge;
+- module database tables and uninstall purge beyond local Configuration keys;
 - custom order states;
 - mail bodies;
 - functional JS/CSS;

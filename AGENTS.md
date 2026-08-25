@@ -267,9 +267,15 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 0 е **foundation only**.
+Phase 1 е **local configuration layer**.
 
-Не въвеждай financing functionality, configuration storage, CP connection, calculator, hooks, module tables, payment method, frontend assets или business functionality, докато съответната фаза не бъде изрично възложена.
+Разрешено:
+
+- локални Configuration ключове;
+- `ConfigurationRepository` / `ConfigurationValidator`;
+- Back Office configuration page (`getContent()` + Smarty).
+
+Не въвеждай Control Panel client, shop cache, calculator, hooks, module tables, payment method, frontend assets или financing functionality, докато съответната фаза не бъде изрично възложена.
 
 ---
 

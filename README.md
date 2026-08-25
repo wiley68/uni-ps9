@@ -2,15 +2,13 @@
 
 Native PrestaShop 9 module for **UniCredit financing** (credit calculator, checkout payment method, order lifecycle, Control Panel integration, and SmartUCF).
 
-| Item                  | Value                        |
-| --------------------- | ---------------------------- |
-| Module technical name | `unipayment`                 |
-| Current version       | `2.0.1`                      |
-| Repository            | `wiley68/uni-ps9`            |
-| Repository root       | Module root (this directory) |
-| Current state         | **Phase 0 foundation only**  |
-
-This repository currently contains a **minimal installable skeleton**. It has **no production financing functionality**.
+| Item                  | Value                                   |
+| --------------------- | --------------------------------------- |
+| Module technical name | `unipayment`                            |
+| Current version       | `2.0.1`                                 |
+| Repository            | `wiley68/uni-ps9`                       |
+| Repository root       | Module root (this directory)            |
+| Current state         | **Phase 1 — local configuration layer** |
 
 ## Purpose
 
@@ -18,8 +16,6 @@ Provide a PrestaShop 9-native adapter/port of the UniPayment product family:
 
 - `uni-ps8` remains the functional source of truth;
 - `uni-ps9` is the PS9-native implementation.
-
-Phase 0 establishes module identity, Composer/autoload, Symfony service registration, documentation, and a contract test runner. Later phases will port business behavior.
 
 ## Platform
 
@@ -34,15 +30,33 @@ The development shop currently runs **PrestaShop 9.1 / PHP 8.4**. Production cod
 
 ## Current implementation status
 
-Phase 0 provides:
+Phase 1 provides:
 
-- Module Manager discovery;
-- install / enable / disable / uninstall / reinstall;
-- a placeholder Configure page with no settings;
-- empty `src/` namespace and `config/services.yml` registration;
-- no financing UI, no payment option, no calculators, no hooks, no module tables, no custom order states, no JS/CSS behavior.
+- Module Manager discovery and install/enable/disable/uninstall/reinstall;
+- Back Office local configuration page (`getContent()` + Smarty template);
+- encrypted secret storage, UNICID validation, local flags and product-button settings;
+- no Control Panel HTTP calls;
+- no financing UI, payment option, calculators, FO hooks, module tables, custom order states, or JS/CSS behavior.
 
 Do not use this checkout as a working UniCredit financing integration yet.
+
+## Local configuration (Phase 1)
+
+Merchant-facing settings (Back Office → Modules → UniPayment → Configure):
+
+| Setting               | Purpose                                      |
+| --------------------- | -------------------------------------------- |
+| Enable module         | Master on/off (`UNIPAYMENT_ENABLED`)         |
+| UNICID                | Shop identifier for future CP authentication |
+| Shared secret         | CP/module shared secret; stored encrypted    |
+| Advertising enabled   | Homepage promotional content gate (stored)   |
+| Debug enabled         | Diagnostic flag (stored; no FO effect yet)   |
+| Product button action | `add_to_cart` / `buy` (stored only)          |
+| Button top spacing    | 0–200 px (stored only)                       |
+
+Business financing rules remain owned by the Control Panel and are **not** duplicated locally.
+
+CP-dependent actions on the configuration page (**Refresh bank data**, **Download journal**) are visible but **disabled** until later phases.
 
 ## Reference repositories
 
@@ -52,8 +66,6 @@ Do not use this checkout as a working UniCredit financing integration yet.
 | `wiley68/uni-ps8`             | Functional source of truth   | no       |
 | `wiley68/jet-ps9`             | PS9 selector/event reference | no       |
 | `wiley68/uni.avalonbg.com`    | Control Panel                | no       |
-
-Do not copy those repositories blindly.
 
 ## Installation
 
@@ -66,5 +78,5 @@ Then install the module from the PrestaShop Back Office (Modules → Module Mana
 
 ## Documentation
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — intended boundaries vs Phase 0 state
-- [`docs/TESTING.md`](docs/TESTING.md) — automated checks and STOP GATE 0
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — intended boundaries vs implemented state
+- [`docs/TESTING.md`](docs/TESTING.md) — automated checks and STOP GATE 1
