@@ -64,7 +64,7 @@ Phase 10 durable order path:
 | `tests/Checkout/PaymentOptionContractTest.php`     | Phase 10 validatecheckout wiring                       |
 | `tests/Product/PopupSubmissionRepositoryTest.php`  | `markOrderCreated` strict `processing → order_created` |
 
-Current safe suite: **84 passed** (`composer test`).
+Current safe suite: **85 passed** (`composer test`).
 
 Phase 11 post-CP lifecycle:
 
@@ -83,6 +83,7 @@ Phase 12 post-order communication:
 | ----------------------------------------------------------- | ------------------------------------------------------- |
 | `tests/Order/Phase12PostOrderCommunicationContractTest.php` | Mail dispatcher default, hooks, privacy wiring, AUD-009 |
 | `tests/Order/Aud007LeasingEmailNotifierTest.php`            | leasing_email_sent marker / no schema mutate            |
+| `tests/Order/LeasingEmailCompletionTest.php`                | marker only after all required Mail::Send succeed       |
 | `tests/Order/Aud014PrivacyRetentionTest.php`                | Process 1/2 EGN audience + retention                    |
 | `tests/Order/OrderConfirmationThankYouContractTest.php`     | Process 2 thank-you / displayPaymentReturn              |
 | `tests/Order/CpCreateFailureThankYouContractTest.php`       | CP failure confirmation UX                              |

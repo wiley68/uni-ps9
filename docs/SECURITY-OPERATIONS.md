@@ -183,6 +183,9 @@ Phase 11 SmartUCF: do not log EGN, full SmartUCF customer payload, certificate/k
 
 - Implementation: `LeasingOrderEmailPresenter` + `LeasingEmailNotifier` via `FinancingOrderMailDispatcher`
 - Marker: `leasing_email_sent` (once per attempt; combined customer+admin)
+- Set to `1` **only** when every required audience send succeeds (`Mail::Send === true`)
+- `Mail::Send` false or throw → marker unchanged; `LeasingEmailDeliveryException` → lifecycle `withEmailSent(false)`
+- Retry after failure may duplicate a previously successful audience (accepted residual risk; no schema change)
 - Mail logs: order reference + audience class + exception class only — never body/EGN/SMTP credentials
 - Thank-you page uses **customer** audience rows (no EGN); BO may show Process 2 EGN via admin rows (audited)
 - BO may also show CP id + safe SmartUCF diagnostics; never raw request/response or secrets

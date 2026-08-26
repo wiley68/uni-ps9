@@ -50,12 +50,15 @@ Callback race: inbound `orderbankstatus` uses financing snapshot JOIN; local Sma
 
 ## Phase 12 mail / confirmation recovery
 
-| Issue                                          | Guidance                                                                    |
-| ---------------------------------------------- | --------------------------------------------------------------------------- |
-| Mail failure after bank success                | Bank status unchanged; log exception class only; customer stays order-aware |
-| SMTP accepted, `leasing_email_sent` write fail | Residual duplicate-mail risk on replay (audited combined marker)            |
-| Confirmation refresh / callback                | Must not re-send financing mails or duplicate `order_conf`                  |
-| Manual Retry CP / SmartUCF buttons             | Not provided (not audited safe UI)                                          |
+| Issue                                       | Guidance                                                                                |
+| ------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Mail failure after bank success             | Bank status unchanged; log audience/exception class; customer stays order-aware         |
+| Required audience `Mail::Send` false/throw  | `leasing_email_sent` stays 0; replay retries leasing mail                               |
+| Partial customer OK / admin fail            | Marker stays 0; retry may resend customer (accepted vs permanent lost mail)             |
+| SMTP accepted, marker persistence fails     | Exception; marker unset; replay may duplicate if SMTP already delivered                 |
+| Native `order_conf` flush then leasing fail | Queue emptied once — no second `order_conf`; leasing retries independently              |
+| Confirmation refresh / callback             | Must not re-send financing mails when marker=1; duplicate `order_conf` guarded by queue |
+| Manual Retry CP / SmartUCF buttons          | Not provided (not audited safe UI)                                                      |
 
 AUD-009: do not map bank rejection callbacks to native PS order state. `SYNC_BANK_REJECTION_STATE` is dormant (empty rejection whitelist).
 

@@ -246,7 +246,9 @@ PostControlPanelLifecycleService
 | Process 1 | No EGN; scheme/amount    | No EGN; operational data |
 | Process 2 | No EGN; confirmation msg | May include EGN + phone2 |
 
-Marker: `financing_snapshot.leasing_email_sent` — combined once-per-attempt (audited). Partial audience failure still marks sent after SMTP attempts (residual risk documented in RECOVERY).
+Marker: `financing_snapshot.leasing_email_sent` — combined once-per-attempt.
+`leasing_email_sent = 1` only after **all** required audience `Mail::Send` calls return true (false/throw leave marker unset for retry).
+Accepted residual risk: retry after partial success may duplicate the already-delivered audience (no per-audience columns).
 
 **Confirmation UX:**
 
