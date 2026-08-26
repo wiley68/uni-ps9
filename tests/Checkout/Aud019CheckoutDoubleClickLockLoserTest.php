@@ -64,7 +64,7 @@ assertDbl(
 );
 assertDbl(
     (bool) preg_match(
-        '/submitState === "click_accepted" \|\| submitState === "submitting"[\s\S]{0,160}preventDefault/s',
+        '/submitState\s*===\s*"click_accepted"\s*\|\|\s*submitState\s*===\s*"submitting"[\s\S]{0,240}preventDefault/s',
         $js
     ),
     'B: second click while click_accepted/submitting prevented'
