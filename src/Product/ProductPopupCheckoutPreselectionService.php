@@ -82,26 +82,35 @@ final class ProductPopupCheckoutPreselectionService
         $currencyIso = $context->currency instanceof \Currency
             ? (string) $context->currency->iso_code
             : '';
-        $cartContext = (new \PrestaShop\Module\Unipayment\Cart\CartContextFactory())->createForCheckout($cart);
-        $snapshot = new \PrestaShop\Module\Unipayment\Checkout\CartSnapshot();
-        $fingerprint = $snapshot->fingerprint($cartContext, $currencyIso);
-        $linesFingerprint = $snapshot->linesFingerprint($cartContext, $currencyIso);
+        // Product page: line identity only. Full checkout fingerprint binds later on checkout.
+        // Avoid checkout-state cart context here — shipping/carrier may be unset and is unnecessary.
+        $cartContext = (new \PrestaShop\Module\Unipayment\Cart\CartContextFactory())->create($cart);
+        $linesFingerprint = (new \PrestaShop\Module\Unipayment\Checkout\CartSnapshot())
+            ->linesFingerprint($cartContext, $currencyIso);
 
-        $this->preferences->save($context->cookie, [
-            'product_id' => $productId,
-            'product_attribute_id' => $productAttributeId,
-            'quantity' => $quantity,
-            'scheme_type' => (string) ($calculation['scheme_type'] ?? ''),
-            'kop_code' => (string) ($calculation['kop_code'] ?? ''),
-            'months' => (int) ($calculation['months'] ?? 0),
-            'filter_id' => (int) ($calculation['filter_id'] ?? 0),
-            'scheme_key' => (string) ($calculation['scheme_key'] ?? ''),
-            'first_installment' => $calculation['first_installment'] ?? 0,
-            'product_amount' => $calculation['price'] ?? 0,
-            'cart_fingerprint' => $fingerprint,
-            'lines_fingerprint' => $linesFingerprint,
-            'flow' => 'product_preselect',
-        ], $cartId, (int) $context->customer->id);
+        try {
+            $this->preferences->save($context->cookie, [
+                'product_id' => $productId,
+                'product_attribute_id' => $productAttributeId,
+                'quantity' => $quantity,
+                'scheme_type' => (string) ($calculation['scheme_type'] ?? ''),
+                'kop_code' => (string) ($calculation['kop_code'] ?? ''),
+                'months' => (int) ($calculation['months'] ?? 0),
+                'filter_id' => (int) ($calculation['filter_id'] ?? 0),
+                'first_installment' => $calculation['first_installment'] ?? 0,
+                'product_amount' => $calculation['price'] ?? 0,
+                'lines_fingerprint' => $linesFingerprint,
+                'flow' => 'product_preselect',
+            ], $cartId, (int) $context->customer->id);
+        } catch (\InvalidArgumentException $exception) {
+            throw new ProductPopupCheckoutPreselectionException(
+                'Заявката не може да бъде обработена. Моля, опитайте отново.'
+            );
+        } catch (\PrestaShopException $exception) {
+            throw new ProductPopupCheckoutPreselectionException(
+                'Заявката не може да бъде обработена. Моля, опитайте отново.'
+            );
+        }
 
         return [
             'checkout_url' => $link->getPageLink('order', true),

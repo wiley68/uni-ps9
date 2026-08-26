@@ -172,7 +172,9 @@ assertRem002(strpos($js, 'unipaymentCheckoutHandoff') !== false, 'handoff JS def
 assertRem002(strpos($js, 'unipaymentPaymentPreselectAborted') !== false, '8: manual switch aborts');
 assertRem002(strpos($js, 'applyHandoffScheme') !== false, '6: exact scheme applied after payment select');
 assertRem002(strpos($module, 'Media::addJsDef') !== false, 'Media handoff exposed outside hidden form');
-assertRem002(strpos($preselect, 'scheme_key') !== false, 'preference stores scheme_key');
+assertRem002(strpos($preselect, 'scheme_key') === false || !preg_match("/'scheme_key'\s*=>/", $preselect), 'preference must not store pipe scheme_key in cookie');
+assertRem002(strpos($preselect, '->createForCheckout(') === false, 'Product page handoff must not use createForCheckout');
+assertRem002((bool) preg_match('/->create\(\$cart\)/', $preselect), 'Product page uses CartContextFactory::create');
 
 // Journal authorization
 assertRem002(strpos($module, 'isAuthorizedJournalDownload') !== false, 'journal auth helper');

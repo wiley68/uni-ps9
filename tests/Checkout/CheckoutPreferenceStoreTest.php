@@ -189,20 +189,27 @@ assertCheckoutPreferenceStore(
 $store->clear($cookie);
 assertCheckoutPreferenceStore($store->load($cookie, 91001, 0) === null, 'clear must invalidate checkout preference');
 
-// 8. Phase 9 product preselect writes cart_fingerprint.
+// 8. Product Купи stores lines_fingerprint only; full fingerprint binds at checkout.
 $preselect = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Product/ProductPopupCheckoutPreselectionService.php');
 assertCheckoutPreferenceStore(
-    strpos($preselect, "'cart_fingerprint' => \$fingerprint") !== false
-        || strpos($preselect, '"cart_fingerprint"') !== false,
-    'Phase 9 product preselect preference must include cart_fingerprint'
+    !preg_match("/'cart_fingerprint'\s*=>/", $preselect),
+    'Product Купи must not write full cart_fingerprint before checkout'
 );
 assertCheckoutPreferenceStore(
     strpos($preselect, 'lines_fingerprint') !== false,
     'product preselect preference must include lines_fingerprint for Купи handoff rebind'
 );
 assertCheckoutPreferenceStore(
-    strpos($preselect, 'CartSnapshot') !== false && strpos($preselect, 'createForCheckout') !== false,
-    'product preselect must compute fingerprint from authoritative checkout cart'
+    strpos($preselect, 'CartSnapshot') !== false
+        && strpos($preselect, 'linesFingerprint') !== false
+        && strpos($preselect, 'CartContextFactory') !== false
+        && (bool) preg_match('/->create\(\$cart\)/', $preselect)
+        && strpos($preselect, '->createForCheckout(') === false,
+    'product preselect must compute lines fingerprint from product-page cart (not checkout-state factory)'
+);
+assertCheckoutPreferenceStore(
+    !preg_match("/'scheme_key'\s*=>/", $preselect),
+    'product preselect must not store pipe-delimited scheme_key in cookie preference'
 );
 
 // Product "Купи" one-time rebind when carrier evolves but lines identity matches.
@@ -230,5 +237,16 @@ assertCheckoutPreferenceStore(
     strpos($calculate, "'cart_fingerprint' => \$fingerprint") !== false,
     'checkoutcalculate preference must include cart_fingerprint'
 );
+
+// Empty cart_fingerprint (Product-page handoff) binds on first checkout expected fingerprint.
+$cookieEmptyFp = new FakeCheckoutCookie();
+$emptyHandoff = $preference;
+unset($emptyHandoff['cart_fingerprint']);
+$emptyHandoff['lines_fingerprint'] = $fpLines;
+$emptyHandoff['flow'] = 'product_preselect';
+$store->save($cookieEmptyFp, $emptyHandoff, 91001, 0);
+$boundFromEmpty = $store->load($cookieEmptyFp, 91001, 0, $fpFull2, $fpLines);
+assertCheckoutPreferenceStore(is_array($boundFromEmpty), 'empty product-page cart_fingerprint may bind at checkout');
+assertCheckoutPreferenceStore(($boundFromEmpty['cart_fingerprint'] ?? '') === $fpFull2, 'empty handoff binds expected full fingerprint');
 
 fwrite(STDOUT, "OK (Checkout preference cookie-safe persistence + fingerprint binding)\n");

@@ -93,10 +93,11 @@ assertRem001(strpos($productJs, 'order_created') !== false || strpos($productJs,
 
 // I–M Product Купи preselection
 assertRem001(strpos($preselect, 'lines_fingerprint') !== false, 'I: preselect stores lines_fingerprint');
-assertRem001(strpos($preselect, 'cart_fingerprint') !== false, 'I: preselect stores cart_fingerprint');
 assertRem001(strpos($preferenceStoreSrc, 'checkout_fingerprint_bound') !== false, 'I: one-time checkout rebind');
 assertRem001(strpos($snapshotSrc, 'function linesFingerprint') !== false, 'I: CartSnapshot linesFingerprint');
 assertRem001(strpos($module, 'linesFingerprint') !== false, 'I: hookPaymentOptions passes lines fingerprint');
+assertRem001(strpos($preselect, '->createForCheckout(') === false, 'I: Product page does not use createForCheckout');
+assertRem001(!preg_match("/'scheme_key'\s*=>/", $preselect), 'I: no pipe scheme_key in product preference cookie');
 assertRem001(strpos($checkoutJs, 'tryPreselectPayment') !== false, 'I: checkout JS preselects UniPayment');
 assertRem001(strpos($checkoutJs, 'data-module-name="unipayment"') !== false, 'L/M: theme-compatible payment radio selector');
 assertRem001(strpos($checkoutJs, 'unipaymentPaymentPreselectAborted') !== false, 'K: manual switch aborts reselection loop');

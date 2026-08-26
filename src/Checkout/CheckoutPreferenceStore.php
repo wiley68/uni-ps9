@@ -12,6 +12,16 @@ final class CheckoutPreferenceStore
     /** @param object $cookie PrestaShop Cookie or test double with write() */
     public function save($cookie, array $preference, int $cartId, int $customerId): void
     {
+        // PrestaShop Cookie::__set rejects "|" and "¤" (Cookie.php delimiter alphabet).
+        unset($preference['scheme_key'], $preference['calculation']);
+        foreach ($preference as $key => $value) {
+            if (is_string($value) && preg_match('/¤|\|/', $key . $value)) {
+                throw new \InvalidArgumentException(
+                    'Checkout preference values must be cookie-safe (no pipe or section delimiters).'
+                );
+            }
+        }
+
         $preference['cart_id'] = $cartId;
         $preference['customer_id'] = $customerId;
         $preference['created_at'] = time();
