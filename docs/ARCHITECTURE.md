@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 13** state.
+This document describes high-level boundaries and the **current accepted implementation** for module **2.0.1** (pre-release / final audit remediation). Phase numbers below are historical delivery milestones; they are all implemented unless marked deferred.
 
 ---
 
@@ -13,7 +13,7 @@ uni-ps9 = PS9-native adapter/port
 
 ---
 
-## Intended layering (planned)
+## Intended layering
 
 ```text
 PrestaShop integration
@@ -25,50 +25,50 @@ Infrastructure
 
 ---
 
-## Implemented through Phase 8
+## Implemented capabilities (Phases 0–13 + final audit remediations)
 
-| Area                        | State                                                                                 |
-| --------------------------- | ------------------------------------------------------------------------------------- |
-| Local configuration         | Phase 1 repository/validator/UI                                                       |
-| Credential-change boundary  | `TokenRepository::invalidate()` **and** `ShopConfigurationCache::clear()`             |
-| Token storage               | `TokenRepository` (`enc:v1:` via `PhpEncryption` / `_NEW_COOKIE_KEY_`)                |
-| HTTP transport              | `CurlHttpTransport` (TLS verify on, timeouts 5s/15s)                                  |
-| CP client                   | `ControlPanelClient` (auth + `getShop` + unused order/SSL helpers)                    |
-| Shop snapshot cache         | `ShopConfigurationCache` table `unipayment_shop_cache`, TTL **86400** seconds         |
-| Snapshot validation         | `ShopConfigurationSnapshotValidator` + `ShopConfigurationSnapshotValidationException` |
-| Pull / forced refresh       | `ShopConfigurationService::get(false\|true)` via `ShopConfigurationProviderInterface` |
-| Flag helpers                | `ShopConfigurationFlags`                                                              |
-| BO bank-data refresh        | enabled — `get(true)` with PS8 error mapping                                          |
-| Inbound signed API          | Phase 4 — `shopcache`, `orderbankstatus`, `smartucfdebuglog` + HMAC/nonce             |
-| Replay store                | `unipayment_api_nonce` (900s retention)                                               |
-| Bank status persistence     | `unipayment_order_bank_status` (no FO / order-state side effects yet)                 |
-| SmartUCF debug journal      | `unipayment_smartucf_log` + diagnostic journal (BO download deferred)                 |
-| Financing calculator domain | Phase 5 — pure snapshot-driven Calculator                                             |
-| Product page FO             | Phase 6 — hook + AJAX + vanilla JS (Hummingbird + Classic)                            |
-| Popup identity / dedupe     | Phase 7 — `unipayment_popup_submission`, operation guard, Step 2 identity             |
-| Cart page FO                | Phase 8 — `displayShoppingCart` + cartcalculator/cartpopup + Phase 7 flow isolation   |
-| Checkout PaymentOption      | Phase 9 — `paymentOptions` + checkoutcalculate + preference/fingerprint handoff       |
-| Durable checkout submission | Phase 10 — lock + attempt + PS order + snapshot + CP create                           |
-| Post-CP lifecycle           | Phase 11 — Process 1 SmartUCF / Process 2 handoff + bank status                       |
-| Post-order communication    | Phase 12 — financing emails, order_conf, Thank You, BO diagnostics                    |
-| Homepage advertising        | Phase 13 — cached CP promo via `displayFooter` (index only)                           |
+| Area                        | State                                                                                           |
+| --------------------------- | ----------------------------------------------------------------------------------------------- |
+| Local configuration         | Repository/validator/UI                                                                         |
+| Credential-change boundary  | `TokenRepository::invalidate()` **and** `ShopConfigurationCache::clear()`                       |
+| Token storage               | `TokenRepository` (`enc:v1:` via `PhpEncryption` / `_NEW_COOKIE_KEY_`)                          |
+| HTTP transport              | `CurlHttpTransport` (TLS verify on, timeouts 5s/15s)                                            |
+| CP client                   | `ControlPanelClient` — API base from `config/environment.php` (`control_panel_url` + `/api/v1`) |
+| Shop snapshot cache         | `ShopConfigurationCache` table `unipayment_shop_cache`, TTL **86400** seconds                   |
+| Snapshot validation         | `ShopConfigurationSnapshotValidator` + `ShopConfigurationSnapshotValidationException`           |
+| Pull / forced refresh       | `ShopConfigurationService::get(false\|true)` (explicit/non-render paths)                        |
+| FO advertising cache read   | `ShopConfigurationService::getCachedOnly()` — **never** refreshes / calls CP (AUD-022)          |
+| Flag helpers                | `ShopConfigurationFlags`                                                                        |
+| BO bank-data refresh        | enabled — `get(true)` with PS8 error mapping                                                    |
+| Inbound signed API          | `shopcache`, `orderbankstatus`, `smartucfdebuglog` + HMAC/nonce                                 |
+| Replay store                | `unipayment_api_nonce` (900s retention)                                                         |
+| Bank status persistence     | `unipayment_order_bank_status` (no FO / order-state side effects; AUD-009 dormant)              |
+| SmartUCF debug journal      | `unipayment_smartucf_log` — **shop-scoped** lookup (`id_shop` + `order_id`, AUD-020)            |
+| Financing calculator domain | Pure snapshot-driven Calculator                                                                 |
+| Product page FO             | Hook + AJAX + vanilla JS (Hummingbird + Classic)                                                |
+| Popup identity / dedupe     | `unipayment_popup_submission`, operation guard, Step 2 identity                                 |
+| Cart page FO                | `displayShoppingCart` + cartcalculator/cartpopup                                                |
+| Checkout PaymentOption      | `paymentOptions` + checkoutcalculate + preference/fingerprint handoff                           |
+| Durable order submission    | Lock + attempt + PS order + snapshot + CP create (checkout **and** product/cart popups)         |
+| Post-CP lifecycle           | Process 1 SmartUCF / Process 2 handoff + bank status                                            |
+| Post-order communication    | Financing emails, order_conf, Thank You, BO diagnostics                                         |
+| Homepage advertising        | Cache-only CP promo via `displayFooter` (index only)                                            |
+| mTLS private-key passphrase | `secrets/smartucf-key.php` in module ZIP (AUD-021) — no server env requirement                  |
 
 ### Shop configuration cache flow
 
 ```text
-get(false)
+get(false) / get(true)   ← BO refresh, product/cart calculators, explicit sync
     ↓
 fresh local cache for current UNICID?
     ├─ yes → return cached snapshot
-    └─ no  → GET /shop
-              ↓
-           validate snapshot
-              ↓
-           full replace in unipayment_shop_cache
-              ↓
-           return
+    └─ no / force → GET /shop → validate → replace → return
 
-get(true) → always attempt CP pull (same validate/replace path)
+getCachedOnly()   ← FO homepage advertising only (AUD-022)
+    ↓
+fresh local cache?
+    ├─ yes → return snapshot
+    └─ no / stale / malformed → null (no refresh, no CP HTTP)
 ```
 
 Invalid remote snapshot: **do not overwrite** a known-good cache; do not purge tokens.
@@ -81,7 +81,7 @@ Cache scope key is **`unicid`** (UNIQUE), not PrestaShop `id_shop` — same as a
 
 `replaceSnapshot()` is used by inbound `shopcache` for full CP push replacement (no merge).
 
-### Inbound CP → module flow (Phase 4)
+### Inbound CP → module flow
 
 ```text
 POST /module/unipayment/{shopcache|orderbankstatus|smartucfdebuglog}
@@ -96,11 +96,11 @@ endpoint handler
 
 See [`SECURITY-OPERATIONS.md`](SECURITY-OPERATIONS.md) for HMAC/nonce details.
 
-### Financing calculator domain (Phase 5)
+### Financing calculator domain
 
 Pure domain — validated shop snapshot + `ProductContext` → offers / calculation results.
 
-### Product page (Phase 6)
+### Product page
 
 ```text
 PrestaShop product
@@ -113,7 +113,7 @@ Calculator + ProductCalculatorPresenter
         ↓
 hook displayProductAdditionalInfo → product_calculator.tpl
         ↓
-AJAX productcalculator (refresh) / productpopup (calculate + identity/dedupe)
+AJAX productcalculator (refresh) / productpopup (calculate + identity + durable order)
 ```
 
 Theme lifecycle:
@@ -125,29 +125,36 @@ Theme lifecycle:
 
 Race protection: `AbortController` + `refreshSequence` (stale responses ignored).
 
-### Product popup identity (Phase 7)
+### Product / cart popup identity + durable financing
+
+Shared popup submission guard (token issue → claim → apply):
 
 ```text
-calculate (authoritative ProductContext + Calculator)
+calculate (authoritative context + Calculator)
     ↓
 issue_submission_token  → unipayment_popup_submission (issued, TTL 1800s)
     ↓
 apply
-    → selection_hash match (product/combination/qty/scheme/guest/customer/shop)
+    → selection_hash match
     → atomic UPDATE issued → processing
     → validate customer + consents + address ownership
-    → identity_accepted (no PS/CP order yet)
+    → prepare cart/customer (guest factory / address resolver)
+    → OrderOrchestrator (PS order + snapshot + CP create)
+    → mark popup submission order_created
+    → PostControlPanelLifecycleService (SmartUCF Process 1 or Process 2)
 ```
 
 | Token                       | Role                                                                | Authoritative?                          |
 | --------------------------- | ------------------------------------------------------------------- | --------------------------------------- |
 | `popup_submission_token`    | Server `bin2hex(random_bytes(32))`, UNIQUE, bound to selection hash | Yes                                     |
-| `preselect_operation_token` | Client 16-byte hex, cookie idempotency for Silent Buy               | Correlation / cart-mutation dedupe only |
+| `preselect_operation_token` | Client 16-byte hex, cookie idempotency for Silent Buy (product)     | Correlation / cart-mutation dedupe only |
 | CSRF `token`                | `Tools::getToken(false)`                                            | Yes, separate from submission identity  |
 
-Guest identity: `$context->cookie->id_guest`. Logged-in: `$context->customer->isLogged()` only (AUD-001: never email lookup). Address ownership: `id_customer` match, skip deleted. Apply does **not** create guests, addresses, carts, or orders.
+Guest identity: context guest / cookie (`PopupSubmissionBindingFactory::identityFromContext`). Logged-in: `$context->customer->isLogged()` only (AUD-001: never email lookup). Address ownership: `id_customer` match, skip deleted.
 
-### Cart financing (Phase 8)
+**Product popup** may create a fresh cart for financing. **Cart popup** finances the existing FO cart (no `preselect` re-add of lines).
+
+### Cart financing
 
 ```text
 native PrestaShop cart
@@ -158,7 +165,7 @@ CartSchemeResolver (intersection of per-line schemes; each line priced at cart t
     ↓
 CartCalculatorPresenter → displayShoppingCart → cart_calculator.tpl
     ↓
-AJAX cartcalculator (refresh) / cartpopup (calculate + Phase 7 identity/dedupe)
+AJAX cartcalculator (refresh) / cartpopup (calculate + durable apply — see above)
 ```
 
 Amount semantics (PS8 / Woo cart oracle):
@@ -172,7 +179,7 @@ Amount semantics (PS8 / Woo cart oracle):
 
 Cart UI is **cart-wide** (one calculator for the whole cart), not per-line widgets.
 
-Cart popup reuses Phase 7 `PopupSubmissionRepository` / guard / identity services with `flow=cart_popup` and binding `{id_cart, cart_total, scheme…}`. Apply stops at `identity_accepted`. No `preselect` (does not re-add cart lines). No PaymentOption / orders / SmartUCF.
+**Guest Cart order materialization:** after customer/address mutation, `CartShippingStateSynchronizer` resets stale `delivery_option` / package caches before `validateOrder()`. One durable submission must resolve to **exactly one authoritative** PrestaShop order with `order_detail` lines. Empty twin orders must not bind financing (`AuthoritativeOrderResolver` + empty-lines guard). Replay of the same submission token must not create a second native order.
 
 Theme lifecycle (cart):
 
@@ -181,7 +188,7 @@ Theme lifecycle (cart):
 | Hummingbird 2.0 | `displayShoppingCart` | `prestashop.on('updatedCart')` after AJAX     |
 | Classic 3.1.1   | same                  | same (`updateCart` → refresh → `updatedCart`) |
 
-### Checkout financing (Phase 9–10)
+### Checkout financing
 
 ```text
 native checkout cart
@@ -194,7 +201,7 @@ CheckoutPaymentPresenter → hookPaymentOptions → checkout_payment.tpl
     ↓
 AJAX checkoutcalculate (recalc + refresh preference)
     ↓
-validatecheckout (Phase 10)
+validatecheckout
     → CheckoutSubmitLock (45s TTL, id_shop + id_cart)
     → CheckoutPaymentValidator (revalidate fingerprint/selection/consents)
     → OrderOrchestrator (recovery-first)
@@ -203,10 +210,12 @@ validatecheckout (Phase 10)
         → financing_snapshot (INSERT IGNORE, id_attempt UNIQUE)
         → ControlPanelOrderPayloadBuilder → POST /api/v1/orders once
     → CheckoutPreferenceStore::clear() after successful validation path begins durable work
-    → Phase10CheckoutOutcome / post-order template or order-confirmation redirect
+    → post-order template or order-confirmation / SmartUCF redirect
 ```
 
-**Phase 10 boundary ends at `cp_created`.** Phase 11 continues with SmartUCF / Process 2. Phase 12 completes human-facing communication:
+**Post-order durability (AUD-019):** once a native PrestaShop order exists for the durable attempt, later CP/SmartUCF/mail failures remain **order-aware**. The module must not invite a fresh financing attempt that can create a duplicate durable order for the same submission. Lock-loser / degraded UX stays post-order (not a blank checkout restart).
+
+Durable `cp_created` continues with SmartUCF / Process 2. Human-facing communication:
 
 ```text
 OrderOrchestrationResult (cp_created)
@@ -221,7 +230,7 @@ PostControlPanelLifecycleService
     └─ Process 1
           → SmartUcfSessionCoordinator::run/resume
           → claim smartucf_state on financing_snapshot
-          → createSession (exactly-once via durable state)
+          → createSession (exactly-once via durable state; mTLS passphrase from secrets/smartucf-key.php)
           → bank_sent_process1 | bank_send_failed_smartucf | processing | outcome_unknown
           → FinancingOrderMailDispatcher on terminal mail path
                 → flush deferred order_conf + audience leasing mails
@@ -229,18 +238,18 @@ PostControlPanelLifecycleService
 
 **Bank status meanings:**
 
-| Status                      | Trigger                                            |
-| --------------------------- | -------------------------------------------------- |
-| `bank_send_failed_cp`       | Phase 10: PS order exists, CP create failed        |
-| `bank_sent_process1`        | CP created **and** SmartUCF Process 1 succeeded    |
-| `bank_send_failed_smartucf` | CP created **and** SmartUCF Process 1 failed       |
-| `bank_sent_process2`        | CP created **and** Process 2 handoff (no SmartUCF) |
+| Status                      | Trigger                                                   |
+| --------------------------- | --------------------------------------------------------- |
+| `bank_send_failed_cp`       | PS order exists, CP create failed (no confirmed CP order) |
+| `bank_sent_process1`        | CP created **and** SmartUCF Process 1 succeeded           |
+| `bank_send_failed_smartucf` | CP created **and** SmartUCF Process 1 failed              |
+| `bank_sent_process2`        | CP created **and** Process 2 handoff (no SmartUCF)        |
 
 **SmartUCF snapshot states:** `not_started` → `submitting` → `created` \| `failed` \| `outcome_unknown`.
 
-**UniPayment tables remain 8** (Phase 10 schema already includes `smartucf_*` columns).
+**Module-owned tables: 8** — `shop_cache`, `api_nonce`, `order_bank_status`, `smartucf_log`, `popup_submission`, `checkout_lock`, `order_attempt`, `financing_snapshot`.
 
-**Mail audiences (Phase 12):**
+**Mail audiences:**
 
 | Flow      | Customer financing mail  | Admin financing mail     |
 | --------- | ------------------------ | ------------------------ |
@@ -263,7 +272,7 @@ Accepted residual risk: retry after partial success may duplicate the already-de
 
 **BO diagnostics:** `displayAdminOrderMainBottom` → leasing rows + process label + CP id + safe SmartUCF fields. Absent snapshot → empty (non-financing orders).
 
-**Homepage advertising (Phase 13):**
+**Homepage advertising:**
 
 ```text
 UNIPAYMENT_ADVERTISING_ENABLED + module enabled + UNICID
@@ -273,27 +282,31 @@ UNIPAYMENT_ADVERTISING_ENABLED + module enabled + UNICID
 → displayFooter + homepage_advertising.tpl + scoped CSS/JS
 ```
 
-Empty/invalid promo → render nothing. Failures fail closed (no FO 500).
+| Cache state                         | FO advertising       |
+| ----------------------------------- | -------------------- |
+| Fresh valid snapshot                | May render           |
+| Missing / stale / malformed         | No advertising block |
+| Explicit BO / inbound cache refresh | Allowed (non-render) |
+
+Empty/invalid promo → render nothing. Failures fail closed (no FO 500). No browser/AJAX CP fallback.
 
 **Order-state sync (AUD-009):** inbound `orderbankstatus` does **not** map bank status to native PS order state (`ps_order_state_changed: false`). `BankStatusOrderStateMapper` / `SYNC_BANK_REJECTION_STATE` remain **dormant**; rejection whitelist empty until proven CP codes.
 
 **Uninstall (AUD-006):** `ModuleDataPurger` drops 8 tables, config keys, tokens, cert runtime artifacts; preserves referenced custom order states; never deletes native PS orders.
 
-**Deferred after Phase 13:** final audit/remediation, release tag/package, coordinated **v2.0.2** scheme aggregation (`months ASC`; same months: standard before promo).
+**Deferred (not released yet):** release tag/package, coordinated **v2.0.2** scheme aggregation (`months ASC`; same months: standard before promo).
 
 **Attempt state machine** (`OrderOrchestrator`):
 
-| State                 | Meaning                                                   |
-| --------------------- | --------------------------------------------------------- |
-| `reserved`            | Attempt row created (UNIQUE shop/cart/fingerprint)        |
-| `ps_order_created`    | Native PS order attached                                  |
-| `cp_submitting`       | CP POST in flight                                         |
-| `cp_created`          | CP order id persisted — terminal success for Phase 10     |
-| `cp_failed_retryable` | CP 5xx — retry without new PS order                       |
-| `cp_outcome_unknown`  | CP timeout/connection — retry; bank `bank_send_failed_cp` |
-| `terminal_failed`     | Non-retryable CP/validation failure after PS order        |
-
-**UniPayment tables after Phase 10 (8 total):** `shop_cache`, `api_nonce`, `order_bank_status`, `smartucf_log`, `popup_submission`, `checkout_lock`, `order_attempt`, `financing_snapshot`.
+| State                 | Meaning                                                        |
+| --------------------- | -------------------------------------------------------------- |
+| `reserved`            | Attempt row created (UNIQUE shop/cart/fingerprint)             |
+| `ps_order_created`    | Native PS order attached                                       |
+| `cp_submitting`       | CP POST in flight                                              |
+| `cp_created`          | CP order id persisted — terminal success for durable CP create |
+| `cp_failed_retryable` | CP 5xx — retry without new PS order                            |
+| `cp_outcome_unknown`  | CP timeout/connection — retry; bank `bank_send_failed_cp`      |
+| `terminal_failed`     | Non-retryable CP/validation failure after PS order             |
 
 Checkout fingerprint canonical payload (non-PII):
 
@@ -304,7 +317,7 @@ checkout_state{id_cart, carrier_id, delivery_option, shipping_total, cart_rules[
 
 Lines sorted by product/attribute; cart_rules sorted by `id_cart_rule`.
 
-Deferred **v2.0.2** (Woo + PS8 + PS9 coordinated): standard popup/list should expose eligible promo schemes inside standard selection. Phase 9–12 preserve audited v2.0.1 aggregation via `CartSchemeResolver` / `unifiedSchemes` — **do not change** here.
+Deferred **v2.0.2** (Woo + PS8 + PS9 coordinated): standard popup/list should expose eligible promo schemes inside standard selection. Current code preserves audited v2.0.1 aggregation via `CartSchemeResolver` / `unifiedSchemes` — **do not change** without coordinated release.
 
 ### Authentication lifecycle
 
@@ -337,13 +350,23 @@ UNIPAYMENT_CP_TOKEN_TYPE
 UNIPAYMENT_CP_TOKEN_EXPIRES_AT
 ```
 
+### Deployment packaging (ZIP-only)
+
+No SSH / PHP-FPM / environment-variable setup is required for merchants.
+
+| File                       | Role                                                         |
+| -------------------------- | ------------------------------------------------------------ |
+| `config/environment.php`   | Authoritative CP host (`control_panel_url`)                  |
+| `secrets/smartucf-key.php` | SmartUCF mTLS private-key passphrase (Git-ignored; ZIP fill) |
+
+Maintainer prepares development / test / production ZIPs by editing **only** those deployment files (plus PEMs under `keys/` when shipping certificates).
+
 ---
 
-## Explicitly not implemented yet
+## Explicitly deferred (not in v2.0.1 release scope)
 
-| Area                                    | Phase |
-| --------------------------------------- | ----- |
-| Full financing customer/admin email UX  | 12+   |
-| Final Thank You / confirmation redesign | 12+   |
-| Admin/order UI polish                   | 12+   |
-| Advertising FO                          | later |
+| Area                                        | Notes                                |
+| ------------------------------------------- | ------------------------------------ |
+| Production release tag / package            | After final regression gate          |
+| Coordinated v2.0.2 scheme aggregation       | uni-woo + uni-ps8 + uni-ps9          |
+| Bank-rejection → native PS order-state sync | Dormant until proven CP status codes |

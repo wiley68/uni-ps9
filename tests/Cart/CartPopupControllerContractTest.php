@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Cartpopup controller contract: Phase 7 reuse, no order creation.
+ * Cartpopup controller contract: Phase 7 identity reuse + durable order apply.
  */
 
 if (PHP_SAPI !== 'cli') {

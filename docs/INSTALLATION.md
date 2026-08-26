@@ -18,16 +18,48 @@ Related: [`../README.md`](../README.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [
 | Control Panel             | Shop registered with matching UNICID and shared secret |
 | Writable module directory | Certificate sync may write under `{module}/keys/`      |
 
-Default CP host: `config/environment.php` → `control_panel_url` (API base = host + `/api/v1`).
-
 Themes: Hummingbird 2.0 (primary) and Classic 3.1.1.
+
+**Merchant install assumes Back Office only** — no SSH, shell, PHP-FPM, Apache, or environment-variable configuration.
 
 ---
 
-## 2. Install
+## 2. ZIP packaging (maintainer)
 
-1. Place module at `modules/unipayment` (or upload ZIP without secrets/`keys/`/`.env`).
-2. Run `composer install --no-dev --optimize-autoloader` if `vendor/` is missing.
+Prepare development / test / production packages by editing **only**:
+
+| File                               | Purpose                                               |
+| ---------------------------------- | ----------------------------------------------------- |
+| `config/environment.php`           | `control_panel_url` (CP host; API = host + `/api/v1`) |
+| `secrets/smartucf-key.php`         | SmartUCF mTLS private-key passphrase                  |
+| `keys/*.pem` (when shipping certs) | SmartUCF client certificate + private key             |
+
+Then ZIP the module and send it for BO install.
+
+### Git vs ZIP material
+
+**Tracked (clone-ready structure):**
+
+- `config/environment.php`, `config/index.php`, `config/services.yml`
+- `secrets/.htaccess`, `secrets/index.php`
+- `keys/.htaccess`, `keys/index.php`
+
+**Ignored (fill before packaging / runtime):**
+
+- `secrets/smartucf-key.php`
+- `keys/*.pem`
+- `keys/.incoming/`
+- `keys/.ssl_state.json`
+- `keys/.sync.lock`
+
+There is **no** `UNIPAYMENT_MTLS_KEY_PASSPHRASE` (or other server env) requirement.
+
+---
+
+## 3. Install
+
+1. Place module at `modules/unipayment` (upload prepared ZIP).
+2. Run `composer install --no-dev --optimize-autoloader` only if `vendor/` is missing (dev checkouts).
 3. BO → Modules → install **UniPayment**.
 4. Configure UNICID, shared secret, enable module.
 5. **Обнови данните от банката** (shop cache refresh).
@@ -37,19 +69,20 @@ Install creates **8** module tables, custom order states (AWAITING / FAILED / RE
 
 ---
 
-## 3. Smoke checklist
+## 4. Smoke checklist
 
 - [ ] Configure page opens
 - [ ] Shop cache refresh succeeds
-- [ ] Product calculator (Hummingbird + Classic)
-- [ ] Cart calculator
+- [ ] Product calculator + product financing popup (Hummingbird + Classic)
+- [ ] Cart calculator + cart financing popup (logged-in + guest)
 - [ ] Checkout PaymentOption + Process 1 / Process 2
-- [ ] Homepage advertising when enabled + CP `uni_container_status`
+- [ ] Homepage advertising when enabled + fresh shop cache + CP `uni_container_status`
+- [ ] Homepage still loads when advertising cache is missing (no advertising block)
 - [ ] BO order financing block on financing orders only
 
 ---
 
-## 4. Uninstall caveats
+## 5. Uninstall caveats
 
 Uninstall runs `ModuleDataPurger` (AUD-006):
 
@@ -63,14 +96,15 @@ Confirm dialog warns that local UniPayment settings and data will be removed.
 
 ---
 
-## 5. Development policy
+## 6. Development policy
 
 - No upgrade scripts until first production release packaging cycle
 - Current module version metadata: **2.0.1** (do not invent upgrade-\*.php for interim schema)
 - Do not commit secrets, Bearer tokens, private keys, or production `.env`
+- Schema-changing development used uninstall/reinstall where appropriate (no production upgrade path invented yet)
 
 ---
 
-## 6. Multishop
+## 7. Multishop
 
-Configure UNICID/secret and refresh cache per shop context. Advertising and financing content follow the current shop’s UNICID cache row.
+Configure UNICID/secret and refresh cache per shop context. Advertising and financing content follow the current shop’s UNICID cache row. SmartUCF journal reads are constrained by authenticated shop id.

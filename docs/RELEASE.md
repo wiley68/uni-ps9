@@ -1,18 +1,20 @@
 # Release procedure
 
-Release and packaging checklist for UniPayment PrestaShop **9**. Phase 13 prepares readiness; it does **not** create a tag or production package.
+Release and packaging checklist for UniPayment PrestaShop **9**.
+
+This document does **not** authorize creating a production tag or package yet.
 
 ---
 
 ## 1. Current state
 
-| Item           | Value                                                       |
-| -------------- | ----------------------------------------------------------- |
-| Module version | **2.0.1** (`unipayment.php`)                                |
-| Project status | **Phase 13 complete — STOP GATE 13 / awaiting final audit** |
-| Suite          | See `composer test` in [`TESTING.md`](TESTING.md)           |
+| Item           | Value                                                                                |
+| -------------- | ------------------------------------------------------------------------------------ |
+| Module version | **2.0.1** (`unipayment.php`)                                                         |
+| Project status | Final audit remediations accepted — **final regression gate** required before tag    |
+| Suite          | Full safe suite on PHP **8.1–8.5** (`composer test`; see [`TESTING.md`](TESTING.md)) |
 
-Do **not** tag or package until the final audit/remediation cycle passes.
+Do **not** tag or package until the final regression gate passes.
 
 ---
 
@@ -29,15 +31,16 @@ Do **not** tag or package until the final audit/remediation cycle passes.
 ### Quality
 
 - [ ] `composer validate --no-check-publish`
-- [ ] `composer test` green
+- [ ] `composer test` green on PHP 8.1–8.5
 - [ ] `git diff --check` clean
-- [ ] Manual STOP GATE 13 (advertising + uninstall + transactional regression)
-- [ ] Final audit / remediation cycle (separate phase)
+- [ ] Manual final regression (product/cart/checkout, Process 1/2, guest cart, advertising cache-only, ZIP packaging files)
+- [ ] Confirm `secrets/smartucf-key.php` and PEMs are present in the **package** only (not committed)
 
 ### Packaging (future)
 
 - [ ] `composer install --no-dev --optimize-autoloader` in staging tree
-- [ ] Artifact excludes secrets, `keys/`, tests, IDE files, `.env`
+- [ ] Fill `config/environment.php` + `secrets/smartucf-key.php` (+ PEMs) for the target environment
+- [ ] Artifact excludes Git-ignored secrets/PEMs from the **source** tree unless intentionally packaged
 - [ ] Search tree for accidental EGN/token/key leakage
 
 ### Deferred product work

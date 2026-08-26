@@ -277,25 +277,31 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 13 е **advertising FO + install/uninstall hygiene + docs/release readiness**.
+Модул **2.0.1** — Phase 0–13 са реализирани; final audit remediations (AUD-019…AUD-023 и cart guest fixes) са приети в кода.
 
-Разрешено:
+Разрешено / в сила:
 
-- всичко от Phase 0–12;
-- `HomepageAdvertisingGate` / `HomepageAdvertisingPresenter` + `displayFooter` (index only);
+- всичко от Phase 0–13;
+- durable financing от checkout **и** product/cart popup (`OrderOrchestrator` → CP → SmartUCF/Process 2);
+- `HomepageAdvertisingGate` / `HomepageAdvertisingPresenter` + `displayFooter` (index only) през `getCachedOnly()`;
 - `ModuleDataPurger` uninstall (AUD-006);
-- documentation: INSTALLATION / RELEASE / CHANGELOG / README refresh.
+- ZIP deployment: `config/environment.php` + `secrets/smartucf-key.php` (без server env);
+- documentation: README / INSTALLATION / ARCHITECTURE / SECURITY / RECOVERY / RELEASE / TESTING / CHANGELOG.
 
 Критични инварианти (не регресирай):
 
-- exactly-once checkout / CP / SmartUCF;
+- exactly-once checkout / popup / CP / SmartUCF;
+- post-order failures остават order-aware (AUD-019);
+- Guest Cart → една authoritative PS order с lines;
+- SmartUCF journal lookup е shop-scoped (AUD-020);
+- FO advertising никога не вика CP синхронно (AUD-022);
 - не логвай PII / secrets / EGN;
 - не променяй CP без доказана нужда;
 - **v2.0.2** scheme aggregation/sorting остава deferred (uni-woo + uni-ps8 + uni-ps9);
 - rejection sync остава dormant без proven CP codes;
-- не започвай final audit/remediation и не създавай release tag/package без изрично указание.
+- не създавай release tag/package без изрично указание.
 
-Product/cart popup paths остават на `identity_accepted` — primary entry е checkout → `validatecheckout`.
+Primary financing entries: checkout `validatecheckout`, product popup apply, cart popup apply.
 
 ---
 

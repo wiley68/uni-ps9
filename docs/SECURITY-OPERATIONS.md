@@ -19,7 +19,9 @@ Never log secrets, tokens, Authorization headers, decrypted SECRET, or the mTLS 
 
 ### mTLS private-key passphrase (AUD-021)
 
-ZIP-only deployment — edit before packaging (placeholder in Git; real value only in prepared ZIP):
+Self-contained ZIP deployment — **no** SSH / PHP-FPM / environment variables.
+
+Edit before packaging (real value only in prepared ZIP; file is Git-ignored):
 
 ```php
 <?php
@@ -31,9 +33,13 @@ return [
 
 Missing/invalid file → certificate validation and SmartUCF mTLS fail closed. No environment-variable fallback.
 
+Tracked under `secrets/`: `.htaccess`, `index.php` only.
+
 ### Control Panel base URL
 
 Single authoritative host in `config/environment.php` (`control_panel_url`). Outbound API calls use `{control_panel_url}/api/v1`.
+
+Maintainer switches development / test / production CP hosts by editing **only** that file before ZIP packaging.
 
 ---
 
@@ -125,8 +131,10 @@ All: **POST** only, JSON body, signed headers.
 ### smartucfdebuglog
 
 - Read path via `SmartUcfDiagnosticJournal`
-- Writes go through `record()` only when `UNIPAYMENT_DEBUG_ENABLED` (outbound SmartUCF later)
+- Lookup is **shop-scoped**: latest entry for `(id_shop, order_id)` from the authenticated shop context (AUD-020)
+- Writes go through `record()` only when `UNIPAYMENT_DEBUG_ENABLED`
 - Responses sanitize secrets / PII keys
+- Do not look up journal rows by order id alone across shops
 
 ---
 
@@ -193,7 +201,7 @@ Phase 10 financing snapshot stores EGN/phone2 only in encrypted `sensitive_paylo
 
 Phase 11 SmartUCF: do not log EGN, full SmartUCF customer payload, certificate/key material, or Bearer tokens. Safe: order reference, attempt id, SmartUCF state/error class.
 
-Phase 13 homepage advertising: CP text fields are plain text after `strip_tags` (not trusted HTML). Promo/image/CTA URLs must pass `FILTER_VALIDATE_URL` with scheme `http` or `https` only.
+Phase 13 homepage advertising: FO render uses `getCachedOnly()` only (AUD-022). CP text fields are plain text after `strip_tags` (not trusted HTML). Promo/image/CTA URLs must pass `FILTER_VALIDATE_URL` with scheme `http` or `https` only.
 
 ### Phase 12 financing email audiences
 

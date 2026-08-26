@@ -1,28 +1,32 @@
-# Recovery — Phase 10 durable checkout
+# Recovery — durable financing
 
 Recovery is **state-first**: inspect `order_attempt` + `financing_snapshot` before any new side effect.
+
+Applies to checkout (`validatecheckout`) and product/cart popup apply paths that share `OrderOrchestrator`.
 
 ## Invariants
 
 | Resource         | Exactly-once key                                                                     |
 | ---------------- | ------------------------------------------------------------------------------------ |
-| PrestaShop order | `Order::getIdByCartId()` + attempt `id_order`                                        |
+| PrestaShop order | Authoritative same-cart order with lines (gateway + `AuthoritativeOrderResolver`)    |
 | Attempt          | UNIQUE `(id_shop, id_cart, cart_fingerprint)`                                        |
 | Snapshot         | UNIQUE `id_attempt` and `id_order`                                                   |
 | CP order         | Persist `control_panel_order_id`; CP dedupes by `(shop_id, order_id)` / PS reference |
 
+**Guest Cart:** shipping/package state is synchronized after guest/address mutation so `validateOrder()` materializes one authoritative order (not an empty twin). Financing never binds to an order with zero `order_detail` rows.
+
 ## Crash windows
 
-| Window                                         | Recovery                                                                                                                                                                                                                                  |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Before PS order                                | Release checkout lock; customer may retry checkout safely                                                                                                                                                                                 |
-| After `validateOrder()`, before attempt update | Lock owner retries: `reserved` + `id_order NULL` is recoverable; gateway uses `Order::getIdByCartId()` (no second `validateOrder`); `attachOrderIfReserved` persists identity atomically. Live concurrency stays on `CheckoutSubmitLock`. |
-| After snapshot, during CP POST                 | Retry resumes CP create with same payload; timeout → `cp_outcome_unknown` + `bank_send_failed_cp`                                                                                                                                         |
-| After CP success, before attempt update        | Retry finds CP id on success response or CP lookup by reference (Phase 11 may extend)                                                                                                                                                     |
+| Window                                         | Recovery                                                                                                                                                                                                                                                    |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Before PS order                                | Release checkout lock / abandon popup processing; customer may retry safely when no `id_order` exists                                                                                                                                                       |
+| After `validateOrder()`, before attempt update | Lock owner retries: `reserved` + `id_order NULL` is recoverable; gateway recovers existing same-cart authoritative order (no second `validateOrder`); `attachOrderIfReserved` persists identity atomically. Live concurrency stays on `CheckoutSubmitLock`. |
+| After snapshot, during CP POST                 | Retry resumes CP create with same payload; timeout → `cp_outcome_unknown` + `bank_send_failed_cp`                                                                                                                                                           |
+| After CP success, before attempt update        | Retry finds CP id on success response or CP lookup by reference                                                                                                                                                                                             |
 
-## Post-order rule
+## Post-order rule (AUD-019)
 
-Once `id_order` exists on the attempt, **never** start a fresh financing attempt for the same `(shop, cart, fingerprint)`. CP failure keeps the PS order; retry resumes attempt/snapshot/CP only.
+Once `id_order` exists on the attempt, **never** start a fresh financing attempt for the same `(shop, cart, fingerprint)`. CP/SmartUCF/mail failure keeps the PS order; retry resumes attempt/snapshot/CP/SmartUCF only. Customer UX stays order-aware (not a blank new financing invite).
 
 ## Lock stale recovery
 
@@ -32,7 +36,7 @@ Once `id_order` exists on the attempt, **never** start a fresh financing attempt
 
 Connection/timeout → `cp_outcome_unknown`, `bank_send_failed_cp`, retryable post-order outcome. Safe retry reuses stored `cp_payload` and relies on CP idempotency by shop/order reference.
 
-## Phase 11 post-CP lifecycle
+## Post-CP lifecycle
 
 After durable `cp_created`:
 
@@ -44,11 +48,11 @@ After durable `cp_created`:
 | Process 1 terminal failure    | `bank_send_failed_smartucf`; no new PS/CP order                           |
 | Process 1 ambiguous transport | `outcome_unknown`; do **not** mark `bank_sent_process1`                   |
 | Replay after created          | Coordinator returns durable session; no second `createSession`            |
-| CP missing / Phase 10 failure | Phase 11 must not run                                                     |
+| CP missing / pre-CP failure   | Post-CP lifecycle must not run                                            |
 
 Callback race: inbound `orderbankstatus` uses financing snapshot JOIN; local SmartUCF success writes `bank_sent_process1` first — do not regress success to SmartUCF failure on replay.
 
-## Phase 12 mail / confirmation recovery
+## Mail / confirmation recovery
 
 | Issue                                       | Guidance                                                                                |
 | ------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -64,4 +68,4 @@ AUD-009: do not map bank rejection callbacks to native PS order state. `SYNC_BAN
 
 ## Multishop
 
-All durable rows are scoped by `id_shop`. Inbound `orderbankstatus` authorizes via `order_reference + id_shop + financing_snapshot JOIN` (AUD-011). BO financing block resolves by `id_order` → snapshot (unique per order).
+All durable rows are scoped by `id_shop`. Inbound `orderbankstatus` authorizes via `order_reference + id_shop + financing_snapshot JOIN` (AUD-011). SmartUCF journal reads use `id_shop + order_id` (AUD-020). BO financing block resolves by `id_order` → snapshot (unique per order).
