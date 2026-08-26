@@ -40,7 +40,7 @@ class Unipayment extends PaymentModule
             'Modules.Unipayment.Admin'
         );
         $this->confirmUninstall = $this->trans(
-            'Сигурни ли сте, че искате да деинсталирате модула? Настройките на UniPayment ще бъдат изтрити.',
+            'Сигурни ли сте, че искате да деинсталирате модула? Настройките и локалните данни на UniPayment ще бъдат изтрити.',
             [],
             'Modules.Unipayment.Admin'
         );
@@ -98,29 +98,17 @@ class Unipayment extends PaymentModule
 
     public function uninstall(): bool
     {
-        $orderStates = new PrestaShop\Module\Unipayment\Order\OrderStateInstaller();
-        $snapshots = new PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository();
-        $attempts = new PrestaShop\Module\Unipayment\Order\OrderAttemptRepository();
-        $checkoutLock = new PrestaShop\Module\Unipayment\Checkout\CheckoutSubmitLockRepository();
-        $popupSubmissions = new PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository();
-        $debugLog = new PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository();
-        $bankStatus = new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository();
-        $apiNonce = new PrestaShop\Module\Unipayment\Security\ApiNonceRepository();
-        $cache = new PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCache();
-        $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
+        $client = null;
+        try {
+            if ((new PrestaShop\Module\Unipayment\Security\TokenRepository())->hasToken()) {
+                $client = $this->createControlPanelClient();
+            }
+        } catch (Throwable $exception) {
+            $client = null;
+        }
 
-        if (
-            !$popupSubmissions->uninstall()
-            || !$snapshots->uninstall()
-            || !$attempts->uninstall()
-            || !$checkoutLock->uninstall()
-            || !$orderStates->uninstall()
-            || !$debugLog->uninstall()
-            || !$bankStatus->uninstall()
-            || !$apiNonce->uninstall()
-            || !$cache->uninstall()
-            || !$repository->uninstall()
-        ) {
+        $cleanup = (new PrestaShop\Module\Unipayment\Uninstall\ModuleDataPurger(null, $client))->purge();
+        if (!$cleanup->isSuccess()) {
             return false;
         }
 
@@ -156,7 +144,7 @@ class Unipayment extends PaymentModule
 
     public function getContent(): string
     {
-        // Idempotent: already-installed shops gain Phase 6–12 hooks/tables without reinstall.
+        // Idempotent: already-installed shops gain Phase 6–13 hooks/tables without reinstall.
         $this->registerFrontOfficeHooks();
         $this->registerPostOrderHooks();
         $this->registerHook('actionEmailSendBefore');
@@ -761,9 +749,97 @@ class Unipayment extends PaymentModule
         $searchQueryBuilder->addSelect("COALESCE(unipayment_bs.status_label, '') AS unipayment_bank_status");
     }
 
+    /**
+     * Homepage advertising float (Woo wp_footer equivalent) — index page only.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function hookDisplayFooter($params = []): string
+    {
+        if (!isset($this->context->controller->php_self) || $this->context->controller->php_self !== 'index') {
+            return '';
+        }
+
+        $advertising = $this->homepageAdvertisingContext();
+        if ($advertising === null) {
+            return '';
+        }
+
+        $this->context->smarty->assign([
+            'unipayment_advertising' => $advertising,
+        ]);
+
+        return $this->display(__FILE__, 'views/templates/hook/homepage_advertising.tpl');
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function homepageAdvertisingContext(): ?array
+    {
+        static $resolved = false;
+        static $context = null;
+        if ($resolved) {
+            return $context;
+        }
+        $resolved = true;
+        $context = null;
+
+        $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
+        $gate = new PrestaShop\Module\Unipayment\Advertising\HomepageAdvertisingGate();
+        $phpSelf = (string) ($this->context->controller->php_self ?? '');
+        if (
+            !$gate->allowsAssets(
+                $phpSelf,
+                (bool) $this->active,
+                $repository->isEnabled(),
+                $repository->isAdvertisingEnabled(),
+                $repository->getUnicid()
+            )
+        ) {
+            return null;
+        }
+
+        try {
+            $shop = $this->createShopConfigurationService()->get();
+        } catch (Throwable $exception) {
+            return null;
+        }
+
+        $context = (new PrestaShop\Module\Unipayment\Advertising\HomepageAdvertisingPresenter($gate))->present(
+            $shop,
+            $this->context->isMobile(),
+            $this->_path . 'views/img/product/uni_logo.svg'
+        );
+
+        return $context;
+    }
+
     public function hookActionFrontControllerSetMedia(): void
     {
         if (!$this->active || !isset($this->context->controller->php_self)) {
+            return;
+        }
+
+        if ($this->context->controller->php_self === 'index') {
+            if ($this->homepageAdvertisingContext() === null) {
+                return;
+            }
+            $this->context->controller->registerStylesheet(
+                'module-unipayment-homepage-advertising',
+                'modules/' . $this->name . '/views/css/homepage-advertising.css',
+                ['media' => 'all', 'priority' => 150]
+            );
+            $this->context->controller->registerJavascript(
+                'module-unipayment-homepage-advertising',
+                'modules/' . $this->name . '/views/js/homepage-advertising.js',
+                [
+                    'position' => 'bottom',
+                    'priority' => 150,
+                    'version' => $this->assetVersion('views/js/homepage-advertising.js'),
+                ]
+            );
+
             return;
         }
 
@@ -829,7 +905,7 @@ class Unipayment extends PaymentModule
             return;
         }
 
-        // Product-page assets (no homepage FO assets in Phase 9).
+        // Product-page assets (homepage advertising handled above on index).
         if ($this->context->controller->php_self !== 'product') {
             return;
         }
@@ -943,6 +1019,7 @@ class Unipayment extends PaymentModule
         return $this->registerHook('displayProductAdditionalInfo')
             && $this->registerHook('displayShoppingCart')
             && $this->registerHook('paymentOptions')
+            && $this->registerHook('displayFooter')
             && $this->registerHook('actionFrontControllerSetMedia');
     }
 

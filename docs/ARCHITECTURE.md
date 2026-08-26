@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 12** state.
+This document describes **intended** high-level boundaries and the **implemented Phase 13** state.
 
 ---
 
@@ -51,6 +51,7 @@ Infrastructure
 | Durable checkout submission | Phase 10 — lock + attempt + PS order + snapshot + CP create                           |
 | Post-CP lifecycle           | Phase 11 — Process 1 SmartUCF / Process 2 handoff + bank status                       |
 | Post-order communication    | Phase 12 — financing emails, order_conf, Thank You, BO diagnostics                    |
+| Homepage advertising        | Phase 13 — cached CP promo via `displayFooter` (index only)                           |
 
 ### Shop configuration cache flow
 
@@ -262,9 +263,23 @@ Accepted residual risk: retry after partial success may duplicate the already-de
 
 **BO diagnostics:** `displayAdminOrderMainBottom` → leasing rows + process label + CP id + safe SmartUCF fields. Absent snapshot → empty (non-financing orders).
 
-**Order-state sync (AUD-009):** inbound `orderbankstatus` does **not** map bank status to native PS order state (`ps_order_state_changed: false`). `BankStatusOrderStateMapper` / `SYNC_BANK_REJECTION_STATE` exist as dormant policy classes; rejection whitelist is empty until proven CP codes. Do not re-wire callback sync without audit evidence.
+**Homepage advertising (Phase 13):**
 
-**Deferred Phase 13:** advertising FO, landing promo, release packaging, v2.0.2 scheme aggregation (`months ASC`, same months: standard before promo).
+```text
+UNIPAYMENT_ADVERTISING_ENABLED + module enabled + UNICID
+→ HomepageAdvertisingGate (php_self=index + uni_status + uni_container_status)
+→ ShopConfigurationService::get() (cache only; no live CP on render)
+→ HomepageAdvertisingPresenter (strip_tags + http/https URL filter)
+→ displayFooter + homepage_advertising.tpl + scoped CSS/JS
+```
+
+Empty/invalid promo → render nothing. Failures fail closed (no FO 500).
+
+**Order-state sync (AUD-009):** inbound `orderbankstatus` does **not** map bank status to native PS order state (`ps_order_state_changed: false`). `BankStatusOrderStateMapper` / `SYNC_BANK_REJECTION_STATE` remain **dormant**; rejection whitelist empty until proven CP codes.
+
+**Uninstall (AUD-006):** `ModuleDataPurger` drops 8 tables, config keys, tokens, cert runtime artifacts; preserves referenced custom order states; never deletes native PS orders.
+
+**Deferred after Phase 13:** final audit/remediation, release tag/package, coordinated **v2.0.2** scheme aggregation (`months ASC`; same months: standard before promo).
 
 **Attempt state machine** (`OrderOrchestrator`):
 

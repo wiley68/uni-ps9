@@ -277,17 +277,23 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 12 е **post-order communication** (financing emails, native `order_conf`, Thank You UX, BO diagnostics).
+Phase 13 е **advertising FO + install/uninstall hygiene + docs/release readiness**.
 
 Разрешено:
 
-- всичко от Phase 0–11;
-- `FinancingOrderMailDispatcher` + `LeasingEmailNotifier` + audience presenters;
-- `displayPaymentReturn` / `displayAdminOrderMainBottom` / `sendMailAlterTemplateVars`;
-- `leasing_email_sent` idempotency;
-- bank status persistence независимо от mail flag.
+- всичко от Phase 0–12;
+- `HomepageAdvertisingGate` / `HomepageAdvertisingPresenter` + `displayFooter` (index only);
+- `ModuleDataPurger` uninstall (AUD-006);
+- documentation: INSTALLATION / RELEASE / CHANGELOG / README refresh.
 
-Не въвеждай advertising FO, landing promo, release packaging или v2.0.2 scheme ordering, докато Phase 13 не бъде изрично възложена.
+Критични инварианти (не регресирай):
+
+- exactly-once checkout / CP / SmartUCF;
+- не логвай PII / secrets / EGN;
+- не променяй CP без доказана нужда;
+- **v2.0.2** scheme aggregation/sorting остава deferred (uni-woo + uni-ps8 + uni-ps9);
+- rejection sync остава dormant без proven CP codes;
+- не започвай final audit/remediation и не създавай release tag/package без изрично указание.
 
 Product/cart popup paths остават на `identity_accepted` — primary entry е checkout → `validatecheckout`.
 

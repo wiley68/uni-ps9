@@ -174,6 +174,8 @@ Phase 10 financing snapshot stores EGN/phone2 only in encrypted `sensitive_paylo
 
 Phase 11 SmartUCF: do not log EGN, full SmartUCF customer payload, certificate/key material, or Bearer tokens. Safe: order reference, attempt id, SmartUCF state/error class.
 
+Phase 13 homepage advertising: CP text fields are plain text after `strip_tags` (not trusted HTML). Promo/image/CTA URLs must pass `FILTER_VALIDATE_URL` with scheme `http` or `https` only.
+
 ### Phase 12 financing email audiences
 
 | Flow      | Customer email                        | Admin email (`PS_SHOP_EMAIL`)             |
@@ -189,6 +191,19 @@ Phase 11 SmartUCF: do not log EGN, full SmartUCF customer payload, certificate/k
 - Mail logs: order reference + audience class + exception class only — never body/EGN/SMTP credentials
 - Thank-you page uses **customer** audience rows (no EGN); BO may show Process 2 EGN via admin rows (audited)
 - BO may also show CP id + safe SmartUCF diagnostics; never raw request/response or secrets
+
+### Data retention (module-owned)
+
+| Store                      | Retention / cleanup                                                           |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| `financing_snapshot`       | 180 days; opportunistic redact of PII + `sensitive_payload` (batch 200 / 24h) |
+| `sensitive_payload`        | Removed with snapshot redaction; never stored plaintext elsewhere             |
+| `order_bank_status`        | Kept for order diagnostics; not purged by snapshot retention                  |
+| `smartucf_log`             | Diagnostic journal; no aggressive auto-purge beyond uninstall                 |
+| `api_nonce`                | ~900s replay window; probabilistic expiry purge                               |
+| `shop_cache`               | TTL 86400s freshness; replaced on refresh/push; deleted on uninstall          |
+| `popup_submission`         | Opportunistic delete of expired issued/failed/identity_accepted               |
+| `checkout_lock` / attempts | Lifecycle rows; dropped on uninstall                                          |
 
 Expired / replayed / wrong-shop / wrong-identity operations return safe customer-facing JSON (no SQL, no token hash, no stack traces).
 

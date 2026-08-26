@@ -64,7 +64,18 @@ Phase 10 durable order path:
 | `tests/Checkout/PaymentOptionContractTest.php`     | Phase 10 validatecheckout wiring                       |
 | `tests/Product/PopupSubmissionRepositoryTest.php`  | `markOrderCreated` strict `processing → order_created` |
 
-Current safe suite: **85 passed** (`composer test`).
+Current safe suite: **91 passed** (`composer test`; destructive Aud006 DB test SKIPs in safe suite).
+
+Phase 13 advertising / uninstall:
+
+| Test                                                            | What it checks                        |
+| --------------------------------------------------------------- | ------------------------------------- |
+| `tests/Advertising/HomepageAdvertisingGateTest.php`             | page/local/shop gates                 |
+| `tests/Advertising/HomepageAdvertisingPresenterTest.php`        | strip_tags + http(s) URL reject       |
+| `tests/Advertising/HomepageAdvertisingContractTest.php`         | hooks/assets/template                 |
+| `tests/Advertising/Phase13AdvertisingIsolationContractTest.php` | no transactional coupling; cache-only |
+| `tests/Uninstall/Aud006ModuleDataPurgerTest.php`                | uninstall contracts                   |
+| `tests/Uninstall/Aud006ModuleDataPurgerDbTest.php`              | destructive DB purge / SKIP in safe   |
 
 Phase 11 post-CP lifecycle:
 

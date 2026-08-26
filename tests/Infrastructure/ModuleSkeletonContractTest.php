@@ -113,8 +113,9 @@ assertModuleSkeleton(
         && is_file($root . '/views/css/cart-calculator.css')
         && is_file($root . '/views/js/checkout-payment.js')
         && is_file($root . '/views/css/checkout-payment.css')
-        && !is_file($root . '/views/js/homepage-advertising.js'),
-    'Phase 8–9 cart/checkout assets must exist; homepage FO assets must remain absent'
+        && is_file($root . '/views/js/homepage-advertising.js')
+        && is_file($root . '/views/css/homepage-advertising.css'),
+    'Phase 8–9 cart/checkout assets and Phase 13 homepage advertising assets must exist'
 );
 
 assertModuleSkeleton(
@@ -203,5 +204,22 @@ assertModuleSkeleton(
         && (bool) preg_match('/registerHook\s*\(\s*[\'"]sendMailAlterTemplateVars[\'"]\s*\)/', $module),
     'Phase 12 must register confirmation + admin order + mail alter hooks'
 );
+assertModuleSkeleton(
+    (bool) preg_match('/registerHook\s*\(\s*[\'"]displayFooter[\'"]\s*\)/', $module)
+        && (bool) preg_match('/function\s+hookDisplayFooter\b/', $module)
+        && is_file($root . '/src/Advertising/HomepageAdvertisingGate.php')
+        && is_file($root . '/src/Advertising/HomepageAdvertisingPresenter.php')
+        && is_file($root . '/views/templates/hook/homepage_advertising.tpl'),
+    'Phase 13 must register homepage advertising via displayFooter'
+);
+assertModuleSkeleton(
+    is_file($root . '/src/Uninstall/ModuleDataPurger.php')
+        && (bool) preg_match('/ModuleDataPurger/', $module),
+    'Phase 13 uninstall must use ModuleDataPurger'
+);
+assertModuleSkeleton(
+    !is_file($root . '/src/Order/Phase11DeferredMailDispatcher.php'),
+    'superseded Phase11DeferredMailDispatcher must be removed'
+);
 
-fwrite(STDOUT, "OK (module skeleton Phase 12 contract)\n");
+fwrite(STDOUT, "OK (module skeleton Phase 13 contract)\n");

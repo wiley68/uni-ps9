@@ -98,8 +98,8 @@ final class TestSuiteGuard
         fwrite(
             STDERR,
             'FAIL: refusing destructive DB test against "' . $databaseName . '". '
-            . 'Use an isolated test database (name contains _test/_testing) or set '
-            . self::ENV_TEST_DB_NAME . ' to the exact database name.' . PHP_EOL
+                . 'Use an isolated test database (name contains _test/_testing) or set '
+                . self::ENV_TEST_DB_NAME . ' to the exact database name.' . PHP_EOL
         );
         exit(1);
     }

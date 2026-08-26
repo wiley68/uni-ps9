@@ -36,8 +36,16 @@ assertProductFrontend(
     'assets must be gated to product controller'
 );
 assertProductFrontend(
-    strpos($module, 'homepage-advertising') === false,
-        'Phase 9 must not enqueue homepage FO assets'
+    strpos($module, "php_self === 'index'") !== false
+        && strpos($module, 'homepage-advertising') !== false,
+    'Phase 13 homepage advertising assets must load on index only'
+);
+assertProductFrontend(
+    (bool) preg_match(
+        '/php_self === \'product\'[\s\S]*homepage-advertising/',
+        $module
+    ) === false,
+    'product asset path must not enqueue homepage advertising'
 );
 assertProductFrontend(
     strpos($module, "php_self === 'cart'") !== false
