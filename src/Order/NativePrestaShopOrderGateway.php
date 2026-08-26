@@ -11,18 +11,25 @@ final class NativePrestaShopOrderGateway implements PrestaShopOrderGatewayInterf
 {
     private \PaymentModule $module;
     private \Context $context;
+    /** @var AuthoritativeOrderResolver */
+    private $authoritativeOrders;
 
-    public function __construct(\PaymentModule $module, \Context $context)
-    {
+    public function __construct(
+        \PaymentModule $module,
+        \Context $context,
+        ?AuthoritativeOrderResolver $authoritativeOrders = null
+    ) {
         $this->module = $module;
         $this->context = $context;
+        $this->authoritativeOrders = $authoritativeOrders ?? new AuthoritativeOrderResolver();
     }
 
     public function create(ValidatedPaymentRequest $request, array $shop = []): CreatedOrder
     {
         $cart = $this->context->cart;
         $customer = $this->context->customer;
-        $existingOrderId = (int) \Order::getIdByCartId((int) $cart->id);
+        $idCart = (int) $cart->id;
+        $existingOrderId = $this->findExistingAuthoritativeOrderId($idCart);
         if ($existingOrderId > 0) {
             return $this->load($existingOrderId);
         }
@@ -37,7 +44,7 @@ final class NativePrestaShopOrderGateway implements PrestaShopOrderGatewayInterf
 
         try {
             $this->module->validateOrder(
-                (int) $cart->id,
+                $idCart,
                 (int) \Configuration::get(OrderStateInstaller::AWAITING),
                 $amount,
                 $this->module->displayName,
@@ -48,7 +55,7 @@ final class NativePrestaShopOrderGateway implements PrestaShopOrderGatewayInterf
                 (string) $customer->secure_key
             );
         } catch (\Throwable $exception) {
-            $existingOrderId = (int) \Order::getIdByCartId((int) $cart->id);
+            $existingOrderId = $this->findExistingAuthoritativeOrderId($idCart);
             if ($existingOrderId <= 0) {
                 if (!$process2) {
                     DeferredOrderMailQueue::discard();
@@ -63,7 +70,7 @@ final class NativePrestaShopOrderGateway implements PrestaShopOrderGatewayInterf
             throw new \RuntimeException('PrestaShop did not create the financing order.');
         }
 
-        return $this->load((int) $this->module->currentOrder);
+        return $this->resolveCreatedOrder($idCart, (int) $this->module->currentOrder);
     }
 
     public function load(int $idOrder): CreatedOrder
@@ -117,6 +124,76 @@ final class NativePrestaShopOrderGateway implements PrestaShopOrderGatewayInterf
         $order = new \Order($idOrder);
         if (\Validate::isLoadedObject($order)) {
             $order->setCurrentState((int) \Configuration::get(OrderStateInstaller::AWAITING));
+        }
+    }
+
+    /**
+     * Prefer a non-empty same-cart order over PaymentModule::$currentOrder (often the empty twin).
+     */
+    private function resolveCreatedOrder(int $idCart, int $preferredOrderId): CreatedOrder
+    {
+        $candidates = [];
+        foreach ($this->listOrderIdsForCart($idCart) as $idOrder) {
+            $candidates[] = $this->load($idOrder);
+        }
+        if ($candidates === [] && $preferredOrderId > 0) {
+            $candidates[] = $this->load($preferredOrderId);
+        }
+
+        $resolved = $this->authoritativeOrders->resolve($candidates, $preferredOrderId);
+        $this->assertOrderBelongsToCart($resolved, $idCart);
+
+        return $resolved;
+    }
+
+    private function findExistingAuthoritativeOrderId(int $idCart): int
+    {
+        $candidates = [];
+        foreach ($this->listOrderIdsForCart($idCart) as $idOrder) {
+            $candidates[] = $this->load($idOrder);
+        }
+        if ($candidates === []) {
+            return 0;
+        }
+        try {
+            return $this->authoritativeOrders->resolve($candidates)->idOrder;
+        } catch (\RuntimeException $exception) {
+            // Existing cart orders are unsafe (empty-only or ambiguous). Never validateOrder again.
+            throw $exception;
+        }
+    }
+
+    /** @return list<int> */
+    private function listOrderIdsForCart(int $idCart): array
+    {
+        if ($idCart <= 0) {
+            return [];
+        }
+        $rows = \Db::getInstance()->executeS(
+            'SELECT `id_order` FROM `' . _DB_PREFIX_ . 'orders` WHERE `id_cart` = ' . (int) $idCart . ' ORDER BY `id_order` ASC'
+        );
+        if (!is_array($rows)) {
+            return [];
+        }
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id_order'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    private function assertOrderBelongsToCart(CreatedOrder $order, int $idCart): void
+    {
+        $native = new \Order($order->idOrder);
+        if (!\Validate::isLoadedObject($native) || (int) $native->id_cart !== $idCart) {
+            throw new \RuntimeException('The financing order does not belong to the expected cart.');
+        }
+        if ((int) $this->context->shop->id > 0 && (int) $native->id_shop !== (int) $this->context->shop->id) {
+            throw new \RuntimeException('The financing order does not belong to the expected shop.');
         }
     }
 

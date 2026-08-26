@@ -92,6 +92,23 @@ final class OrderOrchestrator
             if ((int) ($attempt['id_order'] ?? 0) > 0) {
                 $order = $this->orders->load((int) $attempt['id_order']);
                 if ($snapshot === null) {
+                    if ($order->lines === []) {
+                        $this->attempts->update($attemptId, [
+                            'state' => self::TERMINAL_FAILED,
+                            'last_error_class' => 'EmptyOrderLines',
+                        ]);
+                        DeferredOrderMailQueue::discard();
+                        throw new OrderOrchestrationException(
+                            'The created financing order has no order lines.',
+                            false,
+                            null,
+                            $order->idOrder,
+                            $attemptId,
+                            self::TERMINAL_FAILED,
+                            false,
+                            $order->reference
+                        );
+                    }
                     if (abs($order->total - $request->calculation->price) > 0.01) {
                         $this->attempts->update($attemptId, ['state' => self::TERMINAL_FAILED, 'last_error_class' => 'OrderTotalMismatch']);
                         DeferredOrderMailQueue::discard();
@@ -114,6 +131,23 @@ final class OrderOrchestrator
                 // create() only throws when no native order exists (true pre-order failure).
                 $order = $this->orders->create($request, $shop);
                 $attempt = $this->attachNativeOrder($attemptId, $order);
+                if ($order->lines === []) {
+                    $this->attempts->update($attemptId, [
+                        'state' => self::TERMINAL_FAILED,
+                        'last_error_class' => 'EmptyOrderLines',
+                    ]);
+                    DeferredOrderMailQueue::discard();
+                    throw new OrderOrchestrationException(
+                        'The created financing order has no order lines.',
+                        false,
+                        null,
+                        $order->idOrder,
+                        $attemptId,
+                        self::TERMINAL_FAILED,
+                        false,
+                        $order->reference
+                    );
+                }
                 if (abs($order->total - $request->calculation->price) > 0.01) {
                     $this->attempts->update($attemptId, ['state' => self::TERMINAL_FAILED, 'last_error_class' => 'OrderTotalMismatch']);
                     DeferredOrderMailQueue::discard();
@@ -130,6 +164,24 @@ final class OrderOrchestrator
                 }
                 $snapshot = $this->snapshotFactory->create($request, $order, $submissionSource);
                 $this->persistSnapshot($attemptId, $snapshot, $order);
+            }
+
+            if ($order->lines === []) {
+                $this->attempts->update($attemptId, [
+                    'state' => self::TERMINAL_FAILED,
+                    'last_error_class' => 'EmptyOrderLines',
+                ]);
+                DeferredOrderMailQueue::discard();
+                throw new OrderOrchestrationException(
+                    'The financing order has no order lines.',
+                    false,
+                    null,
+                    $order->idOrder,
+                    $attemptId,
+                    self::TERMINAL_FAILED,
+                    false,
+                    $order->reference
+                );
             }
 
             return $this->submitToControlPanel($attempt, $attemptId, $order, $snapshot, $idShop, $shop);

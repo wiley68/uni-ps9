@@ -187,6 +187,9 @@ final class CartPopupApplyService
             throw new \RuntimeException('The cart could not be prepared for the popup order.');
         }
 
+        // Invalidate stale multi-address delivery_option / package caches before validateOrder().
+        (new \PrestaShop\Module\Unipayment\Order\CartShippingStateSynchronizer())->synchronize($cart);
+
         $context->cart = $cart;
         $context->cookie->id_cart = (int) $cart->id;
         $context->cookie->write();
