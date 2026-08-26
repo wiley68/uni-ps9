@@ -11,6 +11,8 @@ use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfSessionCoordinator;
 
 /**
  * Authoritative post-CP lifecycle: snapshot load, Process 2, SmartUCF, bank status, leasing email.
+ *
+ * Bank-status persistence is independent of the mail-send flag (Phase 12).
  */
 final class PostControlPanelLifecycleService
 {
@@ -33,7 +35,7 @@ final class PostControlPanelLifecycleService
         ?SmartUcfEndpointPolicy $endpointPolicy = null
     ) {
         $this->snapshots = $snapshots ?? new FinancingSnapshotRepository();
-        $this->mailDispatcher = $mailDispatcher ?? new Phase11DeferredMailDispatcher();
+        $this->mailDispatcher = $mailDispatcher ?? new FinancingOrderMailDispatcher();
         $this->bankStatus = $bankStatus ?? new OrderBankStatusRepository();
         $this->endpointPolicy = $endpointPolicy ?? new SmartUcfEndpointPolicy();
     }
@@ -83,8 +85,9 @@ final class PostControlPanelLifecycleService
 
         if ($process2) {
             $result = PostControlPanelLifecycleResult::process2($finalStatus);
+            // Bank status is authoritative lifecycle; mail is a separate side effect.
+            $this->persistBankStatus($context->idShop, $order->orderReference, $finalStatus);
             if ($context->sendLeasingEmail) {
-                $this->persistBankStatus($context->idShop, $order->orderReference, $finalStatus);
                 $result = $this->dispatchLeasingEmail($result, $snapshot, $order->attemptId, $shop, $finalStatus);
             }
 

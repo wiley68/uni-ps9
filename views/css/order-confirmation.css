@@ -1,0 +1,49 @@
+.unipayment-thankyou-credit-details {
+    margin-top: 0;
+}
+
+.unipayment-thankyou-credit-details__title {
+    margin: 0 0 1rem;
+}
+
+.unipayment-thankyou-credit-details__table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.unipayment-thankyou-credit-details__table th,
+.unipayment-thankyou-credit-details__table td {
+    text-align: left;
+    vertical-align: middle;
+    padding: 0.75rem;
+    border: 1px solid #eee;
+}
+
+.unipayment-thankyou-credit-details__table th {
+    width: 40%;
+    font-weight: 600;
+}
+
+.unipayment-thankyou-smartucf-failure {
+    margin: 0 0 1.5rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid #f5c2c7;
+    background: #f8d7da;
+    color: #58151c;
+}
+
+.unipayment-thankyou-smartucf-failure__title {
+    margin: 0 0 0.75rem;
+}
+
+.unipayment-thankyou-smartucf-failure p {
+    margin: 0 0 0.75rem;
+}
+
+.unipayment-thankyou-smartucf-failure p:last-child {
+    margin-bottom: 0;
+}
+
+.unipayment-thankyou-smartucf-failure__noretry {
+    font-weight: 600;
+}

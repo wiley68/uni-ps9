@@ -64,7 +64,7 @@ Phase 10 durable order path:
 | `tests/Checkout/PaymentOptionContractTest.php`     | Phase 10 validatecheckout wiring                       |
 | `tests/Product/PopupSubmissionRepositoryTest.php`  | `markOrderCreated` strict `processing → order_created` |
 
-Current safe suite: **75 tests** (`composer test`).
+Current safe suite: **84 passed** (`composer test`).
 
 Phase 11 post-CP lifecycle:
 
@@ -76,6 +76,19 @@ Phase 11 post-CP lifecycle:
 | `tests/SmartUcf/Aud002bPostSuccessBoundaryTest.php`   | no second createSession after remote success              |
 | `tests/SmartUcf/Aud003SmartUcfEndpointPolicyTest.php` | trusted redirect hosts                                    |
 | `tests/SmartUcf/Aud002bLifecycleRepositoryTest.php`   | SKIP unless runtime suite                                 |
+
+Phase 12 post-order communication:
+
+| Test                                                        | What it checks                                          |
+| ----------------------------------------------------------- | ------------------------------------------------------- |
+| `tests/Order/Phase12PostOrderCommunicationContractTest.php` | Mail dispatcher default, hooks, privacy wiring, AUD-009 |
+| `tests/Order/Aud007LeasingEmailNotifierTest.php`            | leasing_email_sent marker / no schema mutate            |
+| `tests/Order/Aud014PrivacyRetentionTest.php`                | Process 1/2 EGN audience + retention                    |
+| `tests/Order/OrderConfirmationThankYouContractTest.php`     | Process 2 thank-you / displayPaymentReturn              |
+| `tests/Order/CpCreateFailureThankYouContractTest.php`       | CP failure confirmation UX                              |
+| `tests/Order/SmartUcfFailureThankYouContractTest.php`       | SmartUCF failure confirmation UX                        |
+| `tests/Order/AdminOrderCreditBoxContractTest.php`           | BO financing box labels                                 |
+| `tests/Order/Aud009BankStatusOrderStateTest.php`            | No callback→PS state sync                               |
 
 ```bash
 composer validate --no-check-publish

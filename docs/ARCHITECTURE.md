@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 11** state.
+This document describes **intended** high-level boundaries and the **implemented Phase 12** state.
 
 ---
 
@@ -50,6 +50,7 @@ Infrastructure
 | Checkout PaymentOption      | Phase 9 — `paymentOptions` + checkoutcalculate + preference/fingerprint handoff       |
 | Durable checkout submission | Phase 10 — lock + attempt + PS order + snapshot + CP create                           |
 | Post-CP lifecycle           | Phase 11 — Process 1 SmartUCF / Process 2 handoff + bank status                       |
+| Post-order communication    | Phase 12 — financing emails, order_conf, Thank You, BO diagnostics                    |
 
 ### Shop configuration cache flow
 
@@ -204,22 +205,25 @@ validatecheckout (Phase 10)
     → Phase10CheckoutOutcome / post-order template or order-confirmation redirect
 ```
 
-**Phase 10 boundary ends at `cp_created`.** Phase 11 continues:
+**Phase 10 boundary ends at `cp_created`.** Phase 11 continues with SmartUCF / Process 2. Phase 12 completes human-facing communication:
 
 ```text
 OrderOrchestrationResult (cp_created)
     ↓
 PostControlPanelLifecycleService
     ├─ Process 2 (uni_proces=1)
-    │     → bank_sent_process2
-    │     → Phase11DeferredMailDispatcher (flush order_conf)
+    │     → persist bank_sent_process2 (always; independent of mail flag)
+    │     → FinancingOrderMailDispatcher (if sendLeasingEmail)
+    │           → DeferredOrderMailQueue::flush (native order_conf + leasing vars)
+    │           → LeasingEmailNotifier (customer + admin; leasing_email_sent once)
     │     → native order confirmation redirect
     └─ Process 1
           → SmartUcfSessionCoordinator::run/resume
           → claim smartucf_state on financing_snapshot
           → createSession (exactly-once via durable state)
           → bank_sent_process1 | bank_send_failed_smartucf | processing | outcome_unknown
-          → flush deferred order_conf on terminal mail path
+          → FinancingOrderMailDispatcher on terminal mail path
+                → flush deferred order_conf + audience leasing mails
 ```
 
 **Bank status meanings:**
@@ -235,7 +239,30 @@ PostControlPanelLifecycleService
 
 **UniPayment tables remain 8** (Phase 10 schema already includes `smartucf_*` columns).
 
-**Post-order UX:** Process 2 / SmartUCF failure → order confirmation; SmartUCF created → trusted bank redirect; processing/unknown → `checkout_validated.tpl`.
+**Mail audiences (Phase 12):**
+
+| Flow      | Customer financing mail  | Admin financing mail     |
+| --------- | ------------------------ | ------------------------ |
+| Process 1 | No EGN; scheme/amount    | No EGN; operational data |
+| Process 2 | No EGN; confirmation msg | May include EGN + phone2 |
+
+Marker: `financing_snapshot.leasing_email_sent` — combined once-per-attempt (audited). Partial audience failure still marks sent after SMTP attempts (residual risk documented in RECOVERY).
+
+**Confirmation UX:**
+
+| Outcome                       | Customer landing                                             |
+| ----------------------------- | ------------------------------------------------------------ |
+| Process 2 success             | Native order-confirmation + leasing table                    |
+| Process 1 SmartUCF created    | Trusted SmartUCF redirect (then shop confirmation on return) |
+| Process 1 SmartUCF failed     | Native confirmation + safe failure notice                    |
+| CP failed / outcome unknown   | Native confirmation + safe degraded notice                   |
+| SmartUCF processing / unknown | `checkout_validated.tpl` (order-aware; do not resubmit)      |
+
+**BO diagnostics:** `displayAdminOrderMainBottom` → leasing rows + process label + CP id + safe SmartUCF fields. Absent snapshot → empty (non-financing orders).
+
+**Order-state sync (AUD-009):** inbound `orderbankstatus` does **not** map bank status to native PS order state (`ps_order_state_changed: false`). `BankStatusOrderStateMapper` / `SYNC_BANK_REJECTION_STATE` exist as dormant policy classes; rejection whitelist is empty until proven CP codes. Do not re-wire callback sync without audit evidence.
+
+**Deferred Phase 13:** advertising FO, landing promo, release packaging, v2.0.2 scheme aggregation (`months ASC`, same months: standard before promo).
 
 **Attempt state machine** (`OrderOrchestrator`):
 
@@ -251,8 +278,6 @@ PostControlPanelLifecycleService
 
 **UniPayment tables after Phase 10 (8 total):** `shop_cache`, `api_nonce`, `order_bank_status`, `smartucf_log`, `popup_submission`, `checkout_lock`, `order_attempt`, `financing_snapshot`.
 
-**Post-order UX (temporary until Phase 12):** Process 2 + CP success → native order confirmation; Process 1 + CP success → `checkout_validated.tpl`; CP failure / unknown after PS order → order confirmation or validated warning (no return to editable checkout submit).
-
 Checkout fingerprint canonical payload (non-PII):
 
 ```text
@@ -262,7 +287,7 @@ checkout_state{id_cart, carrier_id, delivery_option, shipping_total, cart_rules[
 
 Lines sorted by product/attribute; cart_rules sorted by `id_cart_rule`.
 
-Deferred **v2.0.2** (Woo + PS8 + PS9 coordinated): standard popup/list should expose eligible promo schemes inside standard selection. Phase 9 preserves audited v2.0.1 aggregation via `CartSchemeResolver` / `unifiedSchemes` — **do not change** here.
+Deferred **v2.0.2** (Woo + PS8 + PS9 coordinated): standard popup/list should expose eligible promo schemes inside standard selection. Phase 9–12 preserve audited v2.0.1 aggregation via `CartSchemeResolver` / `unifiedSchemes` — **do not change** here.
 
 ### Authentication lifecycle
 

@@ -18,7 +18,7 @@ final class PostControlPanelLifecycleContext
     /** @var bool Use SmartUcfSessionCoordinator::resume() instead of run(). */
     public $resumeSmartUcf;
 
-    /** @var bool When false, skip leasing email and Process 2 bank-status persistence (popup replay). */
+    /** @var bool When false, skip leasing email dispatch (bank status still persists). */
     public $sendLeasingEmail;
 
     public function __construct(

@@ -75,6 +75,7 @@ class Unipayment extends PaymentModule
             || !$snapshots->install()
             || !$orderStates->install()
             || !$this->registerFrontOfficeHooks()
+            || !$this->registerPostOrderHooks()
             || !$this->registerHook('actionEmailSendBefore')
         ) {
             $orderStates->uninstall();
@@ -155,8 +156,9 @@ class Unipayment extends PaymentModule
 
     public function getContent(): string
     {
-        // Idempotent: already-installed shops gain Phase 6–10 hooks/tables without reinstall.
+        // Idempotent: already-installed shops gain Phase 6–12 hooks/tables without reinstall.
         $this->registerFrontOfficeHooks();
+        $this->registerPostOrderHooks();
         $this->registerHook('actionEmailSendBefore');
         (new PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository())->install();
         (new PrestaShop\Module\Unipayment\Checkout\CheckoutSubmitLockRepository())->install();
@@ -629,6 +631,136 @@ class Unipayment extends PaymentModule
         return PrestaShop\Module\Unipayment\Order\DeferredOrderMailQueue::intercept($params);
     }
 
+    /**
+     * Inject UniPayment leasing table into native order_conf when deferred mail is flushed.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function hookSendMailAlterTemplateVars(array $params): void
+    {
+        if (($params['template'] ?? '') !== 'order_conf') {
+            return;
+        }
+
+        if (!isset($params['template_vars']) || !is_array($params['template_vars'])) {
+            return;
+        }
+
+        $templateVars = &$params['template_vars'];
+        $leasingHtml = trim((string) ($templateVars['{unipayment_leasing_html}'] ?? ''));
+        $leasingTxt = trim((string) ($templateVars['{unipayment_leasing_txt}'] ?? ''));
+
+        if ($leasingHtml !== '') {
+            $templateVars['{products}'] = (string) ($templateVars['{products}'] ?? '') . $leasingHtml;
+        }
+
+        if ($leasingTxt !== '') {
+            $templateVars['{products_txt}'] = (string) ($templateVars['{products_txt}'] ?? '') . $leasingTxt;
+        }
+    }
+
+    /**
+     * Native order-confirmation extras: Process 2 leasing table or financing failure notice.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function hookDisplayPaymentReturn(array $params): string
+    {
+        $order = $params['order'] ?? null;
+        $idOrder = $order instanceof Order ? (int) $order->id : (int) ($params['id_order'] ?? 0);
+        if ($idOrder <= 0) {
+            return '';
+        }
+
+        $outcome = (new PrestaShop\Module\Unipayment\Order\OrderConfirmationFinancingOutcomePresenter(
+            new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository(),
+            new PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository()
+        ))->outcome($idOrder);
+        if ($outcome === PrestaShop\Module\Unipayment\Order\OrderConfirmationFinancingOutcomePresenter::SMARTUCF_FAILED) {
+            return $this->display(__FILE__, 'views/templates/hook/order_confirmation_smartucf_failure.tpl');
+        }
+        if ($outcome === PrestaShop\Module\Unipayment\Order\OrderConfirmationFinancingOutcomePresenter::CP_FAILED) {
+            return $this->display(__FILE__, 'views/templates/hook/order_confirmation_cp_failure.tpl');
+        }
+        if ($outcome === PrestaShop\Module\Unipayment\Order\OrderConfirmationFinancingOutcomePresenter::CP_OUTCOME_UNKNOWN) {
+            return $this->display(__FILE__, 'views/templates/hook/order_confirmation_cp_outcome_unknown.tpl');
+        }
+
+        $leasingRows = (new PrestaShop\Module\Unipayment\Order\OrderLeasingDetailsPresenter())
+            ->thankYouRows($idOrder);
+        if ($leasingRows === []) {
+            return '';
+        }
+
+        $this->context->smarty->assign([
+            'unipayment_leasing_rows' => $leasingRows,
+        ]);
+
+        return $this->display(__FILE__, 'views/templates/hook/order_confirmation_leasing.tpl');
+    }
+
+    /**
+     * Back-office financing diagnostics for UniPayment orders.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function hookDisplayAdminOrderMainBottom(array $params): string
+    {
+        $idOrder = (int) ($params['id_order'] ?? 0);
+        $leasingRows = (new PrestaShop\Module\Unipayment\Order\OrderLeasingDetailsPresenter())
+            ->rowsForOrder($idOrder);
+        if ($leasingRows === []) {
+            return '';
+        }
+
+        $this->context->smarty->assign([
+            'unipayment_leasing_rows' => $leasingRows,
+        ]);
+
+        return $this->display(__FILE__, 'views/templates/hook/admin_order_financing_details.tpl');
+    }
+
+    /** @param array<string, mixed> $params */
+    public function hookActionOrderGridDefinitionModifier(array $params): void
+    {
+        $definition = $params['definition'] ?? null;
+        if (!$definition instanceof PrestaShop\PrestaShop\Core\Grid\Definition\GridDefinitionInterface) {
+            return;
+        }
+
+        $columns = $definition->getColumns();
+
+        $column = (new PrestaShop\PrestaShop\Core\Grid\Column\Type\DataColumn('unipayment_bank_status'))
+            ->setName('UniCredit статус')
+            ->setOptions([
+                'field' => 'unipayment_bank_status',
+            ]);
+
+        try {
+            $columns->addAfter('osname', $column);
+        } catch (Throwable $exception) {
+            $columns->add($column);
+        }
+    }
+
+    /** @param array<string, mixed> $params */
+    public function hookActionOrderGridQueryBuilderModifier(array $params): void
+    {
+        $searchQueryBuilder = $params['search_query_builder'] ?? null;
+        if (!$searchQueryBuilder instanceof Doctrine\DBAL\Query\QueryBuilder) {
+            return;
+        }
+
+        $bankStatusTable = _DB_PREFIX_ . PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository::TABLE;
+        $searchQueryBuilder->leftJoin(
+            'o',
+            $bankStatusTable,
+            'unipayment_bs',
+            'unipayment_bs.id_order = o.id_order'
+        );
+        $searchQueryBuilder->addSelect("COALESCE(unipayment_bs.status_label, '') AS unipayment_bank_status");
+    }
+
     public function hookActionFrontControllerSetMedia(): void
     {
         if (!$this->active || !isset($this->context->controller->php_self)) {
@@ -663,6 +795,16 @@ class Unipayment extends PaymentModule
                     'priority' => 151,
                     'version' => $this->assetVersion('views/js/cart-calculator.js'),
                 ]
+            );
+
+            return;
+        }
+
+        if ($this->context->controller->php_self === 'order-confirmation') {
+            $this->context->controller->registerStylesheet(
+                'module-unipayment-order-confirmation',
+                'modules/' . $this->name . '/views/css/order-confirmation.css',
+                ['media' => 'all', 'priority' => 150]
             );
 
             return;
@@ -802,6 +944,15 @@ class Unipayment extends PaymentModule
             && $this->registerHook('displayShoppingCart')
             && $this->registerHook('paymentOptions')
             && $this->registerHook('actionFrontControllerSetMedia');
+    }
+
+    private function registerPostOrderHooks(): bool
+    {
+        return $this->registerHook('displayPaymentReturn')
+            && $this->registerHook('displayAdminOrderMainBottom')
+            && $this->registerHook('sendMailAlterTemplateVars')
+            && $this->registerHook('actionOrderGridDefinitionModifier')
+            && $this->registerHook('actionOrderGridQueryBuilderModifier');
     }
 
     /**

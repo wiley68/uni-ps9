@@ -232,6 +232,25 @@ assertAud018($smartFake->runCalls === 0 && $smartFake->resumeCalls === 0, 'A: Sm
 assertAud018($bankSpy->updates !== [] && $bankSpy->updates[0]['id'] === BankStatus::SENT_PROCESS2, 'A: process2 bank status persisted');
 assertAud018($resultA->emailSent() === true, 'A: leasing email sent');
 
+// Test A2 — Process 2 bank status persists even when mail is skipped (Phase 12 decoupling)
+$storeA2 = new Aud018MemorySnapshotStore();
+$storeA2->seed(10, $snapshot);
+$bankSpyA2 = new Aud018BankStatusSpy();
+$mailSpyA2 = new Aud018NoopMailDispatcher();
+$noMailContext = new PostControlPanelLifecycleContext(1, 'BGN', false, false);
+$resultA2 = (new PostControlPanelLifecycleService($storeA2, $mailSpyA2, $bankSpyA2))->handle(
+    $order,
+    $shopProcess2,
+    $noMailContext,
+    new Aud018FakeSmartUcfPort()
+);
+assertAud018($resultA2->isProcess2(), 'A2: process2 outcome without mail');
+assertAud018(
+    $bankSpyA2->updates !== [] && $bankSpyA2->updates[0]['id'] === BankStatus::SENT_PROCESS2,
+    'A2: bank_sent_process2 persists when sendLeasingEmail=false'
+);
+assertAud018($resultA2->emailSent() === false, 'A2: leasing email not sent when flag false');
+
 // Test L — explicit process2 no SmartUCF
 assertAud018($smartFake->runCalls === 0, 'L: process2 must not run SmartUCF');
 

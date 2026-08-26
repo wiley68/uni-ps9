@@ -2,13 +2,13 @@
 
 Native PrestaShop 9 module for **UniCredit financing** (credit calculator, checkout payment method, order lifecycle, Control Panel integration, and SmartUCF).
 
-| Item                  | Value                                                             |
-| --------------------- | ----------------------------------------------------------------- |
-| Module technical name | `unipayment`                                                      |
-| Current version       | `2.0.1`                                                           |
-| Repository            | `wiley68/uni-ps9`                                                 |
-| Repository root       | Module root (this directory)                                      |
-| Current state         | **Phase 11 — post-CP lifecycle (SmartUCF Process 1 / Process 2)** |
+| Item                  | Value                                                           |
+| --------------------- | --------------------------------------------------------------- |
+| Module technical name | `unipayment`                                                    |
+| Current version       | `2.0.1`                                                         |
+| Repository            | `wiley68/uni-ps9`                                               |
+| Repository root       | Module root (this directory)                                    |
+| Current state         | **Phase 12 — post-order mail, confirmation UX, BO diagnostics** |
 
 ## Purpose
 
@@ -28,21 +28,20 @@ Provide a PrestaShop 9-native adapter/port of the UniPayment product family:
 
 ## Current implementation status
 
-Phase 11 provides:
+Phase 12 provides:
 
-- Phases 0–10 (durable PS order + snapshot + CP create);
-- `PostControlPanelLifecycleService` after `cp_created`;
-- SmartUCF Process 1 (session create/resume) → `bank_sent_process1`;
-- Process 2 handoff (no SmartUCF) → `bank_sent_process2`;
-- `bank_send_failed_smartucf` when CP succeeded but SmartUCF failed;
-- deferred native `order_conf` flush via `Phase11DeferredMailDispatcher`.
+- Phases 0–11 (durable order + CP + SmartUCF / Process 2);
+- `FinancingOrderMailDispatcher` + `LeasingEmailNotifier` (customer/admin audiences);
+- native `order_conf` flush coordinated with leasing mails;
+- Thank You / `displayPaymentReturn` financing notices;
+- BO financing block (`displayAdminOrderMainBottom`);
+- privacy: Process 1 no EGN; Process 2 admin may receive EGN; customer never receives EGN.
 
-Still **not** implemented:
+Still **not** implemented (Phase 13+):
 
-- full financing customer/admin email presentation (Phase 12);
-- final Thank You redesign;
-- advertising FO;
-- v2.0.2 scheme ordering.
+- advertising FO / landing promotional content;
+- release packaging / tagging;
+- v2.0.2 scheme aggregation/sorting.
 
 ## Documentation
 

@@ -99,7 +99,9 @@ All: **POST** only, JSON body, signed headers.
 
 - Lookup: `orders.reference` + `id_shop` + INNER JOIN `unipayment_financing_snapshot` (AUD-011)
 - Phase 10 installs `unipayment_financing_snapshot`. The repository still gates with `SHOW TABLES LIKE` for shops not yet upgraded via BO Configure.
-- No customer-facing order-state changes in Phase 4 (`ps_order_state_changed: false`)
+- No customer-facing order-state changes (`ps_order_state_changed: false`) — AUD-009
+- `BankStatusOrderStateMapper` is **not** wired into the callback; rejection whitelist empty until proven CP codes
+- `SYNC_BANK_REJECTION_STATE` remains a dormant config key (not shown in BO UI)
 
 ### smartucfdebuglog
 
@@ -172,7 +174,18 @@ Phase 10 financing snapshot stores EGN/phone2 only in encrypted `sensitive_paylo
 
 Phase 11 SmartUCF: do not log EGN, full SmartUCF customer payload, certificate/key material, or Bearer tokens. Safe: order reference, attempt id, SmartUCF state/error class.
 
-Phase 11 SmartUCF: do not log EGN, full SmartUCF customer payload, certificate/key material, or Bearer tokens. Safe: order reference, attempt id, SmartUCF state/error class.
+### Phase 12 financing email audiences
+
+| Flow      | Customer email                        | Admin email (`PS_SHOP_EMAIL`)             |
+| --------- | ------------------------------------- | ----------------------------------------- |
+| Process 1 | No EGN                                | No EGN                                    |
+| Process 2 | No EGN (confirmation message allowed) | **Full EGN** + second phone (operational) |
+
+- Implementation: `LeasingOrderEmailPresenter` + `LeasingEmailNotifier` via `FinancingOrderMailDispatcher`
+- Marker: `leasing_email_sent` (once per attempt; combined customer+admin)
+- Mail logs: order reference + audience class + exception class only — never body/EGN/SMTP credentials
+- Thank-you page uses **customer** audience rows (no EGN); BO may show Process 2 EGN via admin rows (audited)
+- BO may also show CP id + safe SmartUCF diagnostics; never raw request/response or secrets
 
 Expired / replayed / wrong-shop / wrong-identity operations return safe customer-facing JSON (no SQL, no token hash, no stack traces).
 

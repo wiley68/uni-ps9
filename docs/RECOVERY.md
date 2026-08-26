@@ -38,7 +38,7 @@ After durable `cp_created`:
 
 | Path                          | Recovery                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------- |
-| Process 2                     | Persist `bank_sent_process2`; flush deferred native mail; no SmartUCF     |
+| Process 2                     | Persist `bank_sent_process2` (always); mail is separate side effect       |
 | Process 1 success             | Snapshot `smartucf_state=created`; `bank_sent_process1`; trusted redirect |
 | Process 1 retryable failure   | `smartucf_failed` + retryable=1; same attempt/CP; resume claim            |
 | Process 1 terminal failure    | `bank_send_failed_smartucf`; no new PS/CP order                           |
@@ -48,6 +48,17 @@ After durable `cp_created`:
 
 Callback race: inbound `orderbankstatus` uses financing snapshot JOIN; local SmartUCF success writes `bank_sent_process1` first — do not regress success to SmartUCF failure on replay.
 
+## Phase 12 mail / confirmation recovery
+
+| Issue                                          | Guidance                                                                    |
+| ---------------------------------------------- | --------------------------------------------------------------------------- |
+| Mail failure after bank success                | Bank status unchanged; log exception class only; customer stays order-aware |
+| SMTP accepted, `leasing_email_sent` write fail | Residual duplicate-mail risk on replay (audited combined marker)            |
+| Confirmation refresh / callback                | Must not re-send financing mails or duplicate `order_conf`                  |
+| Manual Retry CP / SmartUCF buttons             | Not provided (not audited safe UI)                                          |
+
+AUD-009: do not map bank rejection callbacks to native PS order state. `SYNC_BANK_REJECTION_STATE` is dormant (empty rejection whitelist).
+
 ## Multishop
 
-All durable rows are scoped by `id_shop`. Inbound `orderbankstatus` authorizes via `order_reference + id_shop + financing_snapshot JOIN` (AUD-011).
+All durable rows are scoped by `id_shop`. Inbound `orderbankstatus` authorizes via `order_reference + id_shop + financing_snapshot JOIN` (AUD-011). BO financing block resolves by `id_order` → snapshot (unique per order).

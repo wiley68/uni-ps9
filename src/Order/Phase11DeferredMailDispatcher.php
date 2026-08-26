@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace PrestaShop\Module\Unipayment\Order;
 
 /**
- * Phase 11 mail boundary: flush deferred native order_conf only.
- * Full customer/admin financing leasing emails remain Phase 12.
+ * Phase 11 temporary mail boundary (flush deferred native order_conf only).
+ *
+ * Superseded in Phase 12 by {@see FinancingOrderMailDispatcher}, which flushes
+ * native order_conf and sends audience-specific leasing emails.
+ *
+ * Kept for explicit injection in tests/tools; not the production default.
  */
 final class Phase11DeferredMailDispatcher implements LeasingMailDispatchPort
 {

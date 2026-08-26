@@ -277,18 +277,17 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 11 е **post-Control-Panel lifecycle** (SmartUCF Process 1 / Process 2 handoff).
+Phase 12 е **post-order communication** (financing emails, native `order_conf`, Thank You UX, BO diagnostics).
 
 Разрешено:
 
-- всичко от Phase 0–10;
-- `PostControlPanelLifecycleService` след durable `cp_created`;
-- `SmartUcfSessionCoordinator` Process 1 create/resume;
-- Process 2 → `bank_sent_process2` без SmartUCF;
-- `bank_send_failed_smartucf` при SmartUCF failure след CP success;
-- flush на deferred native `order_conf` (`Phase11DeferredMailDispatcher`).
+- всичко от Phase 0–11;
+- `FinancingOrderMailDispatcher` + `LeasingEmailNotifier` + audience presenters;
+- `displayPaymentReturn` / `displayAdminOrderMainBottom` / `sendMailAlterTemplateVars`;
+- `leasing_email_sent` idempotency;
+- bank status persistence независимо от mail flag.
 
-Не въвеждай full financing mail UX, final Thank You redesign, advertising FO или v2.0.2 scheme ordering, докато Phase 12 не бъде изрично възложена.
+Не въвеждай advertising FO, landing promo, release packaging или v2.0.2 scheme ordering, докато Phase 13 не бъде изрично възложена.
 
 Product/cart popup paths остават на `identity_accepted` — primary entry е checkout → `validatecheckout`.
 

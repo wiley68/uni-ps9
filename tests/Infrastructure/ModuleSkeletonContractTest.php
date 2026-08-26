@@ -189,5 +189,19 @@ assertModuleSkeleton(
         && (bool) preg_match('/SmartUcfSessionCoordinator/', (string) file_get_contents($root . '/controllers/front/validatecheckout.php')),
     'validatecheckout must wire Phase 11 lifecycle after CP create'
 );
+assertModuleSkeleton(
+    is_file($root . '/src/Order/FinancingOrderMailDispatcher.php')
+        && is_file($root . '/src/Order/LeasingEmailNotifier.php')
+        && is_file($root . '/src/Order/OrderLeasingDetailsPresenter.php')
+        && is_file($root . '/views/templates/hook/admin_order_financing_details.tpl')
+        && is_file($root . '/views/templates/hook/order_confirmation_leasing.tpl'),
+    'Phase 12 mail dispatcher + BO/confirmation presenters/templates must exist'
+);
+assertModuleSkeleton(
+    (bool) preg_match('/registerHook\s*\(\s*[\'"]displayPaymentReturn[\'"]\s*\)/', $module)
+        && (bool) preg_match('/registerHook\s*\(\s*[\'"]displayAdminOrderMainBottom[\'"]\s*\)/', $module)
+        && (bool) preg_match('/registerHook\s*\(\s*[\'"]sendMailAlterTemplateVars[\'"]\s*\)/', $module),
+    'Phase 12 must register confirmation + admin order + mail alter hooks'
+);
 
-fwrite(STDOUT, "OK (module skeleton Phase 11 contract)\n");
+fwrite(STDOUT, "OK (module skeleton Phase 12 contract)\n");

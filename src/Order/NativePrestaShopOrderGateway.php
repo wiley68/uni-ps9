@@ -29,7 +29,9 @@ final class NativePrestaShopOrderGateway implements PrestaShopOrderGatewayInterf
 
         $process2 = $shop !== [] && ShopConfigurationFlags::isProcess2($shop);
         $amount = round((float) $cart->getOrderTotal(true, \Cart::BOTH), 2);
+        $extraVars = [];
         if ($shop !== [] && !$process2) {
+            $extraVars = (new LeasingOrderEmailPresenter())->mailExtraVarsFromRequest($request, $shop);
             DeferredOrderMailQueue::start();
         }
 
@@ -40,7 +42,7 @@ final class NativePrestaShopOrderGateway implements PrestaShopOrderGatewayInterf
                 $amount,
                 $this->module->displayName,
                 null,
-                [],
+                $extraVars,
                 (int) $cart->id_currency,
                 false,
                 (string) $customer->secure_key
