@@ -405,13 +405,7 @@ class Unipayment extends PaymentModule
     private function handleDebugJournalDownload(
         PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository $repository
     ): string {
-        $employee = $this->context->employee;
-        $submittedToken = (string) Tools::getValue('token', '');
-        if (
-            !$employee instanceof Employee
-            || !Validate::isLoadedObject($employee)
-            || !hash_equals(Tools::getAdminTokenLite('AdminModules'), $submittedToken)
-        ) {
+        if (!$this->isAuthorizedJournalDownload()) {
             return $this->displayError(
                 $this->trans('Нямате право да изтеглите журнала с операции.', [], 'Modules.Unipayment.Admin')
             );
@@ -451,6 +445,9 @@ class Unipayment extends PaymentModule
             );
         }
 
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         header('Content-Type: application/json; charset=utf-8');
         header('Content-Disposition: attachment; filename="unipayment-smartucf-log-' . gmdate('Ymd-His') . '.json"');
         header('Content-Length: ' . strlen($json));
@@ -458,6 +455,46 @@ class Unipayment extends PaymentModule
         header('X-Content-Type-Options: nosniff');
         echo $json;
         exit;
+    }
+
+    /**
+     * Configure-page employees already passed AdminModules SF security.
+     * CSRF must use PS9 UserTokenManager (Symfony token), not legacy hash_equals
+     * against Tools::getAdminTokenLite() which returns a rotating CSRF value.
+     */
+    private function isAuthorizedJournalDownload(): bool
+    {
+        $employee = $this->context->employee;
+        if (
+            !$employee
+            || !Validate::isLoadedObject($employee)
+            || (int) $employee->id <= 0
+            || (method_exists($employee, 'isLoggedBack') && !$employee->isLoggedBack())
+        ) {
+            return false;
+        }
+
+        try {
+            $container = PrestaShop\PrestaShop\Adapter\SymfonyContainer::getInstance();
+            if ($container !== null && $container->has('PrestaShopBundle\Security\Admin\UserTokenManager')) {
+                /** @var PrestaShopBundle\Security\Admin\UserTokenManager $tokens */
+                $tokens = $container->get('PrestaShopBundle\Security\Admin\UserTokenManager');
+
+                return $tokens->isTokenValid();
+            }
+        } catch (Throwable $exception) {
+            // Fall through to legacy token comparison for non-SF contexts (CLI/tests).
+        }
+
+        $submittedToken = (string) Tools::getValue('token', '');
+        if ($submittedToken === '') {
+            $submittedToken = (string) Tools::getValue('_token', '');
+        }
+        if ($submittedToken === '') {
+            return false;
+        }
+
+        return hash_equals((string) Tools::getAdminTokenLite('AdminModules'), $submittedToken);
     }
 
     private function handleBankDataRefresh(): string
@@ -1022,6 +1059,25 @@ class Unipayment extends PaymentModule
             ))->present(true, $shop, $cartContext, $currencyIso, $preference);
             if ($preference !== null && empty($view['preselect_payment'])) {
                 $preferenceStore->clear($this->context->cookie);
+            } elseif (
+                $preference !== null
+                && !empty($view['preselect_payment'])
+                && !empty($preference['payment_handoff_consumed'])
+            ) {
+                // Scheme defaults stay server-rendered; do not force payment radio again.
+                $view['preselect_payment'] = false;
+            }
+            if ($preference !== null && !empty($view['preselect_payment'])) {
+                // Expose handoff outside the (often hidden) payment form so JS can select
+                // UniCredit before the option panel is opened — Hummingbird + Classic.
+                Media::addJsDef([
+                    'unipaymentCheckoutHandoff' => [
+                        'preselect_payment' => true,
+                        'module_name' => $this->name,
+                        'default_scheme_key' => (string) ($view['default_scheme_key'] ?? ''),
+                        'default_first_installment' => (float) ($view['default_first_installment'] ?? 0),
+                    ],
+                ]);
             }
         } catch (Throwable $exception) {
             PrestaShopLogger::addLog('UniPayment checkout option could not be rendered: ' . get_class($exception), 2);

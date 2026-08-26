@@ -95,6 +95,7 @@ final class ProductPopupCheckoutPreselectionService
             'kop_code' => (string) ($calculation['kop_code'] ?? ''),
             'months' => (int) ($calculation['months'] ?? 0),
             'filter_id' => (int) ($calculation['filter_id'] ?? 0),
+            'scheme_key' => (string) ($calculation['scheme_key'] ?? ''),
             'first_installment' => $calculation['first_installment'] ?? 0,
             'product_amount' => $calculation['price'] ?? 0,
             'cart_fingerprint' => $fingerprint,

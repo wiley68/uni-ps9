@@ -32,15 +32,16 @@ final class CartSnapshot
     }
 
     /**
-     * Product/qty/total identity without carrier/delivery evolution.
-     * Used once to rebind a product "Купи" preference when checkout first assigns shipping.
+     * Product/qty identity for Product "Купи" handoff.
+     *
+     * Must NOT include payable cart total: shipping assignment on checkout changes
+     * Cart::getOrderTotal(BOTH) and would break one-time full-fingerprint rebind.
      */
     public function linesFingerprint(CartContext $cart, string $currencyIso): string
     {
         $payload = [
             'currency' => strtoupper(trim($currencyIso)),
-            'total' => number_format($cart->total, 2, '.', ''),
-            'lines' => $this->normalizedLines($cart),
+            'lines' => $this->normalizedLineIdentity($cart),
         ];
 
         return hash('sha256', (string) json_encode($payload, JSON_UNESCAPED_SLASHES));
@@ -56,6 +57,24 @@ final class CartSnapshot
                 'product_attribute_id' => $line->productAttributeId,
                 'quantity' => $line->quantity,
                 'line_total' => number_format($line->lineTotal, 2, '.', ''),
+            ];
+        }
+        usort($lines, static function (array $a, array $b): int {
+            return [$a['product_id'], $a['product_attribute_id']] <=> [$b['product_id'], $b['product_attribute_id']];
+        });
+
+        return $lines;
+    }
+
+    /** @return list<array<string, int>> */
+    private function normalizedLineIdentity(CartContext $cart): array
+    {
+        $lines = [];
+        foreach ($cart->lines as $line) {
+            $lines[] = [
+                'product_id' => (int) $line->product->productId,
+                'product_attribute_id' => (int) $line->productAttributeId,
+                'quantity' => (int) $line->quantity,
             ];
         }
         usort($lines, static function (array $a, array $b): int {

@@ -88,7 +88,10 @@
       <button type="button" name="submitUnipaymentRefresh" class="btn btn-default" disabled="disabled"><i class="icon-refresh"></i> {l s='Обнови данните от банката' d='Modules.Unipayment.Admin'}</button>
     {/if}
     <form action="{$unipayment_form_action|escape:'htmlall':'UTF-8'}" method="post" style="margin:0;">
+      {* PS9 AdminModules configure strips legacy token from converted SF URLs.
+         Post both token and _token so UserTokenManager::isTokenValid accepts the request. *}
       <input type="hidden" name="token" value="{$unipayment_admin_token|escape:'htmlall':'UTF-8'}">
+      <input type="hidden" name="_token" value="{$unipayment_admin_token|escape:'htmlall':'UTF-8'}">
       <button type="submit" name="submitUnipaymentDownloadJournal" class="btn btn-default"><i class="icon-download"></i> {l s='Изтегли журнал операции' d='Modules.Unipayment.Admin'}</button>
     </form>
   </div>

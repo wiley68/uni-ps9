@@ -24,7 +24,7 @@ final class CheckoutPreferenceStore
      * @param string|null $expectedFingerprint When provided, stored cart_fingerprint must be
      *                                         non-empty and match (legacy cookies without fingerprint are rejected).
      * @param string|null $linesFingerprint When full fingerprint mismatches, product_preselect handoff may
-     *                                      rebind once if lines+total identity still matches.
+     *                                      rebind once if lines identity still matches.
      * @return array<string, mixed>|null
      */
     public function load(
@@ -39,12 +39,31 @@ final class CheckoutPreferenceStore
         if (
             !is_array($preference)
             || (int) ($preference['cart_id'] ?? 0) !== $cartId
-            || (int) ($preference['customer_id'] ?? 0) !== $customerId
             || (int) ($preference['created_at'] ?? 0) < time() - self::TTL_SECONDS
         ) {
             $this->clear($cookie);
 
             return null;
+        }
+
+        $storedCustomerId = (int) ($preference['customer_id'] ?? 0);
+        $customerRebound = false;
+        if ($storedCustomerId !== $customerId) {
+            // Guest Product "Купи" often stores customer_id=0; checkout may create a customer
+            // before the payment step. Allow one identity bind for product_preselect only.
+            if (
+                (string) ($preference['flow'] ?? '') === 'product_preselect'
+                && $storedCustomerId === 0
+                && empty($preference['customer_identity_bound'])
+            ) {
+                $preference['customer_id'] = $customerId;
+                $preference['customer_identity_bound'] = 1;
+                $customerRebound = true;
+            } else {
+                $this->clear($cookie);
+
+                return null;
+            }
         }
 
         if ($expectedFingerprint !== null) {
@@ -56,8 +75,6 @@ final class CheckoutPreferenceStore
                     && empty($preference['checkout_fingerprint_bound'])
                     && $this->linesFingerprintMatches($preference, $linesFingerprint)
                 ) {
-                    // First checkout encounter after Product "Купи": carrier/shipping may evolve.
-                    // Rebind full fingerprint once; later material drift still rejects.
                     $preference['cart_fingerprint'] = $expectedFingerprint;
                     $preference['checkout_fingerprint_bound'] = 1;
                     $this->save($cookie, $preference, $cartId, $customerId);
@@ -70,7 +87,30 @@ final class CheckoutPreferenceStore
             }
         }
 
+        if ($customerRebound) {
+            $this->save($cookie, $preference, $cartId, $customerId);
+        }
+
         return $preference;
+    }
+
+    /**
+     * Mark intentional Product "Купи" payment auto-select as consumed so later
+     * checkout AJAX refreshes do not keep forcing UniCredit after a manual switch.
+     *
+     * @param object $cookie
+     */
+    public function markPaymentHandoffConsumed($cookie): void
+    {
+        $raw = (string) $cookie->{self::COOKIE_NAME};
+        $preference = json_decode($raw, true);
+        if (!is_array($preference)) {
+            return;
+        }
+        $preference['payment_handoff_consumed'] = 1;
+        $cartId = (int) ($preference['cart_id'] ?? 0);
+        $customerId = (int) ($preference['customer_id'] ?? 0);
+        $this->save($cookie, $preference, $cartId, $customerId);
     }
 
     /**

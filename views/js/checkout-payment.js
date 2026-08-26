@@ -423,7 +423,7 @@
             true,
         );
 
-        tryPreselectPayment(config);
+        tryPreselectPayment(handoffFrom(config));
         applyLocalScheme();
         if (
             Number(config.default_first_installment) > 0 ||
@@ -433,94 +433,138 @@
         }
     }
 
+    function handoffFrom(config) {
+        var globalHandoff =
+            (window.unipaymentCheckoutHandoff &&
+                typeof window.unipaymentCheckoutHandoff === "object" &&
+                window.unipaymentCheckoutHandoff) ||
+            null;
+        if (globalHandoff && globalHandoff.preselect_payment) {
+            return globalHandoff;
+        }
+        if (config && config.preselect_payment) {
+            return {
+                preselect_payment: true,
+                module_name: "unipayment",
+                default_scheme_key: config.default_scheme_key || "",
+                default_first_installment:
+                    config.default_first_installment || 0,
+            };
+        }
+        return null;
+    }
+
     /**
      * One-shot UniPayment radio selection for Product "Купи" handoff.
-     * Does not re-force after the customer manually picks another method.
-     * Works for Hummingbird 2.0 and Classic 3.1.1 payment option markup.
+     * Uses Classic + Hummingbird payment.tpl radios:
+     *   input[name="payment-option"][data-module-name="unipayment"]
+     * No MutationObserver loops — retries only on checkout lifecycle events.
      */
-    function tryPreselectPayment(config) {
+    function tryPreselectPayment(handoff) {
         if (
-            !config ||
-            !config.preselect_payment ||
+            !handoff ||
+            !handoff.preselect_payment ||
+            document.body.dataset.unipaymentPaymentPreselected === "1" ||
+            document.body.dataset.unipaymentPaymentPreselectAborted === "1"
+        ) {
+            return false;
+        }
+
+        var moduleName = handoff.module_name || "unipayment";
+        var paymentOption = document.querySelector(
+            'input[name="payment-option"][data-module-name="' +
+                moduleName +
+                '"]',
+        );
+        if (!paymentOption) {
+            return false;
+        }
+
+        if (!paymentOption.checked) {
+            paymentOption.click();
+            if (!paymentOption.checked) {
+                paymentOption.checked = true;
+                paymentOption.dispatchEvent(
+                    new Event("change", { bubbles: true }),
+                );
+                paymentOption.dispatchEvent(
+                    new Event("click", { bubbles: true }),
+                );
+            }
+        }
+
+        document.body.dataset.unipaymentPaymentPreselected = "1";
+        applyHandoffScheme(handoff);
+        return true;
+    }
+
+    function applyHandoffScheme(handoff) {
+        var key = handoff && handoff.default_scheme_key;
+        if (!key) return;
+        document
+            .querySelectorAll("[data-unipayment-checkout]")
+            .forEach(function (root) {
+                var select = root.querySelector("[data-unipayment-scheme]");
+                var first = root.querySelector("[data-unipayment-first]");
+                if (select) {
+                    var options = select.options || [];
+                    var found = false;
+                    for (var i = 0; i < options.length; i++) {
+                        if (options[i].value === key) {
+                            select.value = key;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) {
+                        select.dispatchEvent(
+                            new Event("change", { bubbles: true }),
+                        );
+                    }
+                }
+                if (
+                    first &&
+                    Number(handoff.default_first_installment) > 0 &&
+                    !first.readOnly
+                ) {
+                    first.value = String(
+                        Math.trunc(Number(handoff.default_first_installment)),
+                    );
+                }
+            });
+    }
+
+    var handoffRetryTimer = null;
+    var handoffRetryCount = 0;
+
+    function scheduleHandoffRetry() {
+        if (
             document.body.dataset.unipaymentPaymentPreselected === "1" ||
             document.body.dataset.unipaymentPaymentPreselectAborted === "1"
         ) {
             return;
         }
-
-        function paymentRadios() {
-            return document.querySelectorAll(
-                'input[name="payment-option"][data-module-name="unipayment"],' +
-                    'input[type="radio"][name="payment-option"][data-module-name="unipayment"]',
-            );
+        var handoff = handoffFrom(null);
+        if (!handoff) {
+            document
+                .querySelectorAll("[data-unipayment-checkout][data-config]")
+                .forEach(function (root) {
+                    if (!handoff) handoff = handoffFrom(parseConfig(root));
+                });
         }
-
-        function attempt() {
-            if (document.body.dataset.unipaymentPaymentPreselected === "1") {
-                return true;
-            }
-            var paymentOption = paymentRadios()[0];
-            if (!paymentOption) {
-                return false;
-            }
-            if (!paymentOption.checked) {
-                paymentOption.click();
-                if (
-                    typeof paymentOption.dispatchEvent === "function" &&
-                    !paymentOption.checked
-                ) {
-                    paymentOption.checked = true;
-                    paymentOption.dispatchEvent(
-                        new Event("change", { bubbles: true }),
-                    );
-                }
-            }
-            document.body.dataset.unipaymentPaymentPreselected = "1";
-            return true;
-        }
-
-        if (attempt()) {
-            return;
-        }
-
-        var tries = 0;
-        var timer = window.setInterval(function () {
-            tries += 1;
-            if (attempt() || tries >= 40) {
-                window.clearInterval(timer);
-                if (
-                    document.body.dataset.unipaymentPaymentPreselected !== "1"
-                ) {
-                    document.body.dataset.unipaymentPaymentPreselectAborted =
-                        "1";
-                }
-            }
-        }, 250);
-
-        if (typeof MutationObserver === "function") {
-            var observer = new MutationObserver(function () {
-                if (attempt()) {
-                    observer.disconnect();
-                }
-            });
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true,
-            });
-            window.setTimeout(function () {
-                observer.disconnect();
-            }, 12000);
-        }
+        if (!handoff) return;
+        if (tryPreselectPayment(handoff)) return;
+        if (handoffRetryCount >= 20) return;
+        if (handoffRetryTimer) window.clearTimeout(handoffRetryTimer);
+        handoffRetryCount += 1;
+        handoffRetryTimer = window.setTimeout(function () {
+            tryPreselectPayment(handoff);
+        }, 200);
     }
 
     function initialize() {
         document.querySelectorAll("[data-unipayment-checkout]").forEach(setup);
-        // Prefer server-rendered preselect flag from any mounted UniPayment form.
-        document
-            .querySelectorAll("[data-unipayment-checkout][data-config]")
-            .forEach(function (root) {
-                tryPreselectPayment(parseConfig(root));
-            });
+        scheduleHandoffRetry();
     }
 
     if (document.readyState === "loading") {
@@ -549,9 +593,7 @@
             ) {
                 return;
             }
-            if (document.body.dataset.unipaymentPaymentPreselected === "1") {
-                document.body.dataset.unipaymentPaymentPreselectAborted = "1";
-            }
+            document.body.dataset.unipaymentPaymentPreselectAborted = "1";
         },
         true,
     );

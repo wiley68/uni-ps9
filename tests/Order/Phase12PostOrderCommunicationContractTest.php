@@ -62,9 +62,11 @@ assertPhase12(
     'thank-you rows must use customer audience (no EGN)'
 );
 assertPhase12(
-    strpos($details, 'Control Panel order ID') !== false
-        && strpos($details, 'SmartUCF state') !== false,
-    'BO presenter must expose CP id and SmartUCF diagnostics'
+    strpos($details, 'appendOperationalDiagnostics') === false
+        && strpos($details, 'Control Panel order ID') === false
+        && strpos($details, 'SmartUCF state') === false
+        && strpos($details, "'Процес'") === false,
+    'BO presenter must not expose Process/CP/SmartUCF diagnostics'
 );
 assertPhase12(
     (bool) preg_match('/registerHook\s*\(\s*[\'"]displayPaymentReturn[\'"]\s*\)/', $module)
