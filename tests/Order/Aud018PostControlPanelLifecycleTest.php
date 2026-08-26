@@ -401,15 +401,15 @@ $resultJ = (new PostControlPanelLifecycleService($storeJ, new Aud018NoopMailDisp
 assertAud018($smartReplay->resumeCalls === 1 && $smartReplay->runCalls === 0, 'J: replay uses resume only');
 assertAud018($resultJ->emailSent() === false, 'J: replay skips leasing email');
 
-// Test K — checkout uses shared lifecycle; product/cart popup remain identity_accepted (Phase 7/8)
+// Test K — checkout + product/cart popup share post-CP lifecycle
 $productPopup = (string) file_get_contents($root . '/controllers/front/productpopup.php');
 $cartPopup = (string) file_get_contents($root . '/controllers/front/cartpopup.php');
 $checkout = (string) file_get_contents($root . '/controllers/front/validatecheckout.php');
 assertAud018(strpos($checkout, 'PostControlPanelLifecycleService') !== false, 'K: validatecheckout uses lifecycle service');
 assertAud018(strpos($checkout, 'SmartUcfSessionCoordinator') !== false, 'K: validatecheckout wires SmartUCF coordinator');
 assertAud018(strpos($checkout, 'applySmartUcfResultToResponse') === false, 'K: duplicated SmartUCF mapper removed');
-assertAud018(strpos($productPopup, 'PostControlPanelLifecycleService') === false, 'K: product popup stays pre-order identity');
-assertAud018(strpos($cartPopup, 'PostControlPanelLifecycleService') === false, 'K: cart popup stays pre-order identity');
+assertAud018(strpos($productPopup, 'PostControlPanelLifecycleService') !== false, 'K: product popup uses shared lifecycle');
+assertAud018(strpos($cartPopup, 'PostControlPanelLifecycleService') !== false, 'K: cart popup uses shared lifecycle');
 
 // Test O — trusted vs untrusted policy
 $policy = new SmartUcfEndpointPolicy();

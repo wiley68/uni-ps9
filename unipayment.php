@@ -160,14 +160,8 @@ class Unipayment extends PaymentModule
         $configurationSubmitted = $requestReader->isConfigurationSubmit();
         $refreshSubmitted = $requestReader->isBankRefreshSubmit();
 
-        if (array_key_exists('submitUnipaymentDownloadJournal', $_POST)) {
-            $output .= $this->displayWarning(
-                $this->trans(
-                    'Изтеглянето на журнал с операции ще бъде налично след имплементацията на SmartUCF диагностиката.',
-                    [],
-                    'Modules.Unipayment.Admin'
-                )
-            );
+        if (Tools::isSubmit('submitUnipaymentDownloadJournal')) {
+            $output .= $this->handleDebugJournalDownload($repository);
         }
 
         if ($configurationSubmitted) {
@@ -240,11 +234,8 @@ class Unipayment extends PaymentModule
             'unipayment_has_secret' => $repository->hasSecret(),
             'unipayment_secret_readable' => $repository->isSecretReadable(),
             'unipayment_bank_refresh_available' => true,
-            'unipayment_journal_available' => false,
-            'unipayment_cache_present' => is_array($cacheMetadata),
-            'unipayment_cache_is_fresh' => is_array($cacheMetadata) ? (bool) ($cacheMetadata['is_fresh'] ?? false) : false,
-            'unipayment_cache_fetched_at' => is_array($cacheMetadata) ? (string) ($cacheMetadata['fetched_at'] ?? '') : '',
-            'unipayment_cache_expires_at' => is_array($cacheMetadata) ? (string) ($cacheMetadata['expires_at'] ?? '') : '',
+            'unipayment_journal_available' => true,
+            'unipayment_admin_token' => Tools::getAdminTokenLite('AdminModules'),
         ]);
 
         return $output . $this->display(__FILE__, 'views/templates/admin/configuration.tpl');
@@ -409,6 +400,64 @@ class Unipayment extends PaymentModule
         return $this->displayConfirmation(
             $this->trans('Настройките са записани успешно.', [], 'Modules.Unipayment.Admin')
         );
+    }
+
+    private function handleDebugJournalDownload(
+        PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository $repository
+    ): string {
+        $employee = $this->context->employee;
+        $submittedToken = (string) Tools::getValue('token', '');
+        if (
+            !$employee instanceof Employee
+            || !Validate::isLoadedObject($employee)
+            || !hash_equals(Tools::getAdminTokenLite('AdminModules'), $submittedToken)
+        ) {
+            return $this->displayError(
+                $this->trans('Нямате право да изтеглите журнала с операции.', [], 'Modules.Unipayment.Admin')
+            );
+        }
+
+        $journal = new PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDiagnosticJournal(
+            $repository,
+            new PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository()
+        );
+        try {
+            $export = $journal->buildExport();
+            $idShop = (int) $this->context->shop->id;
+            $export['id_shop'] = $idShop;
+            $export['entries'] = array_values(array_filter(
+                is_array($export['entries'] ?? null) ? $export['entries'] : [],
+                static function (array $entry) use ($idShop): bool {
+                    $idOrder = (int) ($entry['ps_order_id'] ?? 0);
+                    if ($idOrder <= 0) {
+                        return true;
+                    }
+                    $order = new Order($idOrder);
+                    if (!Validate::isLoadedObject($order)) {
+                        return false;
+                    }
+
+                    return (int) $order->id_shop === $idShop;
+                }
+            ));
+            $export['total_entries'] = count($export['entries']);
+            $json = json_encode(
+                $export,
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException $exception) {
+            return $this->displayError(
+                $this->trans('Журналът с операции не може да бъде изтеглен.', [], 'Modules.Unipayment.Admin')
+            );
+        }
+
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="unipayment-smartucf-log-' . gmdate('Ymd-His') . '.json"');
+        header('Content-Length: ' . strlen($json));
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+        echo $json;
+        exit;
     }
 
     private function handleBankDataRefresh(): string
@@ -952,16 +1001,16 @@ class Unipayment extends PaymentModule
                 return [];
             }
             $currencyIso = (string) $currency->iso_code;
-            $fingerprint = (new PrestaShop\Module\Unipayment\Checkout\CartSnapshot())->fingerprint(
-                $cartContext,
-                $currencyIso
-            );
+            $snapshot = new PrestaShop\Module\Unipayment\Checkout\CartSnapshot();
+            $fingerprint = $snapshot->fingerprint($cartContext, $currencyIso);
+            $linesFingerprint = $snapshot->linesFingerprint($cartContext, $currencyIso);
             $preferenceStore = new PrestaShop\Module\Unipayment\Checkout\CheckoutPreferenceStore();
             $preference = $preferenceStore->load(
                 $this->context->cookie,
                 (int) $cart->id,
                 (int) $this->context->customer->id,
-                $fingerprint
+                $fingerprint,
+                $linesFingerprint
             );
             $view = (new PrestaShop\Module\Unipayment\Checkout\CheckoutPaymentPresenter(
                 $calculator,

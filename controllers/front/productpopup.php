@@ -4,21 +4,35 @@ declare(strict_types=1);
 
 use PrestaShop\Module\Unipayment\Calculator\Calculator;
 use PrestaShop\Module\Unipayment\Calculator\UnavailableSchemeException;
+use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
+use PrestaShop\Module\Unipayment\Order\ControlPanelOrderClientAdapter;
+use PrestaShop\Module\Unipayment\Order\ControlPanelOrderPayloadBuilder;
+use PrestaShop\Module\Unipayment\Order\FinancingSnapshotFactory;
+use PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository;
+use PrestaShop\Module\Unipayment\Order\NativePrestaShopOrderGateway;
+use PrestaShop\Module\Unipayment\Order\OrderAttemptRepository;
+use PrestaShop\Module\Unipayment\Order\OrderConfirmationUrlBuilder;
+use PrestaShop\Module\Unipayment\Order\OrderOrchestrationException;
+use PrestaShop\Module\Unipayment\Order\OrderOrchestrationResult;
+use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
+use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleContext;
+use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecyclePopupMapper;
+use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleService;
+use PrestaShop\Module\Unipayment\Order\PostOrderPopupFailureResponse;
+use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
+use PrestaShop\Module\Unipayment\Product\GuestCustomerFactory;
 use PrestaShop\Module\Unipayment\Product\PopupSubmissionBindingFactory;
 use PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository;
+use PrestaShop\Module\Unipayment\Product\PopupSubmissionStates;
 use PrestaShop\Module\Unipayment\Product\ProductContextFactory;
-use PrestaShop\Module\Unipayment\Product\ProductPopupApplyIdentityService;
+use PrestaShop\Module\Unipayment\Product\ProductPopupApplyService;
+use PrestaShop\Module\Unipayment\Product\ProductPopupCustomerValidator;
 use PrestaShop\Module\Unipayment\Product\ProductPopupCalculator;
 use PrestaShop\Module\Unipayment\Product\ProductPopupCheckoutPreselectionException;
 use PrestaShop\Module\Unipayment\Product\ProductPopupCheckoutPreselectionService;
-use PrestaShop\Module\Unipayment\Product\ProductPopupCustomerValidator;
-use PrestaShop\Module\Unipayment\Product\ProductPopupOperationGuard;
 use PrestaShop\Module\Unipayment\Product\ProductPopupValidationException;
+use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfSessionCoordinator;
 
-/**
- * Product popup endpoint: calculate, token issue, Step 2 identity, apply guard, preselect.
- * Order creation / SmartUCF / emails remain deferred.
- */
 final class UnipaymentProductPopupModuleFrontController extends ModuleFrontController
 {
     public $ajax = true;
@@ -89,8 +103,9 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                 );
             }
             if ($action === 'apply') {
-                return $this->handleApply($shop, $calculation, (int) $productId, (int) $attributeId, (int) $quantity);
+                return $this->handleApply($shop, $product, (int) $productId, (int) $attributeId, (int) $quantity);
             }
+
             if ($action === 'validate_step2') {
                 $requireEgn = ((int) ($shop['uni_proces'] ?? 0)) === 1;
                 $customer = (new ProductPopupCustomerValidator())->validate([
@@ -111,6 +126,7 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                     'customer' => $customer,
                 ];
             }
+
             if ($action === 'preselect') {
                 $preselection = (new ProductPopupCheckoutPreselectionService())->execute(
                     $calculation,
@@ -128,6 +144,7 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                     'checkout_url' => $preselection['checkout_url'],
                 ];
             }
+
             if ($action !== 'calculate') {
                 return $this->error(400, 'Невалидно действие на калкулатора.');
             }
@@ -145,7 +162,7 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
         } catch (UnavailableSchemeException $exception) {
             $this->logPopupSelectionFailure($exception);
 
-            return $this->error(422, 'The selected financing scheme is unavailable.');
+            return $this->error(422, 'The financing selection is unavailable.');
         } catch (ProductPopupCheckoutPreselectionException $exception) {
             PrestaShopLogger::addLog(
                 'UniPayment product popup preselect cart failed: ' . $this->sanitizeExceptionMessage($exception),
@@ -155,7 +172,7 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             return $this->error(422, $exception->customerMessage());
         } catch (Throwable $exception) {
             PrestaShopLogger::addLog(
-                'UniPayment product popup request failed: ' . get_class($exception),
+                'UniPayment product popup request failed: ' . get_class($exception) . ' ' . $this->sanitizeExceptionMessage($exception),
                 2
             );
             $this->logPopupSelectionFailure($exception);
@@ -201,10 +218,9 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
 
     /**
      * @param array<string, mixed> $shop
-     * @param array<string, mixed> $calculation
      * @return array<string, mixed>
      */
-    private function handleApply(array $shop, array $calculation, int $productId, int $attributeId, int $quantity): array
+    private function handleApply(array $shop, \PrestaShop\Module\Unipayment\Calculator\ProductContext $product, int $productId, int $attributeId, int $quantity): array
     {
         $posted = [
             'popup_offer_type' => Tools::getValue('popup_offer_type', ''),
@@ -221,7 +237,6 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             'email' => Tools::getValue('email', ''),
             'egn' => Tools::getValue('egn', ''),
             'phone2' => Tools::getValue('phone2', ''),
-            'id_address' => Tools::getValue('id_address', 0),
             'consent' => Tools::getValue('unipayment_consent', []),
         ];
 
@@ -239,32 +254,64 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             'first_installment' => $posted['first_installment'],
         ], $this->context);
 
-        $guard = new ProductPopupOperationGuard($submissions);
-        $gate = $guard->resolve(
-            $token,
-            $resolved['hash'],
-            (int) $this->context->shop->id,
-            $resolved['id_guest'],
-            $resolved['id_customer']
-        );
+        /** @var Unipayment $module */
+        $module = $this->module;
+        $cpApi = $module->getControlPanelClient();
+        $cpClient = new ControlPanelOrderClientAdapter($cpApi);
+
+        $gate = $this->resolvePopupSubmissionGate($submissions, $token, $resolved['hash'], $shop, $module, $cpClient);
         if (isset($gate['response'])) {
             return $gate['response'];
         }
 
         /** @var array<string, mixed> $submission */
         $submission = $gate['submission'];
+        $reuseCartId = (int) ($submission['id_cart'] ?? 0);
         $submissionId = (int) $submission['id_submission'];
 
-        try {
-            $accepted = (new ProductPopupApplyIdentityService())->accept($shop, $posted, $this->context);
-            $submissions->markIdentityAccepted($submissionId);
-            $row = $submissions->requireById($submissionId);
-            $response = $guard->identityAcceptedResponse($row, false);
-            $response['calculation'] = $calculation;
-            $response['customer'] = $accepted['customer'];
-            $response['identity'] = $accepted['identity'];
+        $orchestrator = new OrderOrchestrator(
+            new OrderAttemptRepository(),
+            new FinancingSnapshotRepository(),
+            new NativePrestaShopOrderGateway($module, $this->context),
+            $cpClient,
+            new FinancingSnapshotFactory(new SensitiveDataCipher()),
+            new ControlPanelOrderPayloadBuilder(),
+            new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository()
+        );
+        $service = new ProductPopupApplyService(
+            new Calculator(),
+            new ProductPopupCustomerValidator(),
+            new GuestCustomerFactory(),
+            $orchestrator,
+            new SensitiveDataCipher(),
+            null,
+            null,
+            null,
+            $submissions
+        );
 
-            return $response;
+        try {
+            $result = $service->apply(
+                $shop,
+                $posted,
+                $product,
+                $productId,
+                $attributeId,
+                $quantity,
+                $this->context,
+                $submissionId,
+                $reuseCartId
+            );
+
+            $submissions->markOrderCreated(
+                $submissionId,
+                $result->attemptId,
+                $result->idOrder,
+                $result->orderReference,
+                $result->controlPanelOrderId
+            );
+
+            return $this->buildApplySuccessResponse($shop, $module, $cpClient, $result, true);
         } catch (ProductPopupValidationException $exception) {
             $submissions->revertProcessingWithoutCart($submissionId);
             http_response_code(422);
@@ -275,9 +322,35 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                 'message' => $this->customerValidationMessage($errors),
                 'errors' => $errors,
             ];
+        } catch (UnavailableSchemeException $exception) {
+            $submissions->revertProcessingWithoutCart($submissionId);
+            http_response_code(422);
+            $this->logPopupSelectionFailure($exception);
+
+            return ['success' => false, 'message' => 'The financing selection is unavailable.'];
+        } catch (OrderOrchestrationException $exception) {
+            PrestaShopLogger::addLog('UniPayment popup apply orchestration failed: ' . get_class($exception), 2);
+            if ($exception->isPostOrder()) {
+                $submissions->markOrderCreated(
+                    $submissionId,
+                    $exception->attemptId(),
+                    $exception->idOrder(),
+                    $exception->orderReference(),
+                    0
+                );
+
+                return PostOrderPopupFailureResponse::fromException($exception);
+            }
+            if ($exception->isRetryable()) {
+                return $this->processingResponse($token);
+            }
+            $submissions->markFailed($submissionId);
+            http_response_code(500);
+
+            return ['success' => false, 'message' => 'The financing request could not be processed. Please try again.'];
         } catch (Throwable $exception) {
             PrestaShopLogger::addLog(
-                'UniPayment popup apply identity failed: ' . get_class($exception),
+                'UniPayment popup apply failed: ' . get_class($exception) . ' ' . $this->sanitizeExceptionMessage($exception),
                 2
             );
             $this->logPopupSelectionFailure($exception);
@@ -297,20 +370,268 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
     }
 
     /**
-     * @param array<string, string> $errors
+     * @param array<string, mixed> $shop
+     * @return array{response?: array<string, mixed>, submission?: array<string, mixed>}
      */
-    private function customerValidationMessage(array $errors): string
-    {
-        if (isset($errors['consents']) && $errors['consents'] !== '') {
-            return $errors['consents'];
+    private function resolvePopupSubmissionGate(
+        PopupSubmissionRepository $submissions,
+        string $token,
+        string $selectionHash,
+        array $shop,
+        Unipayment $module,
+        ControlPanelOrderClientAdapter $cpClient
+    ): array {
+        if ($token === '') {
+            http_response_code(400);
+
+            return ['response' => ['success' => false, 'message' => 'Missing popup submission token.']];
         }
-        foreach ($errors as $message) {
-            if (is_string($message) && $message !== '') {
-                return $message;
+
+        $row = $submissions->findByToken($token);
+        if ($row === null) {
+            http_response_code(400);
+
+            return ['response' => ['success' => false, 'message' => 'Invalid popup submission token.']];
+        }
+
+        if (!hash_equals((string) $row['selection_hash'], $selectionHash)) {
+            http_response_code(409);
+
+            return [
+                'response' => [
+                    'success' => false,
+                    'message' => 'The financing selection changed. Please continue from Step 1.',
+                    'selection_changed' => true,
+                ],
+            ];
+        }
+
+        $state = (string) $row['state'];
+        if ($state === PopupSubmissionStates::ORDER_CREATED && (int) ($row['id_order'] ?? 0) > 0) {
+            return [
+                'response' => $this->existingOrderResponse($row, $shop, $module, $cpClient),
+            ];
+        }
+
+        if ($state === PopupSubmissionStates::FAILED) {
+            http_response_code(409);
+
+            return [
+                'response' => [
+                    'success' => false,
+                    'message' => 'This financing submission can no longer be used. Please start again.',
+                ],
+            ];
+        }
+
+        if ($state === PopupSubmissionStates::PROCESSING) {
+            $idCart = (int) ($row['id_cart'] ?? 0);
+            if ($idCart <= 0) {
+                return ['response' => $this->processingResponse($token)];
+            }
+
+            return ['submission' => $row];
+        }
+
+        if ($state === PopupSubmissionStates::ISSUED) {
+            if ($submissions->isExpired($row)) {
+                http_response_code(409);
+
+                return [
+                    'response' => [
+                        'success' => false,
+                        'message' => 'The popup submission token expired. Please continue from Step 1.',
+                    ],
+                ];
+            }
+
+            $claimed = $submissions->claimForProcessing($token);
+            if ($claimed !== null) {
+                return ['submission' => $claimed];
+            }
+
+            $latest = $submissions->findByToken($token);
+            if (is_array($latest) && (string) $latest['state'] === PopupSubmissionStates::ORDER_CREATED) {
+                return ['response' => $this->existingOrderResponse($latest, $shop, $module, $cpClient)];
+            }
+            if (is_array($latest) && (string) $latest['state'] === PopupSubmissionStates::PROCESSING) {
+                if ((int) ($latest['id_cart'] ?? 0) > 0) {
+                    return ['submission' => $latest];
+                }
+
+                return ['response' => $this->processingResponse($token)];
+            }
+
+            return ['response' => $this->processingResponse($token)];
+        }
+
+        http_response_code(409);
+
+        return [
+            'response' => [
+                'success' => false,
+                'message' => 'The popup submission is in an unknown state.',
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $shop
+     * @return array<string, mixed>
+     */
+    private function existingOrderResponse(
+        array $row,
+        array $shop,
+        Unipayment $module,
+        ControlPanelOrderClientAdapter $cpClient
+    ): array {
+        $response = [
+            'success' => true,
+            'step' => 'order_created',
+            'replay' => true,
+            'popup_submission_token' => (string) $row['submission_token'],
+            'order' => [
+                'id_order' => (int) $row['id_order'],
+                'order_reference' => (string) $row['order_reference'],
+                'control_panel_order_id' => (int) ($row['control_panel_order_id'] ?? 0),
+                'id_attempt' => (int) ($row['id_attempt'] ?? 0),
+            ],
+        ];
+
+        if ((int) ($row['control_panel_order_id'] ?? 0) <= 0 && (int) ($row['id_order'] ?? 0) > 0) {
+            return PostOrderPopupFailureResponse::fromPersistedOrder(
+                (int) $row['id_order'],
+                (string) $row['order_reference']
+            );
+        }
+
+        $attemptId = (int) ($row['id_attempt'] ?? 0);
+        if ($attemptId <= 0) {
+            return $response;
+        }
+
+        $lifecycle = $this->runPostControlPanelLifecycle(
+            new OrderOrchestrationResult(
+                $attemptId,
+                'cp_created',
+                (int) $row['id_order'],
+                (string) $row['order_reference'],
+                (int) ($row['control_panel_order_id'] ?? 0)
+            ),
+            $shop,
+            $module,
+            $cpClient,
+            true
+        );
+        if (ShopConfigurationFlags::isProcess2($shop)) {
+            $response['redirect_url'] = (new OrderConfirmationUrlBuilder())->build(
+                $this->context,
+                $module,
+                (int) $row['id_order']
+            );
+        }
+        PostControlPanelLifecyclePopupMapper::apply($response, $lifecycle);
+
+        return $response;
+    }
+
+    /** @return array<string, mixed> */
+    private function processingResponse(string $token): array
+    {
+        return [
+            'success' => true,
+            'step' => 'processing',
+            'popup_submission_token' => $token,
+            'message' => SmartUcfSessionCoordinator::CUSTOMER_PROCESSING,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $shop
+     * @return array<string, mixed>
+     */
+    private function buildApplySuccessResponse(
+        array $shop,
+        Unipayment $module,
+        ControlPanelOrderClientAdapter $cpClient,
+        \PrestaShop\Module\Unipayment\Order\OrderOrchestrationResult $result,
+        bool $runPostOrderSteps
+    ): array {
+        $response = [
+            'success' => true,
+            'step' => 'order_created',
+            'order' => [
+                'id_order' => $result->idOrder,
+                'order_reference' => $result->orderReference,
+                'control_panel_order_id' => $result->controlPanelOrderId,
+            ],
+        ];
+
+        if (!$runPostOrderSteps) {
+            return $response;
+        }
+
+        $lifecycle = $this->runPostControlPanelLifecycle($result, $shop, $module, $cpClient, false);
+        if (ShopConfigurationFlags::isProcess2($shop)) {
+            $response['redirect_url'] = (new OrderConfirmationUrlBuilder())->build(
+                $this->context,
+                $module,
+                $result->idOrder
+            );
+        }
+        PostControlPanelLifecyclePopupMapper::apply($response, $lifecycle);
+
+        if ($this->isDebugResponseEnabled()) {
+            if (!empty($response['smartucf_error'])) {
+                $response['debug_smartucf_error'] = $response['smartucf_error'];
+            }
+            if (!empty($response['email_error'])) {
+                $response['debug_email_error'] = $response['email_error'];
             }
         }
 
-        return 'Данните не могат да бъдат валидирани.';
+        return $response;
+    }
+
+    /**
+     * @param array<string, mixed> $shop
+     */
+    private function runPostControlPanelLifecycle(
+        OrderOrchestrationResult $result,
+        array $shop,
+        Unipayment $module,
+        ControlPanelOrderClientAdapter $cpClient,
+        bool $replayExistingOrder
+    ): \PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleResult {
+        return (new PostControlPanelLifecycleService())->handle(
+            $result,
+            $shop,
+            new PostControlPanelLifecycleContext(
+                (int) $this->context->shop->id,
+                (string) $this->context->currency->iso_code,
+                $replayExistingOrder,
+                !$replayExistingOrder
+            ),
+            $this->createSmartUcfCoordinator($module, $cpClient)
+        );
+    }
+
+    private function createSmartUcfCoordinator(
+        Unipayment $module,
+        ControlPanelOrderClientAdapter $cpClient
+    ): SmartUcfSessionCoordinator {
+        return new SmartUcfSessionCoordinator(
+            null,
+            null,
+            null,
+            null,
+            null,
+            $cpClient,
+            $module,
+            $this->context,
+            $module->getControlPanelClient()
+        );
     }
 
     private function logPopupSelectionFailure(\Throwable $exception): void
@@ -347,9 +668,38 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                     ),
                 1
             );
-        } catch (Throwable $ignored) {
+            $journal = new \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDiagnosticJournal(
+                $configuration,
+                new \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository()
+            );
+            $journal->record(
+                0,
+                'popup-selection',
+                422,
+                $payload,
+                ['source' => 'productpopup', 'error' => $safeMessage],
+                $safeMessage
+            );
+        } catch (\Throwable $ignored) {
             unset($ignored);
         }
+    }
+
+    /**
+     * @param array<string, string> $errors
+     */
+    private function customerValidationMessage(array $errors): string
+    {
+        if (isset($errors['consents']) && $errors['consents'] !== '') {
+            return $errors['consents'];
+        }
+        foreach ($errors as $message) {
+            if (is_string($message) && $message !== '') {
+                return $message;
+            }
+        }
+
+        return 'Данните не могат да бъдат валидирани.';
     }
 
     private function sanitizeExceptionMessage(\Throwable $exception): string
@@ -361,9 +711,41 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             '$1=[redacted]',
             $message
         ) ?? $message;
-        $message = preg_replace('/\b\d{10}\b/', '[redacted-id]', $message) ?? $message;
 
         return mb_substr($message, 0, 500);
+    }
+
+    private function logPopupPostOrderFailure(int $idOrder, string $orderReference, \Throwable $exception, string $source = 'post-order', $request = null): void
+    {
+        try {
+            $configuration = new \PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
+            $journal = new \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDiagnosticJournal(
+                $configuration,
+                new \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository()
+            );
+            $journal->record(
+                $idOrder,
+                $orderReference,
+                500,
+                $request ?? ['source' => 'productpopup-' . $source],
+                ['exception' => get_class($exception), 'message' => $exception->getMessage()],
+                $exception->getMessage()
+            );
+        } catch (\Throwable $ignored) {
+            PrestaShopLogger::addLog(
+                'UniPayment popup debug journal write failed: ' . $ignored->getMessage(),
+                2
+            );
+        }
+    }
+
+    private function isDebugResponseEnabled(): bool
+    {
+        try {
+            return (new \PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository())->isDebugEnabled();
+        } catch (\Throwable $exception) {
+            return false;
+        }
     }
 
     /** @return array{success:bool,message:string} */

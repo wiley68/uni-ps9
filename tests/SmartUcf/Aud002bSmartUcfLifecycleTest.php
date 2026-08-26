@@ -123,8 +123,9 @@ assertAud002b(strpos($client, 'KIND_TRANSPORT') !== false, 'client marks transpo
 assertAud002b(strpos($client, 'KIND_PRE_SEND') !== false, 'client marks pre-send failures');
 
 $popup = (string) file_get_contents($root . '/controllers/front/productpopup.php');
-assertAud002b(strpos($popup, 'SmartUcfSessionCoordinator') === false, 'product popup does not run SmartUCF in Phase 11');
-assertAud002b(strpos($popup, 'markIdentityAccepted') !== false, 'product popup remains identity boundary');
+assertAud002b(strpos($popup, 'SmartUcfSessionCoordinator') !== false, 'product popup runs SmartUCF via shared lifecycle');
+assertAud002b(strpos($popup, 'markOrderCreated') !== false, 'product popup completes order_created');
+assertAud002b(strpos($popup, 'PostControlPanelLifecycleService') !== false, 'product popup uses post-CP lifecycle');
 
 $checkout = (string) file_get_contents($root . '/controllers/front/validatecheckout.php');
 assertAud002b(strpos($checkout, 'SmartUcfSessionCoordinator') !== false, 'checkout wires SmartUCF coordinator');

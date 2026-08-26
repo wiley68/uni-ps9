@@ -49,19 +49,24 @@ assertAdminConfiguration(
     'bank refresh must be available'
 );
 assertAdminConfiguration(
-    strpos($template, 'disabled="disabled"') !== false
-        && strpos($template, 'submitUnipaymentDownloadJournal') !== false,
-    'journal download remains deferred'
+    strpos($template, 'name="submitUnipaymentDownloadJournal"') !== false
+        && !preg_match('/name="submitUnipaymentDownloadJournal"[^>]*disabled/', $template)
+        && strpos($module, 'handleDebugJournalDownload') !== false,
+    'journal download must be active'
 );
 
 assertAdminConfiguration(strpos($module, 'ShopConfigurationService') !== false, 'ShopConfigurationService required');
 assertAdminConfiguration(strpos($module, 'ShopConfigurationCache') !== false, 'ShopConfigurationCache required');
 assertAdminConfiguration(strpos($module, 'createShopConfigurationService') !== false, 'service factory missing');
 assertAdminConfiguration(
-    strpos($module, 'SmartUcfDiagnosticJournal') === false
-        && strpos($template, 'unipayment_journal_available') !== false
-        && (bool) preg_match('/unipayment_journal_available[\'"]\s*=>\s*false/', $module),
-    'BO journal download remains deferred in Phase 4'
+    strpos($module, 'SmartUcfDiagnosticJournal') !== false
+        && strpos($template, 'unipayment_admin_token') !== false
+        && (bool) preg_match('/unipayment_journal_available[\'"]\s*=>\s*true/', $module),
+    'BO journal download must be wired with CSRF token'
+);
+assertAdminConfiguration(
+    strpos($template, 'Локален кеш на конфигурацията') === false,
+    'BO must not expose local cache status section'
 );
 $frontFiles = array_values(array_diff(scandir($root . '/controllers/front') ?: [], ['.', '..', 'index.php']));
 sort($frontFiles);

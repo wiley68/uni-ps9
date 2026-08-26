@@ -31,6 +31,8 @@ assertCheckoutUi(strpos($js, 'updatedDeliveryForm') !== false, 'Hummingbird deli
 assertCheckoutUi(strpos($js, 'changedCheckoutStep') !== false, 'checkout step change reinit');
 assertCheckoutUi(strpos($js, 'updatedCart') !== false, 'cart/voucher update reinit');
 assertCheckoutUi(strpos($js, 'dataset.unipaymentReady') !== false, 'idempotent setup');
+assertCheckoutUi(strpos($js, 'tryPreselectPayment') !== false, 'Product Купи payment preselect helper');
+assertCheckoutUi(strpos($js, 'unipaymentPaymentPreselectAborted') !== false, 'manual payment switch must abort reselection');
 assertCheckoutUi(strpos($js, 'data-module-name="unipayment"') !== false, 'only validate when UniPayment selected');
 assertCheckoutUi(strpos($css, '.unipayment-checkout') !== false, 'namespaced CSS');
 assertCheckoutUi(strpos($module, 'checkout-payment.js') !== false, 'checkout assets registered');

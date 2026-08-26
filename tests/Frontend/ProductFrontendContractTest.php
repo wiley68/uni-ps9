@@ -103,8 +103,9 @@ assertProductFrontend(
     strpos($popupController, "REQUEST_METHOD'] !== 'POST'") !== false
         && strpos($popupController, 'hash_equals') !== false
         && strpos($popupController, 'issue_submission_token') !== false
-        && strpos($popupController, 'ProductPopupOperationGuard') !== false,
-    'productpopup must be POST+token with Phase 7 identity actions'
+        && strpos($popupController, 'claimForProcessing') !== false
+        && strpos($popupController, 'OrderOrchestrator') !== false,
+    'productpopup must be POST+token with durable order apply'
 );
 assertProductFrontend(
     is_file($root . '/src/Product/PopupSubmissionRepository.php'),
@@ -113,8 +114,8 @@ assertProductFrontend(
 assertProductFrontend(
     strpos($js, 'unipaymentInvalidatePopup') !== false
         && strpos($js, 'preselectOperationToken = ""') !== false
-        && strpos($js, 'identity_accepted') !== false,
-    'JS must reset stale popup identity and handle identity_accepted'
+        && strpos($js, 'redirect_url') !== false,
+    'JS must reset stale popup identity and follow redirect outcomes'
 );
 
 fwrite(STDOUT, "OK (Phase 7 product frontend contract)\n");

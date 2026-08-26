@@ -211,7 +211,7 @@ assertAud003(strpos($lifecycleSrc, 'isTrustedApplicationRedirect') !== false, 'c
 $checkout = (string) file_get_contents($root . '/controllers/front/validatecheckout.php');
 assertAud003(strpos($checkout, 'PostControlPanelLifecycleService') !== false, 'validatecheckout uses shared lifecycle');
 $popup = (string) file_get_contents($root . '/controllers/front/productpopup.php');
-assertAud003(strpos($popup, 'PostControlPanelLifecycleService') === false, 'product popup stays identity_accepted in Phase 11');
+assertAud003(strpos($popup, 'PostControlPanelLifecycleService') !== false, 'product popup uses shared post-CP lifecycle');
 
 // 18 legitimate happy-path URL wiring unchanged in shape
 assertAud003(

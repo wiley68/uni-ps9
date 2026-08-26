@@ -71,17 +71,17 @@ assertAud002aContract(
 );
 
 assertAud002aContract(strpos($controller, 'issue_submission_token') !== false, 'controller must issue submission tokens');
-assertAud002aContract(strpos($controller, 'ProductPopupOperationGuard') !== false, 'apply must gate on operation guard');
-assertAud002aContract(strpos($controller, 'markIdentityAccepted') !== false, 'Phase 7 apply accepts identity without order');
-assertAud002aContract(strpos($controller, 'OrderOrchestrator') === false, 'Phase 7 must not create orders');
-assertAud002aContract(strpos($controller, 'SmartUcfSessionCoordinator') === false, 'Phase 7 must not run SmartUCF');
+assertAud002aContract(strpos($controller, 'claimForProcessing') !== false, 'apply must claim submission for processing');
+assertAud002aContract(strpos($controller, 'markOrderCreated') !== false, 'apply completes with order_created');
+assertAud002aContract(strpos($controller, 'OrderOrchestrator') !== false, 'popup must create durable orders');
+assertAud002aContract(strpos($controller, 'SmartUcfSessionCoordinator') !== false, 'popup may run SmartUCF after CP');
 assertAud002aContract(strpos($controller, 'revertProcessingWithoutCart') !== false, 'validation failure without cart must revert');
 assertAud002aContract(strpos($controller, 'selection_changed') !== false || strpos($guard, 'selection_changed') !== false, 'changed binding must be rejected');
 
 assertAud002aContract(strpos($js, 'issue_submission_token') !== false, 'JS must request submission token');
 assertAud002aContract(strpos($js, 'popup_submission_token') !== false, 'JS must send submission token on apply');
 assertAud002aContract(strpos($js, 'body.step === "processing"') !== false, 'JS must handle processing without generic error');
-assertAud002aContract(strpos($js, 'body.step === "identity_accepted"') !== false, 'JS must handle Phase 7 identity accepted');
+assertAud002aContract(strpos($js, 'body.redirect_url') !== false, 'JS must follow order redirect outcomes');
 assertAud002aContract(strpos($js, 'isCartSource') !== false && strpos($js, 'issue_submission_token') !== false, 'shared popup JS supports cart source and submission tokens');
 assertAud002aContract(strpos($js, 'preselectOperationToken = ""') !== false, 'stale popup must clear preselect token');
 
@@ -90,8 +90,4 @@ assertAud002aContract(strpos($guest, 'createGuestCustomer') !== false, 'AUD-001 
 assertAud002aContract((bool) preg_match('/json_encode\(\$canonical/', $hash), 'selection_hash must use structured JSON canonicalization');
 assertAud002aContract(strpos($hash, 'FLOW_CART_POPUP') !== false, 'selection hash must isolate cart_popup flow');
 
-assertAud002aContract(strpos($module, 'unipayment_checkout_lock') === false, 'no checkout lock table');
-assertAud002aContract(strpos($module, 'unipayment_order_attempt') === false, 'no order attempt table');
-assertAud002aContract(strpos($module, 'unipayment_financing_snapshot') === false, 'no financing snapshot table');
-
-fwrite(STDOUT, "OK (AUD-002A Phase 7/8 static contract)\n");
+fwrite(STDOUT, "OK (AUD-002A popup submission + full-order contract)\n");

@@ -38,9 +38,11 @@ assertCartPopupContract(strpos($module, 'product-calculator.js') !== false && st
 assertCartPopupContract(strpos($jsProduct, 'isCartSource') !== false, 'product popup JS must detect cart source');
 assertCartPopupContract(strpos($jsProduct, 'issue_submission_token') !== false, 'cart/product popup JS must issue submission tokens');
 assertCartPopupContract(strpos($controller, 'PopupSubmissionRepository') !== false, 'cartpopup must reuse Phase 7 submission repository');
-assertCartPopupContract(strpos($controller, 'ProductPopupOperationGuard') !== false, 'cartpopup must reuse Phase 7 operation guard');
-assertCartPopupContract(strpos($controller, 'markIdentityAccepted') !== false, 'cart apply must stop at identity_accepted');
-assertCartPopupContract(strpos($controller, 'validateOrder') === false && strpos($controller, 'OrderOrchestrator') === false, 'cartpopup must not create orders in Phase 8');
+assertCartPopupContract(strpos($controller, 'claimForProcessing') !== false, 'cartpopup must claim submission for processing');
+assertCartPopupContract(strpos($controller, 'markOrderCreated') !== false, 'cart apply must reach order_created');
+assertCartPopupContract(strpos($controller, 'OrderOrchestrator') !== false, 'cartpopup must create durable orders via orchestrator');
+assertCartPopupContract(strpos($controller, 'CartPopupApplyService') !== false, 'cartpopup must use CartPopupApplyService');
+assertCartPopupContract(strpos($controller, 'PostControlPanelLifecycleService') !== false, 'cartpopup must run post-CP lifecycle');
 assertCartPopupContract(strpos($controller, 'fromCartSelection') !== false, 'cartpopup must bind cart selection hash');
 assertCartPopupContract(strpos($hash, 'FLOW_CART_POPUP') !== false, 'selection hash must support cart_popup flow');
 assertCartPopupContract(strpos($binding, 'fromCartSelection') !== false, 'binding factory must expose cart selection');
@@ -48,4 +50,4 @@ assertCartPopupContract(strpos($jsCart, 'updatedCart') !== false, 'cart refresh 
 assertCartPopupContract(strpos($jsCart, 'AbortController') !== false, 'cart refresh must abort stale requests');
 assertCartPopupContract(!preg_match('/\$\s*\(|\bjQuery\b/', $jsCart), 'cart JS must not depend on jQuery');
 
-fwrite(STDOUT, "OK (Phase 8 cart popup contract)\n");
+fwrite(STDOUT, "OK (cart popup full-order contract)\n");

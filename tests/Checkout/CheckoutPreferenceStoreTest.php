@@ -55,9 +55,7 @@ final class FakeCheckoutCookie
         unset($this->data[$name]);
     }
 
-    public function write(): void
-    {
-    }
+    public function write(): void {}
 }
 
 /** @param array<string, mixed> $fields */
@@ -199,8 +197,31 @@ assertCheckoutPreferenceStore(
     'Phase 9 product preselect preference must include cart_fingerprint'
 );
 assertCheckoutPreferenceStore(
+    strpos($preselect, 'lines_fingerprint') !== false,
+    'product preselect preference must include lines_fingerprint for Купи handoff rebind'
+);
+assertCheckoutPreferenceStore(
     strpos($preselect, 'CartSnapshot') !== false && strpos($preselect, 'createForCheckout') !== false,
     'product preselect must compute fingerprint from authoritative checkout cart'
+);
+
+// Product "Купи" one-time rebind when carrier evolves but lines identity matches.
+$fpFull = str_repeat('a', 64);
+$fpFull2 = str_repeat('b', 64);
+$fpLines = str_repeat('c', 64);
+$handoff = $preference;
+$handoff['cart_fingerprint'] = $fpFull;
+$handoff['lines_fingerprint'] = $fpLines;
+$handoff['flow'] = 'product_preselect';
+$cookieHandoff = new FakeCheckoutCookie();
+$store->save($cookieHandoff, $handoff, 91001, 0);
+$rebound = $store->load($cookieHandoff, 91001, 0, $fpFull2, $fpLines);
+assertCheckoutPreferenceStore(is_array($rebound), 'product handoff may rebind full fingerprint once');
+assertCheckoutPreferenceStore(($rebound['cart_fingerprint'] ?? '') === $fpFull2, 'rebind updates cart_fingerprint');
+assertCheckoutPreferenceStore(!empty($rebound['checkout_fingerprint_bound']), 'rebind sets checkout_fingerprint_bound');
+assertCheckoutPreferenceStore(
+    $store->load($cookieHandoff, 91001, 0, str_repeat('e', 64), $fpLines) === null,
+    'after bind, further fingerprint drift must reject'
 );
 
 // Current checkoutcalculate also writes fingerprint.

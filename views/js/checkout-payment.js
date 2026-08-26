@@ -226,7 +226,10 @@
                     });
                 })
                 .catch(function (error) {
-                    if (error.name === "AbortError" || error.message === "stale")
+                    if (
+                        error.name === "AbortError" ||
+                        error.message === "stale"
+                    )
                         throw error;
                     showError(
                         t(
@@ -420,18 +423,7 @@
             true,
         );
 
-        if (
-            config.preselect_payment &&
-            document.body.dataset.unipaymentPaymentPreselected !== "1"
-        ) {
-            var paymentOption = document.querySelector(
-                'input[name="payment-option"][data-module-name="unipayment"]',
-            );
-            if (paymentOption && !paymentOption.checked) paymentOption.click();
-            if (paymentOption)
-                document.body.dataset.unipaymentPaymentPreselected = "1";
-        }
-
+        tryPreselectPayment(config);
         applyLocalScheme();
         if (
             Number(config.default_first_installment) > 0 ||
@@ -441,8 +433,94 @@
         }
     }
 
+    /**
+     * One-shot UniPayment radio selection for Product "Купи" handoff.
+     * Does not re-force after the customer manually picks another method.
+     * Works for Hummingbird 2.0 and Classic 3.1.1 payment option markup.
+     */
+    function tryPreselectPayment(config) {
+        if (
+            !config ||
+            !config.preselect_payment ||
+            document.body.dataset.unipaymentPaymentPreselected === "1" ||
+            document.body.dataset.unipaymentPaymentPreselectAborted === "1"
+        ) {
+            return;
+        }
+
+        function paymentRadios() {
+            return document.querySelectorAll(
+                'input[name="payment-option"][data-module-name="unipayment"],' +
+                    'input[type="radio"][name="payment-option"][data-module-name="unipayment"]',
+            );
+        }
+
+        function attempt() {
+            if (document.body.dataset.unipaymentPaymentPreselected === "1") {
+                return true;
+            }
+            var paymentOption = paymentRadios()[0];
+            if (!paymentOption) {
+                return false;
+            }
+            if (!paymentOption.checked) {
+                paymentOption.click();
+                if (
+                    typeof paymentOption.dispatchEvent === "function" &&
+                    !paymentOption.checked
+                ) {
+                    paymentOption.checked = true;
+                    paymentOption.dispatchEvent(
+                        new Event("change", { bubbles: true }),
+                    );
+                }
+            }
+            document.body.dataset.unipaymentPaymentPreselected = "1";
+            return true;
+        }
+
+        if (attempt()) {
+            return;
+        }
+
+        var tries = 0;
+        var timer = window.setInterval(function () {
+            tries += 1;
+            if (attempt() || tries >= 40) {
+                window.clearInterval(timer);
+                if (
+                    document.body.dataset.unipaymentPaymentPreselected !== "1"
+                ) {
+                    document.body.dataset.unipaymentPaymentPreselectAborted =
+                        "1";
+                }
+            }
+        }, 250);
+
+        if (typeof MutationObserver === "function") {
+            var observer = new MutationObserver(function () {
+                if (attempt()) {
+                    observer.disconnect();
+                }
+            });
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+            });
+            window.setTimeout(function () {
+                observer.disconnect();
+            }, 12000);
+        }
+    }
+
     function initialize() {
         document.querySelectorAll("[data-unipayment-checkout]").forEach(setup);
+        // Prefer server-rendered preselect flag from any mounted UniPayment form.
+        document
+            .querySelectorAll("[data-unipayment-checkout][data-config]")
+            .forEach(function (root) {
+                tryPreselectPayment(parseConfig(root));
+            });
     }
 
     if (document.readyState === "loading") {
@@ -458,4 +536,23 @@
         // Voucher/cart mutations on checkout trigger updatedCart after AJAX refresh.
         window.prestashop.on("updatedCart", initialize);
     }
+
+    // If the customer manually chooses another payment method after handoff, never force UniCredit again.
+    document.addEventListener(
+        "change",
+        function (event) {
+            var target = event.target;
+            if (
+                !target ||
+                target.name !== "payment-option" ||
+                target.getAttribute("data-module-name") === "unipayment"
+            ) {
+                return;
+            }
+            if (document.body.dataset.unipaymentPaymentPreselected === "1") {
+                document.body.dataset.unipaymentPaymentPreselectAborted = "1";
+            }
+        },
+        true,
+    );
 })();

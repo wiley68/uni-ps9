@@ -72,26 +72,6 @@
       </div>
     </div>
 
-    <div class="form-group">
-      <label class="control-label col-lg-3">{l s='Локален кеш на конфигурацията' d='Modules.Unipayment.Admin'}</label>
-      <div class="col-lg-9">
-        {if $unipayment_cache_present}
-          <p class="help-block">
-            {l s='Кешът е наличен.' d='Modules.Unipayment.Admin'}
-            {if $unipayment_cache_is_fresh}{l s='Състояние: свеж.' d='Modules.Unipayment.Admin'}{else}{l s='Състояние: изтекъл.' d='Modules.Unipayment.Admin'}{/if}
-          </p>
-          {if $unipayment_cache_fetched_at !== ''}
-            <p class="help-block">{l s='Последно обновяване:' d='Modules.Unipayment.Admin'} {$unipayment_cache_fetched_at|escape:'htmlall':'UTF-8'} UTC</p>
-          {/if}
-          {if $unipayment_cache_expires_at !== ''}
-            <p class="help-block">{l s='Валиден до:' d='Modules.Unipayment.Admin'} {$unipayment_cache_expires_at|escape:'htmlall':'UTF-8'} UTC</p>
-          {/if}
-        {else}
-          <p class="help-block">{l s='Все още няма локален кеш. Използвайте „Обнови данните от банката“.' d='Modules.Unipayment.Admin'}</p>
-        {/if}
-      </div>
-    </div>
-
     {* Submit must live inside the settings form so password/UNICID fields always post with Save.
        Do not rely on the HTML5 form= attribute alone for credential fields. *}
     <div class="panel-footer" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -107,9 +87,9 @@
     {else}
       <button type="button" name="submitUnipaymentRefresh" class="btn btn-default" disabled="disabled"><i class="icon-refresh"></i> {l s='Обнови данните от банката' d='Modules.Unipayment.Admin'}</button>
     {/if}
-    <button type="button" name="submitUnipaymentDownloadJournal" class="btn btn-default" disabled="disabled" title="{l s='Ще бъде налично след SmartUCF диагностиката.' d='Modules.Unipayment.Admin'}"><i class="icon-download"></i> {l s='Изтегли журнал операции' d='Modules.Unipayment.Admin'}</button>
+    <form action="{$unipayment_form_action|escape:'htmlall':'UTF-8'}" method="post" style="margin:0;">
+      <input type="hidden" name="token" value="{$unipayment_admin_token|escape:'htmlall':'UTF-8'}">
+      <button type="submit" name="submitUnipaymentDownloadJournal" class="btn btn-default"><i class="icon-download"></i> {l s='Изтегли журнал операции' d='Modules.Unipayment.Admin'}</button>
+    </form>
   </div>
-  {if !$unipayment_journal_available}
-    <p class="help-block" style="margin-top:10px;">{l s='„Изтегли журнал операции“ остава деактивирано до SmartUCF диагностиката. CP push (shop-cache inbound) е Phase 4.' d='Modules.Unipayment.Admin'}</p>
-  {/if}
 </div>
