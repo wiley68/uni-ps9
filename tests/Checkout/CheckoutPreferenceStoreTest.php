@@ -226,9 +226,13 @@ $rebound = $store->load($cookieHandoff, 91001, 0, $fpFull2, $fpLines);
 assertCheckoutPreferenceStore(is_array($rebound), 'product handoff may rebind full fingerprint once');
 assertCheckoutPreferenceStore(($rebound['cart_fingerprint'] ?? '') === $fpFull2, 'rebind updates cart_fingerprint');
 assertCheckoutPreferenceStore(!empty($rebound['checkout_fingerprint_bound']), 'rebind sets checkout_fingerprint_bound');
+$fpFull3 = str_repeat('e', 64);
+$refreshed = $store->load($cookieHandoff, 91001, 0, $fpFull3, $fpLines);
+assertCheckoutPreferenceStore(is_array($refreshed), 'product handoff refreshes full fingerprint on shipping evolution while lines match');
+assertCheckoutPreferenceStore(($refreshed['cart_fingerprint'] ?? '') === $fpFull3, 'refreshed fingerprint stored');
 assertCheckoutPreferenceStore(
-    $store->load($cookieHandoff, 91001, 0, str_repeat('e', 64), $fpLines) === null,
-    'after bind, further fingerprint drift must reject'
+    $store->load($cookieHandoff, 91001, 0, str_repeat('f', 64), str_repeat('d', 64)) === null,
+    'material lines drift after bind must reject'
 );
 
 // Current checkoutcalculate also writes fingerprint.

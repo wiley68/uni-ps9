@@ -1058,7 +1058,11 @@ class Unipayment extends PaymentModule
                 new PrestaShop\Module\Unipayment\Checkout\ConsentResolver()
             ))->present(true, $shop, $cartContext, $currencyIso, $preference);
             if ($preference !== null && empty($view['preselect_payment'])) {
-                $preferenceStore->clear($this->context->cookie);
+                // Clear only when the Product scheme is genuinely unavailable at checkout.
+                // Do not destroy a valid handoff on transient mismatch / resolution edge cases.
+                if (!empty($view['preference_unresolved'])) {
+                    $preferenceStore->clear($this->context->cookie);
+                }
             } elseif (
                 $preference !== null
                 && !empty($view['preselect_payment'])

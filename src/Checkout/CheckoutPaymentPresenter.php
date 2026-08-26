@@ -115,26 +115,22 @@ final class CheckoutPaymentPresenter
         }
         $preferenceMatched = false;
         $preferredFirstInstallment = 0.0;
+        $preferenceUnresolved = false;
         if ($preference !== null) {
-            foreach ($schemes as $scheme) {
-                if (
-                    $scheme['scheme_type'] === (string) ($preference['scheme_type'] ?? '')
-                    && $scheme['kop_code'] === (string) ($preference['kop_code'] ?? '')
-                    && $scheme['months'] === (int) ($preference['months'] ?? 0)
-                    && $scheme['filter_id'] === (int) ($preference['filter_id'] ?? -1)
-                ) {
-                    $defaultKey = $scheme['key'];
-                    if ($scheme['first_installment_locked']) {
-                        $preferredFirstInstallment = (float) $scheme['first_installment'];
-                    } else {
-                        $requestedFirstInstallment = is_numeric($preference['first_installment'] ?? null)
-                            ? max(0.0, (float) $preference['first_installment'])
-                            : 0.0;
-                        $preferredFirstInstallment = $requestedFirstInstallment < $cart->total ? $requestedFirstInstallment : 0.0;
-                    }
-                    $preferenceMatched = true;
-                    break;
+            $resolved = CheckoutSchemeIdentity::resolve($schemes, $preference);
+            if ($resolved !== null) {
+                $defaultKey = (string) $resolved['key'];
+                if (!empty($resolved['first_installment_locked'])) {
+                    $preferredFirstInstallment = (float) $resolved['first_installment'];
+                } else {
+                    $requestedFirstInstallment = is_numeric($preference['first_installment'] ?? null)
+                        ? max(0.0, (float) $preference['first_installment'])
+                        : 0.0;
+                    $preferredFirstInstallment = $requestedFirstInstallment < $cart->total ? $requestedFirstInstallment : 0.0;
                 }
+                $preferenceMatched = true;
+            } else {
+                $preferenceUnresolved = true;
             }
         }
         $fingerprint = $this->snapshot->fingerprint($cart, $currencyIso);
@@ -150,6 +146,7 @@ final class CheckoutPaymentPresenter
             'default_scheme_key' => $defaultKey,
             'default_first_installment' => $preferredFirstInstallment,
             'preselect_payment' => $preferenceMatched,
+            'preference_unresolved' => $preferenceUnresolved,
             'cart_snapshot' => $this->signer->sign($fingerprint),
             'show_first_installment' => in_array($shop['uni_first_vnoska'] ?? 0, [1, '1', true, 'yes', 'on'], true),
             'process2' => (int) ($shop['uni_proces'] ?? 0) === 1,

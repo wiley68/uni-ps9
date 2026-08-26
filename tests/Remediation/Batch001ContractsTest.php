@@ -169,9 +169,12 @@ $cookie3 = new Rem001FakeCookie();
 $bound = $pref;
 $bound['checkout_fingerprint_bound'] = 1;
 $store->save($cookie3, $bound, 42, 0);
+$refreshedAfterBind = $store->load($cookie3, 42, 0, $fullB, $linesOk);
+assertRem001(is_array($refreshedAfterBind), 'J: product handoff refreshes full fingerprint after bind when lines match');
+assertRem001(($refreshedAfterBind['cart_fingerprint'] ?? '') === $fullB, 'J: refreshed fingerprint stored');
 assertRem001(
-    $store->load($cookie3, 42, 0, $fullB, $linesOk) === null,
-    'J: after bind, full fingerprint drift rejects even with matching lines'
+    $store->load($cookie3, 42, 0, $fullB, $linesDrift) === null,
+    'J: lines drift after bind still rejects'
 );
 
 // N–P BO cache status removed; refresh remains
