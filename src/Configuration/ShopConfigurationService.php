@@ -62,6 +62,28 @@ final class ShopConfigurationService
     }
 
     /**
+     * Cache-only shop snapshot for FO advertising render paths.
+     *
+     * Never calls refresh(), the remote provider, login, or token refresh.
+     * Missing/stale/malformed cache → null (fail closed).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getCachedOnly(): ?array
+    {
+        $unicid = $this->configuration->getUnicid();
+        if ($unicid === '') {
+            return null;
+        }
+
+        try {
+            return $this->cache->getFresh($unicid);
+        } catch (\Throwable $exception) {
+            return null;
+        }
+    }
+
+    /**
      * Full snapshot replacement entry point for the CP push handler.
      *
      * @param array<string, mixed> $shopData

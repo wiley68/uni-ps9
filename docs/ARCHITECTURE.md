@@ -268,7 +268,7 @@ Accepted residual risk: retry after partial success may duplicate the already-de
 ```text
 UNIPAYMENT_ADVERTISING_ENABLED + module enabled + UNICID
 → HomepageAdvertisingGate (php_self=index + uni_status + uni_container_status)
-→ ShopConfigurationService::get() (cache only; no live CP on render)
+→ ShopConfigurationService::getCachedOnly() (local fresh cache only; never refresh/CP on render)
 → HomepageAdvertisingPresenter (strip_tags + http/https URL filter)
 → displayFooter + homepage_advertising.tpl + scoped CSS/JS
 ```

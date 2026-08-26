@@ -28,7 +28,11 @@ $lifecycle = (string) file_get_contents($root . '/src/Order/PostControlPanelLife
 $mail = (string) file_get_contents($root . '/src/Order/LeasingEmailNotifier.php');
 
 assertPhase13Adv(strpos($module, 'HomepageAdvertisingPresenter') !== false, 'module wires advertising presenter');
-assertPhase13Adv(strpos($module, 'createShopConfigurationService()->get()') !== false, 'advertising uses cached shop config');
+assertPhase13Adv(strpos($module, 'createShopConfigurationService()->getCachedOnly()') !== false, 'advertising uses cache-only shop config');
+assertPhase13Adv(
+    !preg_match('/homepageAdvertisingContext[\s\S]{0,1200}->get\s*\(/', $module),
+    'advertising context must not call ShopConfigurationService::get()'
+);
 assertPhase13Adv(
     !preg_match('/homepageAdvertisingContext[\s\S]{0,800}getShop\(/', $module),
     'advertising context must not call CP getShop directly'

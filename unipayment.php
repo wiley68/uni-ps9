@@ -890,8 +890,12 @@ class Unipayment extends PaymentModule
         }
 
         try {
-            $shop = $this->createShopConfigurationService()->get();
+            $shop = $this->createShopConfigurationService()->getCachedOnly();
         } catch (Throwable $exception) {
+            return null;
+        }
+
+        if ($shop === null || $shop === []) {
             return null;
         }
 

@@ -35,12 +35,10 @@ $providerSrc = (string) file_get_contents($root . '/src/Security/MtlsPrivateKeyP
 $cpClientSrc = (string) file_get_contents($root . '/src/Api/ControlPanelClient.php');
 $envSrc = (string) file_get_contents($root . '/src/Configuration/ModuleDeploymentEnvironment.php');
 $envFile = (string) file_get_contents($root . '/config/environment.php');
-$secretFile = (string) file_get_contents($root . '/secrets/smartucf-key.php');
 
-assertAud021(is_file($root . '/secrets/smartucf-key.php'), 'secret file exists');
-assertAud021(strpos($secretFile, "'passphrase'") !== false || strpos($secretFile, '"passphrase"') !== false, 'secret key passphrase');
-assertAud021(strpos($secretFile, 'REPLACE_WITH_DEPLOYMENT_PASSPHRASE') !== false, 'repo uses synthetic placeholder');
-assertAud021(strpos($secretFile, "'1234'") === false && strpos($secretFile, '"1234"') === false, 'F: no historical passphrase in template');
+$gitignore = (string) file_get_contents($root . '/.gitignore');
+assertAud021(strpos($gitignore, '/secrets/smartucf-key.php') !== false, 'secrets/smartucf-key.php must be gitignored');
+// Local secrets/smartucf-key.php is deployment-filled and gitignored — do not assert its contents in CI/tests.
 
 assertAud021(strpos($validatorSrc, 'public const PASSPHRASE') === false, 'F: PASSPHRASE constant removed');
 assertAud021(strpos($clientSrc, 'CertificatePairValidator::PASSPHRASE') === false, 'F: client no PASSPHRASE');
