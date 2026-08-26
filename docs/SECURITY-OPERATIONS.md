@@ -98,7 +98,7 @@ All: **POST** only, JSON body, signed headers.
 ### orderbankstatus
 
 - Lookup: `orders.reference` + `id_shop` + INNER JOIN `unipayment_financing_snapshot` (AUD-011)
-- Phase 4 does **not** install `unipayment_financing_snapshot`. Before the JOIN, the repository checks table existence with `SHOW TABLES LIKE`; if absent → `null` → HTTP **404** (no SQL error / 500). When a later phase creates the table, the audited JOIN activates automatically.
+- Phase 10 installs `unipayment_financing_snapshot`. The repository still gates with `SHOW TABLES LIKE` for shops not yet upgraded via BO Configure.
 - No customer-facing order-state changes in Phase 4 (`ps_order_state_changed: false`)
 
 ### smartucfdebuglog
@@ -166,7 +166,9 @@ Distinct from Phase 4 HMAC nonce replay (CP → module). Protects **customer pop
 | CSRF                               | PrestaShop `Tools::getToken(false)` remains required in addition to the submission token              |
 | Client `preselect_operation_token` | Non-authoritative correlation ID for Silent Buy cookie idempotency                                    |
 
-Do not log: raw `popup_submission_token`, EGN, session cookie, secrets.
+Do not log: raw `popup_submission_token`, EGN, session cookie, secrets, Bearer tokens.
+
+Phase 10 financing snapshot stores EGN/phone2 only in encrypted `sensitive_payload` (`SensitiveDataCipher`); generic `customer_json` excludes EGN. Retention redaction via `FinancingSnapshotRetentionService` (6 months AUD-014 default).
 
 Expired / replayed / wrong-shop / wrong-identity operations return safe customer-facing JSON (no SQL, no token hash, no stack traces).
 

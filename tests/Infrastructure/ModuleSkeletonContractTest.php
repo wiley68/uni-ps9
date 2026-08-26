@@ -134,8 +134,8 @@ assertModuleSkeleton(
     'Phase 6 ProductContextFactory must exist'
 );
 assertModuleSkeleton(
-    !preg_match('/\bnew\s+OrderState\b|\bOrderStateInstaller\b/i', $module),
-    'module entry must not install custom order states'
+    !preg_match('/\bnew\s+OrderState\b/', $module),
+    'module entry must not instantiate OrderState directly'
 );
 assertModuleSkeleton(
     (bool) preg_match('/registerHook\s*\(\s*[\'"]displayProductAdditionalInfo[\'"]\s*\)/', $module),
@@ -156,21 +156,32 @@ assertModuleSkeleton(
     'Phase 9 must register paymentOptions'
 );
 assertModuleSkeleton(
-    !preg_match('/unipayment_checkout_lock/', $module)
-        && !preg_match('/unipayment_order_attempt/', $module)
-        && !preg_match('/unipayment_financing_snapshot/', $module),
-    'Phase 9 must not install checkout lock / order attempt / financing snapshot'
-);
-assertModuleSkeleton(
     is_file($root . '/src/Product/PopupSubmissionRepository.php')
         && (bool) preg_match('/PopupSubmissionRepository/', $module),
     'Phase 7 popup submission persistence must be installed'
 );
 assertModuleSkeleton(
-    !preg_match('/unipayment_financing_snapshot/', $module)
-        && !preg_match('/unipayment_checkout_lock/', $module)
-        && !preg_match('/unipayment_order_attempt/', $module),
-    'future order/checkout tables must remain absent'
+    (bool) preg_match('/OrderStateInstaller/', $module),
+    'Phase 10 must install custom order states via OrderStateInstaller'
+);
+assertModuleSkeleton(
+    (bool) preg_match('/CheckoutSubmitLockRepository/', $module)
+        && (bool) preg_match('/OrderAttemptRepository/', $module)
+        && (bool) preg_match('/FinancingSnapshotRepository/', $module),
+    'Phase 10 must install checkout lock / order attempt / financing snapshot'
+);
+assertModuleSkeleton(
+    is_file($root . '/src/Order/OrderOrchestrator.php')
+        && is_file($root . '/src/Order/NativePrestaShopOrderGateway.php'),
+    'Phase 10 order orchestration services must exist'
+);
+assertModuleSkeleton(
+    is_file($root . '/views/templates/front/checkout_validated.tpl'),
+    'Phase 10 post-order validated template must exist'
+);
+assertModuleSkeleton(
+    !preg_match('/SmartUcfSessionCoordinator|PostControlPanelLifecycleService/', (string) file_get_contents($root . '/controllers/front/validatecheckout.php')),
+    'validatecheckout must not wire SmartUCF or post-CP lifecycle'
 );
 
-fwrite(STDOUT, "OK (module skeleton Phase 7 contract)\n");
+fwrite(STDOUT, "OK (module skeleton Phase 10 contract)\n");

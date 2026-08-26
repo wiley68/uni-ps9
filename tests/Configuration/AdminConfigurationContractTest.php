@@ -111,7 +111,8 @@ assertAdminConfiguration(
         && (bool) preg_match('/function\s+hookPaymentOptions\b/', $module),
     'Phase 8–9 cart + PaymentOption hooks present'
 );
-assertAdminConfiguration(!preg_match('/\bnew\s+OrderState\b|\bOrderStateInstaller\b/', $module), 'no custom order states');
+assertAdminConfiguration((bool) preg_match('/OrderStateInstaller/', $module), 'Phase 10 installs order states via OrderStateInstaller');
+assertAdminConfiguration(!preg_match('/\bnew\s+OrderState\b/', $module), 'module entry must not instantiate OrderState directly');
 assertAdminConfiguration(
     is_dir($root . '/src/Calculator')
         && is_file($root . '/src/Calculator/Calculator.php'),

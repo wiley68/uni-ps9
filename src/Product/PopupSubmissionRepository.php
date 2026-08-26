@@ -260,9 +260,14 @@ final class PopupSubmissionRepository
                 'updated_at' => $now,
             ],
             '`id_submission` = ' . (int) $submissionId
+                . " AND `state` = '" . pSQL(PopupSubmissionStates::PROCESSING) . "'"
         );
         if (!$ok) {
             throw new \RuntimeException('The popup submission could not be marked order_created.');
+        }
+        $row = $this->requireById($submissionId);
+        if ((string) ($row['state'] ?? '') !== PopupSubmissionStates::ORDER_CREATED) {
+            throw new \RuntimeException('The popup submission order_created transition was rejected.');
         }
     }
 

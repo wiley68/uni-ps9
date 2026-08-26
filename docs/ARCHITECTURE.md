@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 9** state.
+This document describes **intended** high-level boundaries and the **implemented Phase 10** state.
 
 ---
 
@@ -48,6 +48,7 @@ Infrastructure
 | Popup identity / dedupe     | Phase 7 — `unipayment_popup_submission`, operation guard, Step 2 identity             |
 | Cart page FO                | Phase 8 — `displayShoppingCart` + cartcalculator/cartpopup + Phase 7 flow isolation   |
 | Checkout PaymentOption      | Phase 9 — `paymentOptions` + checkoutcalculate + preference/fingerprint handoff       |
+| Durable checkout submission | Phase 10 — lock + attempt + PS order + snapshot + CP create (no SmartUCF yet)         |
 
 ### Shop configuration cache flow
 
@@ -159,12 +160,12 @@ AJAX cartcalculator (refresh) / cartpopup (calculate + Phase 7 identity/dedupe)
 
 Amount semantics (PS8 / Woo cart oracle):
 
-| Item            | Source                                                                 |
-| --------------- | ---------------------------------------------------------------------- |
+| Item            | Source                                                                             |
+| --------------- | ---------------------------------------------------------------------------------- |
 | Financed amount | `Cart::getOrderTotal(true, Cart::BOTH)` — tax incl. products + shipping − vouchers |
-| Line `total_wt` | Stored on `CartLine` only; **not** used for eligibility/calculation    |
-| Qty influence   | Via cart payable total (qty changes change `BOTH` total)               |
-| Filter identity | Metadata only; intersection key is `type\|kop\|months`                 |
+| Line `total_wt` | Stored on `CartLine` only; **not** used for eligibility/calculation                |
+| Qty influence   | Via cart payable total (qty changes change `BOTH` total)                           |
+| Filter identity | Metadata only; intersection key is `type\|kop\|months`                             |
 
 Cart UI is **cart-wide** (one calculator for the whole cart), not per-line widgets.
 
@@ -172,17 +173,17 @@ Cart popup reuses Phase 7 `PopupSubmissionRepository` / guard / identity service
 
 Theme lifecycle (cart):
 
-| Theme           | Hook                 | Events                                      |
-| --------------- | -------------------- | ------------------------------------------- |
-| Hummingbird 2.0 | `displayShoppingCart` | `prestashop.on('updatedCart')` after AJAX   |
-| Classic 3.1.1   | same                 | same (`updateCart` → refresh → `updatedCart`) |
+| Theme           | Hook                  | Events                                        |
+| --------------- | --------------------- | --------------------------------------------- |
+| Hummingbird 2.0 | `displayShoppingCart` | `prestashop.on('updatedCart')` after AJAX     |
+| Classic 3.1.1   | same                  | same (`updateCart` → refresh → `updatedCart`) |
 
-### Checkout financing (Phase 9)
+### Checkout financing (Phase 9–10)
 
 ```text
 native checkout cart
     ↓
-CartContextFactory::createForCheckout()  (lines + payable BOTH + carrier/shipping/cart_rules)
+CartContextFactory::createForCheckout()
     ↓
 CartSnapshot fingerprint (HMAC-signed cart_snapshot in PaymentOption form)
     ↓
@@ -190,8 +191,35 @@ CheckoutPaymentPresenter → hookPaymentOptions → checkout_payment.tpl
     ↓
 AJAX checkoutcalculate (recalc + refresh preference)
     ↓
-validatecheckout validates selection then STOPS (no Order / CP / SmartUCF)
+validatecheckout (Phase 10)
+    → CheckoutSubmitLock (45s TTL, id_shop + id_cart)
+    → CheckoutPaymentValidator (revalidate fingerprint/selection/consents)
+    → OrderOrchestrator (recovery-first)
+        → order_attempt reserve (id_shop + id_cart + cart_fingerprint UNIQUE)
+        → NativePrestaShopOrderGateway::validateOrder() once (AWAITING state)
+        → financing_snapshot (INSERT IGNORE, id_attempt UNIQUE)
+        → ControlPanelOrderPayloadBuilder → POST /api/v1/orders once
+    → CheckoutPreferenceStore::clear() after successful validation path begins durable work
+    → Phase10CheckoutOutcome / post-order template or order-confirmation redirect
 ```
+
+**Phase 10 boundary:** no SmartUCF Process 1/2, no `PostControlPanelLifecycleService`, no financing emails beyond native `order_conf` deferral for Process 1 via `DeferredOrderMailQueue` + `hookActionEmailSendBefore`.
+
+**Attempt state machine** (`OrderOrchestrator`):
+
+| State                 | Meaning                                                   |
+| --------------------- | --------------------------------------------------------- |
+| `reserved`            | Attempt row created (UNIQUE shop/cart/fingerprint)        |
+| `ps_order_created`    | Native PS order attached                                  |
+| `cp_submitting`       | CP POST in flight                                         |
+| `cp_created`          | CP order id persisted — terminal success for Phase 10     |
+| `cp_failed_retryable` | CP 5xx — retry without new PS order                       |
+| `cp_outcome_unknown`  | CP timeout/connection — retry; bank `bank_send_failed_cp` |
+| `terminal_failed`     | Non-retryable CP/validation failure after PS order        |
+
+**UniPayment tables after Phase 10 (8 total):** `shop_cache`, `api_nonce`, `order_bank_status`, `smartucf_log`, `popup_submission`, `checkout_lock`, `order_attempt`, `financing_snapshot`.
+
+**Post-order UX (temporary until Phase 12):** Process 2 + CP success → native order confirmation; Process 1 + CP success → `checkout_validated.tpl`; CP failure / unknown after PS order → order confirmation or validated warning (no return to editable checkout submit).
 
 Checkout fingerprint canonical payload (non-PII):
 
@@ -239,12 +267,10 @@ UNIPAYMENT_CP_TOKEN_EXPIRES_AT
 
 ## Explicitly not implemented yet
 
-| Area                                           | Phase |
-| ---------------------------------------------- | ----- |
-| Checkout lock / order attempt / financing snapshot | 10+ |
-| validateOrder / CP order / SmartUCF / emails   | 10+   |
-| Thank You / bank status workflow               | 10+   |
-| Advertising FO                                 | later |
-| Custom order states / BO journal download      | later |
-
-**Carry-forward:** `PopupSubmissionRepository::markOrderCreated()` still lacks a strict state-transition guard before Phase 10 use.
+| Area                                            | Phase |
+| ----------------------------------------------- | ----- |
+| SmartUCF Process 1 / 2                          | 11+   |
+| PostControlPanelLifecycle / bank_sent_process\* | 11+   |
+| Financing customer/admin/bank emails            | 11+   |
+| Final Thank You / confirmation redesign         | 12+   |
+| Advertising FO                                  | later |

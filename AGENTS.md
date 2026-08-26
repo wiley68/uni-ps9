@@ -277,18 +277,20 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 9 е **checkout PaymentOption / financing selection** (Hummingbird + Classic).
+Phase 10 е **durable checkout submission** (PS order + financing snapshot + CP create).
 
 Разрешено:
 
-- всичко от Phase 0–8;
-- `paymentOptions` + `checkoutcalculate` / `validatecheckout` (Phase 9 boundary);
-- `CartSnapshot` fingerprint + `CheckoutPreferenceStore` handoff;
-- Silent Buy product preselect → checkout preference restore.
+- всичко от Phase 0–9;
+- atomic checkout lock, order attempt, financing snapshot;
+- native `validateOrder()` + CP `POST /api/v1/orders`;
+- `bank_send_failed_cp` persistence;
+- temporary post-order customer boundary (`checkout_validated.tpl` / order confirmation redirect);
+- `DeferredOrderMailQueue` deferral of native `order_conf` for Process 1 only.
 
-Не въвеждай checkout lock, order attempt, financing snapshot, `validateOrder`, CP order, SmartUCF, emails, custom order states или advertising FO, докато съответната фаза не бъде изрично възложена.
+Не въвеждай SmartUCF Process 1/2, `PostControlPanelLifecycleService`, financing emails, final Thank You UX, advertising FO или v2.0.2 scheme ordering, докато съответната фаза не бъде изрично възложена.
 
-`validatecheckout` валидира избора и спира без създаване на поръчка.
+Product/cart popup paths остават на `identity_accepted` — primary Phase 10 entry е checkout PaymentOption → `validatecheckout`.
 
 ---
 

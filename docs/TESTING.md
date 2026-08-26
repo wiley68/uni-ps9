@@ -54,7 +54,17 @@ Phase 7 identity/dedupe:
 | `tests/Security/Aud002aPopupSubmissionContractTest.php`     | Static AUD-002A / Phase 7 boundary                                   |
 | `tests/Security/Aud001GuestIdentityContractTest.php`        | No email customer lookup                                             |
 
-Other useful commands:
+Phase 10 durable order path:
+
+| Test                                               | What it checks                                         |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| `tests/Checkout/Aud013CheckoutSubmitLockTest.php`  | Atomic lock acquire/release/TTL/concurrency            |
+| `tests/Order/OrderOrchestratorTest.php`            | Recovery, CP failure, idempotency, EGN privacy         |
+| `tests/Order/Phase10InstallTablesContractTest.php` | Eight tables + snapshot activation                     |
+| `tests/Checkout/PaymentOptionContractTest.php`     | Phase 10 validatecheckout wiring                       |
+| `tests/Product/PopupSubmissionRepositoryTest.php`  | `markOrderCreated` strict `processing → order_created` |
+
+Current safe suite: **68 tests** (`composer test`).
 
 ```bash
 composer validate --no-check-publish
@@ -68,17 +78,17 @@ Product popup identity/dedupe (Hummingbird + Classic). Passed.
 
 ## Phase 8 cart coverage
 
-| Test                                                         | What it checks                                              |
-| ------------------------------------------------------------ | ----------------------------------------------------------- |
-| `tests/Cart/CartSchemeResolverTest.php`                      | Intersection, filter metadata, cart-total price parity      |
-| `tests/Cart/CartCalculatorPresenterTest.php`                 | Offers / currency / labels                                  |
-| `tests/Cart/CartPopupCalculatorTest.php`                     | Modal calc uses cart total                                  |
-| `tests/Cart/CartAmountSemanticsTest.php`                     | Qty vectors 100/300 + filter case                           |
-| `tests/Cart/CartFlowIsolationTest.php`                       | product↔cart hash isolation, drift, cross-session           |
-| `tests/Cart/CartPopupReplayGuardTest.php`                    | Atomic claim replay + cross-flow reject                     |
-| `tests/Cart/CartPopupContractTest.php`                       | Template/JS/controller Phase 8 contracts                    |
-| `tests/Cart/CartPopupControllerContractTest.php`             | Actions / no order / no preselect                           |
-| `tests/Frontend/CartFrontendLifecycleContractTest.php`       | `updatedCart`, AbortController, no jQuery                   |
+| Test                                                   | What it checks                                         |
+| ------------------------------------------------------ | ------------------------------------------------------ |
+| `tests/Cart/CartSchemeResolverTest.php`                | Intersection, filter metadata, cart-total price parity |
+| `tests/Cart/CartCalculatorPresenterTest.php`           | Offers / currency / labels                             |
+| `tests/Cart/CartPopupCalculatorTest.php`               | Modal calc uses cart total                             |
+| `tests/Cart/CartAmountSemanticsTest.php`               | Qty vectors 100/300 + filter case                      |
+| `tests/Cart/CartFlowIsolationTest.php`                 | product↔cart hash isolation, drift, cross-session      |
+| `tests/Cart/CartPopupReplayGuardTest.php`              | Atomic claim replay + cross-flow reject                |
+| `tests/Cart/CartPopupContractTest.php`                 | Template/JS/controller Phase 8 contracts               |
+| `tests/Cart/CartPopupControllerContractTest.php`       | Actions / no order / no preselect                      |
+| `tests/Frontend/CartFrontendLifecycleContractTest.php` | `updatedCart`, AbortController, no jQuery              |
 
 ## Manual STOP GATE 8
 
@@ -86,16 +96,16 @@ Cart-page financing (Hummingbird + Classic). Passed.
 
 ## Phase 9 checkout coverage
 
-| Test                                                           | What it checks                                         |
-| -------------------------------------------------------------- | ------------------------------------------------------ |
-| `tests/Checkout/CartSnapshotFingerprintTest.php`               | Same-total drift, carrier, voucher, determinism        |
-| `tests/Checkout/CheckoutPaymentPresenterTest.php`              | Payment view / preference / currency / consents        |
-| `tests/Checkout/CheckoutPaymentCalculatorTest.php`             | Eligible / promo / shipping / voucher / invalids       |
-| `tests/Checkout/CheckoutPaymentValidatorTest.php`              | Fingerprint + scheme + consent server authority        |
-| `tests/Checkout/CheckoutPreferenceStoreTest.php`               | Cookie-safe preference TTL / cart scope                |
-| `tests/Checkout/PaymentOptionContractTest.php`                 | Hook / action / Phase 9 order boundary                 |
-| `tests/Checkout/DeferredV202PromoAggregationContractTest.php`  | Documents deferred standard/promo v2.0.2               |
-| `tests/Frontend/CheckoutFrontendLifecycleContractTest.php`     | Events, AbortController, no jQuery                     |
+| Test                                                          | What it checks                                   |
+| ------------------------------------------------------------- | ------------------------------------------------ |
+| `tests/Checkout/CartSnapshotFingerprintTest.php`              | Same-total drift, carrier, voucher, determinism  |
+| `tests/Checkout/CheckoutPaymentPresenterTest.php`             | Payment view / preference / currency / consents  |
+| `tests/Checkout/CheckoutPaymentCalculatorTest.php`            | Eligible / promo / shipping / voucher / invalids |
+| `tests/Checkout/CheckoutPaymentValidatorTest.php`             | Fingerprint + scheme + consent server authority  |
+| `tests/Checkout/CheckoutPreferenceStoreTest.php`              | Cookie-safe preference TTL / cart scope          |
+| `tests/Checkout/PaymentOptionContractTest.php`                | Hook / action / Phase 9 order boundary           |
+| `tests/Checkout/DeferredV202PromoAggregationContractTest.php` | Documents deferred standard/promo v2.0.2         |
+| `tests/Frontend/CheckoutFrontendLifecycleContractTest.php`    | Events, AbortController, no jQuery               |
 
 ## Manual STOP GATE 9
 

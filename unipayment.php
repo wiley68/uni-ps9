@@ -58,6 +58,10 @@ class Unipayment extends PaymentModule
         $bankStatus = new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository();
         $debugLog = new PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository();
         $popupSubmissions = new PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository();
+        $checkoutLock = new PrestaShop\Module\Unipayment\Checkout\CheckoutSubmitLockRepository();
+        $attempts = new PrestaShop\Module\Unipayment\Order\OrderAttemptRepository();
+        $snapshots = new PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository();
+        $orderStates = new PrestaShop\Module\Unipayment\Order\OrderStateInstaller();
 
         if (
             !$repository->install()
@@ -66,8 +70,17 @@ class Unipayment extends PaymentModule
             || !$bankStatus->install()
             || !$debugLog->install()
             || !$popupSubmissions->install()
+            || !$checkoutLock->install()
+            || !$attempts->install()
+            || !$snapshots->install()
+            || !$orderStates->install()
             || !$this->registerFrontOfficeHooks()
+            || !$this->registerHook('actionEmailSendBefore')
         ) {
+            $orderStates->uninstall();
+            $snapshots->uninstall();
+            $attempts->uninstall();
+            $checkoutLock->uninstall();
             $popupSubmissions->uninstall();
             $debugLog->uninstall();
             $bankStatus->uninstall();
@@ -84,6 +97,10 @@ class Unipayment extends PaymentModule
 
     public function uninstall(): bool
     {
+        $orderStates = new PrestaShop\Module\Unipayment\Order\OrderStateInstaller();
+        $snapshots = new PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository();
+        $attempts = new PrestaShop\Module\Unipayment\Order\OrderAttemptRepository();
+        $checkoutLock = new PrestaShop\Module\Unipayment\Checkout\CheckoutSubmitLockRepository();
         $popupSubmissions = new PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository();
         $debugLog = new PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository();
         $bankStatus = new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository();
@@ -93,6 +110,10 @@ class Unipayment extends PaymentModule
 
         if (
             !$popupSubmissions->uninstall()
+            || !$snapshots->uninstall()
+            || !$attempts->uninstall()
+            || !$checkoutLock->uninstall()
+            || !$orderStates->uninstall()
             || !$debugLog->uninstall()
             || !$bankStatus->uninstall()
             || !$apiNonce->uninstall()
@@ -134,9 +155,14 @@ class Unipayment extends PaymentModule
 
     public function getContent(): string
     {
-        // Idempotent: already-installed shops gain Phase 6–9 hooks and Phase 7 table without reinstall.
+        // Idempotent: already-installed shops gain Phase 6–10 hooks/tables without reinstall.
         $this->registerFrontOfficeHooks();
+        $this->registerHook('actionEmailSendBefore');
         (new PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository())->install();
+        (new PrestaShop\Module\Unipayment\Checkout\CheckoutSubmitLockRepository())->install();
+        (new PrestaShop\Module\Unipayment\Order\OrderAttemptRepository())->install();
+        (new PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository())->install();
+        (new PrestaShop\Module\Unipayment\Order\OrderStateInstaller())->install();
 
         $repository = new PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository();
         $requestReader = new PrestaShop\Module\Unipayment\Configuration\AdminConfigurationRequestReader();
@@ -595,6 +621,12 @@ class Unipayment extends PaymentModule
         ]);
 
         return $this->display(__FILE__, 'views/templates/hook/cart_calculator.tpl');
+    }
+
+    /** @param array<string, mixed> $params */
+    public function hookActionEmailSendBefore(array $params): bool
+    {
+        return PrestaShop\Module\Unipayment\Order\DeferredOrderMailQueue::intercept($params);
     }
 
     public function hookActionFrontControllerSetMedia(): void

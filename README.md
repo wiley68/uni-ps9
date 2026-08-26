@@ -2,13 +2,13 @@
 
 Native PrestaShop 9 module for **UniCredit financing** (credit calculator, checkout payment method, order lifecycle, Control Panel integration, and SmartUCF).
 
-| Item                  | Value                                                     |
-| --------------------- | --------------------------------------------------------- |
-| Module technical name | `unipayment`                                              |
-| Current version       | `2.0.1`                                                   |
-| Repository            | `wiley68/uni-ps9`                                         |
-| Repository root       | Module root (this directory)                              |
-| Current state         | **Phase 9 — checkout PaymentOption / financing selection** |
+| Item                  | Value                                                                        |
+| --------------------- | ---------------------------------------------------------------------------- |
+| Module technical name | `unipayment`                                                                 |
+| Current version       | `2.0.1`                                                                      |
+| Repository            | `wiley68/uni-ps9`                                                            |
+| Repository root       | Module root (this directory)                                                 |
+| Current state         | **Phase 10 — durable checkout submission (PS order + snapshot + CP create)** |
 
 ## Purpose
 
@@ -28,22 +28,26 @@ Provide a PrestaShop 9-native adapter/port of the UniPayment product family:
 
 ## Current implementation status
 
-Phase 9 provides:
+Phase 10 provides:
 
-- Phases 0–8 (config, CP, calculator, product/cart FO, popup identity);
-- `hookPaymentOptions` + checkout financing UI;
-- authoritative `checkoutcalculate` + cart fingerprint / preference handoff;
-- `validatecheckout` Phase 9 boundary (validates, does not create orders).
+- Phases 0–9 (config, CP, calculator, product/cart FO, checkout PaymentOption);
+- atomic checkout lock + durable `order_attempt` + `financing_snapshot`;
+- exactly-once native PrestaShop order + CP `POST /api/v1/orders`;
+- `bank_send_failed_cp` on CP failure after PS order exists;
+- temporary post-order UX (`checkout_validated.tpl` / order-confirmation redirect).
 
 Still **not** implemented:
 
-- financing snapshots / checkout lock / order attempts;
-- PrestaShop `validateOrder` / CP order / SmartUCF / emails;
-- Thank You / bank status workflow / advertising FO.
+- SmartUCF Process 1 / 2;
+- `PostControlPanelLifecycleService` / final bank statuses;
+- financing email lifecycle;
+- final Thank You redesign;
+- advertising FO.
 
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/SECURITY-OPERATIONS.md`](docs/SECURITY-OPERATIONS.md)
+- [`docs/RECOVERY.md`](docs/RECOVERY.md)
 - [`docs/TESTING.md`](docs/TESTING.md)
 - [`AGENTS.md`](AGENTS.md)

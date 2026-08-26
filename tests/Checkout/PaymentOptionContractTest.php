@@ -34,10 +34,12 @@ assertPaymentOption(strpos($tpl, 'data-unipayment-checkout') !== false, 'checkou
 assertPaymentOption(strpos($tpl, 'unipayment_cart_snapshot') !== false, 'signed cart snapshot field');
 assertPaymentOption(strpos($calc, 'CheckoutPaymentCalculator') !== false, 'checkoutcalculate uses calculator');
 assertPaymentOption(strpos($calc, 'cart_snapshot') !== false, 'checkoutcalculate validates/returns snapshot');
-assertPaymentOption(strpos($validate, 'validateOrder') === false, 'Phase 9 validatecheckout must not call validateOrder');
-assertPaymentOption(strpos($validate, 'OrderOrchestrator') === false, 'Phase 9 must not orchestrate orders');
-assertPaymentOption(strpos($validate, 'SmartUcfSessionCoordinator') === false, 'Phase 9 must not run SmartUCF');
-assertPaymentOption(strpos($validate, 'CheckoutPaymentValidator') !== false, 'Phase 9 validates selection before boundary stop');
-assertPaymentOption(strpos($validate, 'създаването на поръчка все още не е активирано') !== false, 'Phase 9 safe boundary message');
+assertPaymentOption(strpos($validate, 'OrderOrchestrator') !== false, 'Phase 10 orchestrates durable checkout submission');
+assertPaymentOption(strpos($validate, 'CheckoutSubmitLock') !== false, 'Phase 10 acquires checkout lock');
+assertPaymentOption(strpos($validate, 'Phase10CheckoutOutcome') !== false, 'Phase 10 normalized outcomes');
+assertPaymentOption(strpos($validate, 'SmartUcfSessionCoordinator') === false, 'Phase 10 must not run SmartUCF');
+assertPaymentOption(strpos($validate, 'PostControlPanelLifecycleService') === false, 'Phase 10 must not run post-CP lifecycle');
+assertPaymentOption(strpos($validate, 'CheckoutPaymentValidator') !== false, 'Phase 10 revalidates before order creation');
+assertPaymentOption(strpos($validate, 'създаването на поръчка все още не е активирано') === false, 'Phase 9 boundary stop removed');
 
-fwrite(STDOUT, "OK (Phase 9 PaymentOption + boundary contract)\n");
+fwrite(STDOUT, "OK (Phase 10 PaymentOption + durable checkout contract)\n");

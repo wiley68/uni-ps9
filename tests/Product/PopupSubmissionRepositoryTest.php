@@ -141,4 +141,21 @@ assertPopupRepo($repo->claimForProcessing((string) $expired['submission_token'])
 $shopB = $repo->issueOrReuse(2, $hash->hash(array_merge($base, ['id_shop' => 2, 'kop_code' => 'S2'])), 99, 0, '');
 assertPopupRepo((int) $shopB['id_shop'] === 2, 'token is shop-scoped at issue');
 
+$orderPath = $repo->issueOrReuse(1, $hash->hash(array_merge($base, ['kop_code' => 'ORD'])), 99, 0, '');
+$orderWinner = $repo->claimForProcessing((string) $orderPath['submission_token']);
+assertPopupRepo(is_array($orderWinner), 'order_created guard setup claim');
+$repo->markOrderCreated((int) $orderWinner['id_submission'], 1, 100, 'ABCDEFGHIJKLM', 55);
+$orderRow = $repo->findByToken((string) $orderPath['submission_token']);
+assertPopupRepo(is_array($orderRow) && (string) $orderRow['state'] === PopupSubmissionStates::ORDER_CREATED, 'processing to order_created');
+
+$failedPath = $repo->issueOrReuse(1, $hash->hash(array_merge($base, ['kop_code' => 'FAIL'])), 99, 0, '');
+$db->rows[(int) $failedPath['id_submission']]['state'] = PopupSubmissionStates::FAILED;
+$failedThrown = false;
+try {
+    $repo->markOrderCreated((int) $failedPath['id_submission'], 1, 101, 'FAILFAILFAILF', 0);
+} catch (RuntimeException $exception) {
+    $failedThrown = true;
+}
+assertPopupRepo($failedThrown, 'failed state must not transition to order_created');
+
 fwrite(STDOUT, "OK (popup submission hash + repository)\n");
