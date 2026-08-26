@@ -333,15 +333,12 @@
             return true;
         }
 
+        function confirmationButton() {
+            return document.querySelector("#payment-confirmation button");
+        }
+
         function validateBeforeSubmit() {
             if (submitState === "submitting") {
-                showError(
-                    t(
-                        root,
-                        "data-submitting-message",
-                        "Заявката вече се обработва. Моля, изчакайте.",
-                    ),
-                );
                 return false;
             }
             return validateFormFields();
@@ -349,26 +346,42 @@
 
         function markSubmitting() {
             submitState = "submitting";
+            root.classList.remove("unipayment-checkout--click-accepted");
             root.classList.add("unipayment-checkout--submitting");
-            var confirmBtn = document.querySelector(
-                "#payment-confirmation button",
-            );
+            var confirmBtn = confirmationButton();
             if (confirmBtn) {
                 confirmBtn.disabled = true;
                 confirmBtn.classList.add("disabled");
+                confirmBtn.setAttribute("aria-busy", "true");
             }
         }
 
+        /**
+         * First valid confirmation click: claim the client guard without disabling
+         * the submitter. Disabling here (capture phase) would cancel the browser's
+         * native default action and leave the shopper stuck with no request.
+         */
         function acceptFirstClick() {
             submitState = "click_accepted";
-            root.classList.add("unipayment-checkout--submitting");
-            var confirmBtn = document.querySelector(
-                "#payment-confirmation button",
-            );
+            root.classList.add("unipayment-checkout--click-accepted");
+            var confirmBtn = confirmationButton();
             if (confirmBtn) {
-                confirmBtn.disabled = true;
-                confirmBtn.classList.add("disabled");
+                confirmBtn.setAttribute("aria-busy", "true");
             }
+            // If native submit never begins (exception / intercepted default), unlock.
+            // Do not reset once markSubmitting() has run (request in flight / navigating).
+            window.setTimeout(function () {
+                if (submitState !== "click_accepted") {
+                    return;
+                }
+                submitState = "idle";
+                root.classList.remove("unipayment-checkout--click-accepted");
+                root.classList.remove("unipayment-checkout--submitting");
+                var btn = confirmationButton();
+                if (btn) {
+                    btn.removeAttribute("aria-busy");
+                }
+            }, 0);
         }
 
         if (select) {
@@ -412,22 +425,16 @@
                 if (submitState === "submitting") {
                     event.preventDefault();
                     event.stopPropagation();
-                    showError(
-                        t(
-                            root,
-                            "data-submitting-message",
-                            "Заявката вече се обработва. Моля, изчакайте.",
-                        ),
-                    );
                     return false;
                 }
                 if (submitState === "click_accepted") {
-                    // First valid confirmation click already validated + disabled the button.
+                    // First valid click already validated; disable only now.
                     syncHidden();
                     markSubmitting();
                     return true;
                 }
-                if (!validateFormFields()) {
+                // Keyboard / direct submit without a prior confirmation click.
+                if (!validateBeforeSubmit()) {
                     event.preventDefault();
                     event.stopPropagation();
                     return false;
@@ -450,17 +457,24 @@
                 );
                 if (!payment || !payment.checked) return;
                 if (!root.offsetParent && root.hidden) return;
-                if (submitState !== "idle") {
+                if (
+                    submitState === "click_accepted" ||
+                    submitState === "submitting"
+                ) {
+                    // Suppress rapid second click; leave the first native submit alone.
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (typeof event.stopImmediatePropagation === "function") {
+                        event.stopImmediatePropagation();
+                    }
+                    return;
+                }
+                if (!validateBeforeSubmit()) {
                     event.preventDefault();
                     event.stopPropagation();
                     return;
                 }
-                if (!validateFormFields()) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    return;
-                }
-                // Valid first click: acquire client guard before the second click can race.
+                // Claim guard; keep submitter enabled so native default action can fire.
                 acceptFirstClick();
             },
             true,

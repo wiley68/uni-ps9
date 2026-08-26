@@ -38,6 +38,18 @@ assertCheckoutUi(strpos($js, 'new MutationObserver') === false, 'no MutationObse
 assertCheckoutUi(strpos($js, 'submitState') !== false, 'checkout submit state machine');
 assertCheckoutUi(strpos($js, 'click_accepted') !== false, 'first-click accepted before form submit');
 assertCheckoutUi(strpos($js, 'acceptFirstClick') !== false, 'immediate confirmation click guard');
+$acceptBody = '';
+if (preg_match('/function acceptFirstClick\(\)\s*\{([\s\S]*?)\n        \}\n\n        if \(select\)/', $js, $acceptMatch)) {
+    $acceptBody = $acceptMatch[1];
+}
+assertCheckoutUi($acceptBody !== '' && strpos($acceptBody, '.disabled') === false, 'acceptFirstClick must not disable submitter before native submit');
+assertCheckoutUi(
+    (bool) preg_match(
+        '/function markSubmitting\(\)\s*\{[\s\S]*?\.disabled\s*=\s*true/',
+        $js
+    ),
+    'confirmation button disabled only on submit'
+);
 assertCheckoutUi(
     strpos($js, 'data-module-name') !== false && strpos($js, 'unipayment') !== false,
     'only validate when UniPayment selected'

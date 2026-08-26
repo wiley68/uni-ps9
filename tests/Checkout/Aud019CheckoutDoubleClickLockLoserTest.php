@@ -31,27 +31,71 @@ $ctrl = (string) file_get_contents($root . '/controllers/front/validatecheckout.
 $processingTpl = (string) file_get_contents($root . '/views/templates/front/checkout_processing.tpl');
 $errorTpl = (string) file_get_contents($root . '/views/templates/front/checkout_validation_error.tpl');
 
-// A/B client guard contracts
+// A/B client guard contracts — first click must NOT disable before native submit
 assertDbl(strpos($js, 'submitState') !== false, 'A: submitState model present');
 assertDbl(strpos($js, 'click_accepted') !== false, 'A: click_accepted state');
 assertDbl(strpos($js, 'acceptFirstClick') !== false, 'A: acceptFirstClick helper');
-assertDbl(strpos($js, 'validateFormFields') !== false, 'B: field validation separated from guard');
+assertDbl(strpos($js, 'validateBeforeSubmit') !== false, 'A/D: validateBeforeSubmit present');
+assertDbl(strpos($js, 'validateFormFields') !== false, 'C: field validation separated from guard');
+
+$acceptBody = '';
+if (preg_match('/function acceptFirstClick\(\)\s*\{([\s\S]*?)\n        \}\n\n        if \(select\)/', $js, $acceptMatch)) {
+    $acceptBody = $acceptMatch[1];
+}
+assertDbl($acceptBody !== '', 'A: acceptFirstClick body extractable');
 assertDbl(
-    (bool) preg_match('/submitState !== "idle"[\s\S]{0,80}preventDefault/s', $js),
-    'A: non-idle click prevented'
+    strpos($acceptBody, '.disabled') === false,
+    'A: acceptFirstClick must not disable the submitter'
 );
 assertDbl(
-    (bool) preg_match('/click_accepted[\s\S]{0,200}markSubmitting/s', $js),
-    'A: first form submit after click_accepted proceeds'
+    strpos($js, 'unipayment-checkout--click-accepted') !== false,
+    'A: optional click_accepted visual class without disabling submitter'
 );
 assertDbl(
     (bool) preg_match(
-        '/submitState !== "idle"[\s\S]+if \(!validateFormFields\(\)\) \{[\s\S]+acceptFirstClick\(\);/s',
+        '/function markSubmitting\(\)\s*\{[\s\S]*?\.disabled\s*=\s*true/',
         $js
     ),
-    'B: acceptFirstClick only after successful validateFormFields on click path'
+    'A: button disabled only in markSubmitting (during submit)'
+);
+assertDbl(
+    (bool) preg_match('/click_accepted[\s\S]{0,200}markSubmitting/s', $js),
+    'A: first form submit after click_accepted proceeds via markSubmitting'
+);
+assertDbl(
+    (bool) preg_match(
+        '/submitState === "click_accepted" \|\| submitState === "submitting"[\s\S]{0,160}preventDefault/s',
+        $js
+    ),
+    'B: second click while click_accepted/submitting prevented'
+);
+assertDbl(
+    (bool) preg_match(
+        '/document\.addEventListener\(\s*"click",[\s\S]*?if \(!validateBeforeSubmit\(\)\) \{[\s\S]*?return;[\s\S]*?acceptFirstClick\(\);/s',
+        $js
+    ),
+    'C: acceptFirstClick only after successful validateBeforeSubmit on click path'
+);
+assertDbl(
+    (bool) preg_match(
+        '/submitState === "click_accepted"[\s\S]{0,200}markSubmitting[\s\S]{0,200}validateBeforeSubmit/s',
+        $js
+    ),
+    'D: idle/direct submit path still validates via validateBeforeSubmit'
+);
+assertDbl(
+    (bool) preg_match(
+        '/submitState === "submitting"[\s\S]{0,80}preventDefault/s',
+        $js
+    ),
+    'E: repeated submit while submitting blocked'
+);
+assertDbl(
+    strpos($acceptBody, 'submitState = "idle"') !== false,
+    'failure recovery: unlock if submit never began after click_accepted'
 );
 assertDbl(!preg_match('/\$\s*\(|\bjQuery\b/', $js), 'no jQuery');
+assertDbl(strpos($js, 'stopImmediatePropagation') !== false, 'B: second click stopImmediatePropagation available');
 
 // C/D/H server lock-loser contracts
 assertDbl(strpos($ctrl, 'CheckoutLockLoserRecovery') !== false, 'C/D: lock loser recovery wired');
