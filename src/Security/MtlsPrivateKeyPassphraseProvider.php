@@ -5,21 +5,26 @@ declare(strict_types=1);
 namespace PrestaShop\Module\Unipayment\Security;
 
 /**
- * Resolves the SmartUCF mTLS private-key passphrase from the runtime environment only.
+ * Resolves the SmartUCF mTLS private-key passphrase from module ZIP secrets only.
  *
- * Deployment must inject UNIPAYMENT_MTLS_KEY_PASSPHRASE (e.g. PHP-FPM env[]).
- * Never persists, logs, or accepts caller-supplied secrets.
+ * Authoritative source: secrets/smartucf-key.php
+ * Never reads environment variables, PrestaShop Configuration, DB, or request input.
  */
 final class MtlsPrivateKeyPassphraseProvider
 {
-    public const ENV_VAR = 'UNIPAYMENT_MTLS_KEY_PASSPHRASE';
+    public const RELATIVE_PATH = 'secrets/smartucf-key.php';
+    public const ARRAY_KEY = 'passphrase';
 
-    /** @var callable|null Optional test/double override: (): ?string */
-    private $reader;
+    /** @var string Absolute path to secrets/smartucf-key.php */
+    private $secretFilePath;
 
-    public function __construct(?callable $reader = null)
+    /** @var callable|null Optional test double: (): mixed (raw include result or passphrase string) */
+    private $loader;
+
+    public function __construct(?string $secretFilePath = null, ?callable $loader = null)
     {
-        $this->reader = $reader;
+        $this->secretFilePath = $secretFilePath ?? (dirname(__DIR__, 2) . '/' . self::RELATIVE_PATH);
+        $this->loader = $loader;
     }
 
     /**
@@ -36,16 +41,25 @@ final class MtlsPrivateKeyPassphraseProvider
     }
 
     /**
-     * Non-empty passphrase, or null when missing / blank.
+     * Non-empty passphrase, or null when missing / invalid / blank.
      */
     public function resolve(): ?string
     {
-        $raw = $this->reader !== null ? ($this->reader)() : $this->readFromEnvironment();
+        $loaded = $this->loadFile();
+        if ($loaded === null) {
+            return null;
+        }
+        if (!is_array($loaded)) {
+            return null;
+        }
+        if (!array_key_exists(self::ARRAY_KEY, $loaded)) {
+            return null;
+        }
+        $raw = $loaded[self::ARRAY_KEY];
         if (!is_string($raw)) {
             return null;
         }
 
-        // Trim intentional: env files / pool configs often append a trailing newline.
         $trimmed = trim($raw);
         if ($trimmed === '') {
             return null;
@@ -59,27 +73,22 @@ final class MtlsPrivateKeyPassphraseProvider
         return $this->resolve() !== null;
     }
 
-    private function readFromEnvironment(): ?string
+    public function secretFilePath(): string
     {
-        $fromGetenv = getenv(self::ENV_VAR);
-        if (is_string($fromGetenv) && $fromGetenv !== '') {
-            return $fromGetenv;
+        return $this->secretFilePath;
+    }
+
+    /** @return mixed|null */
+    private function loadFile()
+    {
+        if ($this->loader !== null) {
+            return ($this->loader)();
         }
 
-        if (isset($_ENV[self::ENV_VAR]) && is_string($_ENV[self::ENV_VAR]) && $_ENV[self::ENV_VAR] !== '') {
-            return $_ENV[self::ENV_VAR];
+        if (!is_file($this->secretFilePath) || !is_readable($this->secretFilePath)) {
+            return null;
         }
 
-        // PHP-FPM may mirror pool env into $_SERVER; accept only the exact key (never HTTP_*).
-        if (
-            isset($_SERVER[self::ENV_VAR])
-            && is_string($_SERVER[self::ENV_VAR])
-            && $_SERVER[self::ENV_VAR] !== ''
-            && strpos(self::ENV_VAR, 'HTTP_') !== 0
-        ) {
-            return $_SERVER[self::ENV_VAR];
-        }
-
-        return null;
+        return include $this->secretFilePath;
     }
 }

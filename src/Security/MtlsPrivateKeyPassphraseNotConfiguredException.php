@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PrestaShop\Module\Unipayment\Security;
 
 /**
- * Thrown when mTLS private-key passphrase is required but not configured at runtime.
+ * Thrown when mTLS private-key passphrase is required but not configured in the ZIP package.
  */
 final class MtlsPrivateKeyPassphraseNotConfiguredException extends \RuntimeException
 {
@@ -13,7 +13,7 @@ final class MtlsPrivateKeyPassphraseNotConfiguredException extends \RuntimeExcep
     {
         parent::__construct(
             'mTLS private-key passphrase is not configured ('
-            . MtlsPrivateKeyPassphraseProvider::ENV_VAR
+            . MtlsPrivateKeyPassphraseProvider::RELATIVE_PATH
             . ').'
         );
     }

@@ -9,12 +9,11 @@ use PrestaShop\Module\Unipayment\Api\Exception\HttpException;
 use PrestaShop\Module\Unipayment\Api\Exception\InvalidPayloadException;
 use PrestaShop\Module\Unipayment\Api\Exception\MalformedJsonException;
 use PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository;
+use PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment;
 use PrestaShop\Module\Unipayment\Security\TokenRepository;
 
 final class ControlPanelClient implements ShopConfigurationProviderInterface
 {
-    public const DEFAULT_BASE_URL = 'https://uni.avalonbg.com/api/v1';
-
     private const REFRESH_MARGIN_SECONDS = 60;
 
     /** @var ConfigurationRepository */
@@ -40,14 +39,17 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
         TokenRepository $tokens,
         HttpTransportInterface $transport,
         string $shopName,
-        string $baseUrl = self::DEFAULT_BASE_URL,
+        ?string $baseUrl = null,
         ?callable $clock = null
     ) {
         $this->configuration = $configuration;
         $this->tokens = $tokens;
         $this->transport = $transport;
         $this->shopName = rtrim(trim($shopName), '/');
-        $this->baseUrl = rtrim($baseUrl, '/');
+        $resolved = $baseUrl !== null && trim($baseUrl) !== ''
+            ? $baseUrl
+            : (new ModuleDeploymentEnvironment())->controlPanelApiBaseUrl();
+        $this->baseUrl = rtrim($resolved, '/');
         $this->clock = $clock ?? 'time';
     }
 

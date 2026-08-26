@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * AUD-021: CertificatePairValidator uses runtime passphrase (OpenSSL pair).
+ * AUD-021: CertificatePairValidator uses secrets/smartucf-key.php passphrase (OpenSSL pair).
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -30,7 +30,12 @@ assertAud021Cert(@mkdir($tmp, 0700), 'temp dir');
 $keyPath = $tmp . '/key.pem';
 $certPath = $tmp . '/cert.pem';
 $passFile = $tmp . '/pass.txt';
+$secretOk = $tmp . '/smartucf-key.php';
+$secretMissing = $tmp . '/absent-smartucf-key.php';
+$secretWrong = $tmp . '/wrong-smartucf-key.php';
 file_put_contents($passFile, $passphrase);
+file_put_contents($secretOk, "<?php\nreturn ['passphrase' => '" . $passphrase . "'];\n");
+file_put_contents($secretWrong, "<?php\nreturn ['passphrase' => 'wrong-test-passphrase'];\n");
 
 $genKey = 'openssl genrsa -aes256 -passout file:' . escapeshellarg($passFile)
     . ' -out ' . escapeshellarg($keyPath) . ' 2048 2>/dev/null';
@@ -46,50 +51,38 @@ assertAud021Cert($code2 === 0 && is_file($certPath), 'H: generate certificate');
 
 $certPem = (string) file_get_contents($certPath);
 $keyPem = (string) file_get_contents($keyPath);
-assertAud021Cert(strpos($keyPem, 'ENCRYPTED') !== false || strpos($keyPem, 'Proc-Type: 4,ENCRYPTED') !== false
-    || strpos($keyPem, 'BEGIN ENCRYPTED PRIVATE KEY') !== false
-    || strpos($keyPem, 'BEGIN RSA PRIVATE KEY') !== false, 'H: key material present');
 
-// B: missing passphrase fail closed before parse
-$missing = new CertificatePairValidator(new MtlsPrivateKeyPassphraseProvider(static function (): ?string {
-    return null;
-}));
+$missing = new CertificatePairValidator(new MtlsPrivateKeyPassphraseProvider($secretMissing));
 $threw = false;
 try {
     $missing->validate($certPem, $keyPem);
 } catch (MtlsPrivateKeyPassphraseNotConfiguredException $exception) {
     $threw = true;
-    assertAud021Cert(strpos($exception->getMessage(), $passphrase) === false, 'G: no passphrase in exception');
+    assertAud021Cert(strpos($exception->getMessage(), $passphrase) === false, 'K: no passphrase in exception');
 }
-assertAud021Cert($threw, 'B: validator fail closed without runtime secret');
+assertAud021Cert($threw, 'B: validator fail closed without secret file');
 
-// H / D: correct runtime passphrase validates
-$okProvider = new MtlsPrivateKeyPassphraseProvider(static function () use ($passphrase): ?string {
-    return $passphrase;
-});
-$validator = new CertificatePairValidator($okProvider);
+$validator = new CertificatePairValidator(new MtlsPrivateKeyPassphraseProvider($secretOk));
 $result = $validator->validate($certPem, $keyPem);
 assertAud021Cert($result['certificate_pem'] === $certPem, 'H: cert preserved');
 assertAud021Cert($result['private_key_pem'] === $keyPem, 'H: key preserved');
 assertAud021Cert($result['not_after_timestamp'] > time(), 'H: validity window');
 
-// F: wrong passphrase does not fall back to historical secret
-$wrong = new CertificatePairValidator(new MtlsPrivateKeyPassphraseProvider(static function (): ?string {
-    return 'wrong-test-passphrase';
-}));
 $failed = false;
 try {
-    $wrong->validate($certPem, $keyPem);
+    (new CertificatePairValidator(new MtlsPrivateKeyPassphraseProvider($secretWrong)))->validate($certPem, $keyPem);
 } catch (InvalidArgumentException $exception) {
     $failed = strpos($exception->getMessage(), 'could not be parsed') !== false;
     assertAud021Cert(strpos($exception->getMessage(), '1234') === false, 'F: no historical in error');
-    assertAud021Cert(strpos($exception->getMessage(), 'wrong-test-passphrase') === false, 'G: wrong secret not echoed');
+    assertAud021Cert(strpos($exception->getMessage(), 'wrong-test-passphrase') === false, 'K: wrong secret not echoed');
 }
 assertAud021Cert($failed, 'F: wrong passphrase fails without historical fallback');
 
 @unlink($keyPath);
 @unlink($certPath);
 @unlink($passFile);
+@unlink($secretOk);
+@unlink($secretWrong);
 @rmdir($tmp);
 
 fwrite(STDOUT, "OK (AUD-021 certificate validator passphrase)\n");

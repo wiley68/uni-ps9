@@ -6,8 +6,16 @@
 /dist/
 
 *.log
-/keys/
 .DS_Store
 .env
 .env.*
 !.env.example
+
+# Deployment SmartUCF passphrase (ZIP packaging only — keep secrets/ structure tracked)
+/secrets/smartucf-key.php
+
+# SmartUCF certificate / private-key material (keep keys/ protection files tracked)
+/keys/*.pem
+/keys/.incoming/
+/keys/.ssl_state.json
+/keys/.sync.lock

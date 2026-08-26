@@ -83,6 +83,7 @@ final class PrestaShopLogger
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 use PrestaShop\Module\Unipayment\Api\ControlPanelClient;
+use PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment;
 use PrestaShop\Module\Unipayment\Api\CurlHttpTransport;
 use PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCacheInterface;
@@ -143,7 +144,12 @@ function assertLive(bool $condition, string $message): void
 $unicid = trim((string) getenv('UNIPAYMENT_LIVE_UNICID'));
 $secret = trim((string) getenv('UNIPAYMENT_LIVE_SECRET'));
 $shopName = rtrim(trim((string) getenv('UNIPAYMENT_LIVE_SHOP_NAME')), '/');
-$baseUrl = rtrim(trim((string) (getenv('UNIPAYMENT_LIVE_BASE_URL') ?: ControlPanelClient::DEFAULT_BASE_URL)), '/');
+$liveBase = getenv('UNIPAYMENT_LIVE_BASE_URL');
+$baseUrl = rtrim(trim((string) (
+    (is_string($liveBase) && $liveBase !== '')
+        ? $liveBase
+        : (new ModuleDeploymentEnvironment())->controlPanelApiBaseUrl()
+)), '/');
 assertLive($unicid !== '' && $secret !== '' && $shopName !== '', 'live credentials required');
 
 $configuration = new ConfigurationRepository();

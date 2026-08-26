@@ -18,7 +18,7 @@ Related: [`../README.md`](../README.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [
 | Control Panel             | Shop registered with matching UNICID and shared secret |
 | Writable module directory | Certificate sync may write under `{module}/keys/`      |
 
-Default CP API base URL: `https://uni.avalonbg.com/api/v1`.
+Default CP host: `config/environment.php` → `control_panel_url` (API base = host + `/api/v1`).
 
 Themes: Hummingbird 2.0 (primary) and Classic 3.1.1.
 

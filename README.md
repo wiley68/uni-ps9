@@ -44,7 +44,7 @@ No PrestaShop 10 support claim. No production jQuery dependency.
 
 Shop must be registered in UniPayment Control Panel with matching **UNICID** and shared secret.
 
-Default API base: `https://uni.avalonbg.com/api/v1`.
+Default CP host: `config/environment.php` (`control_panel_url`); API base = host + `/api/v1`.
 
 Promotional content and schemes come from cached `GET /api/v1/shop` snapshots (Phase 3). FO pages do **not** call CP synchronously for advertising.
 

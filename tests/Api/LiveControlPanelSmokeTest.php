@@ -14,7 +14,7 @@ declare(strict_types=1);
  *   php tests/Api/LiveControlPanelSmokeTest.php
  *
  * Optional:
- *   UNIPAYMENT_LIVE_BASE_URL='https://uni.avalonbg.com/api/v1'
+ *   UNIPAYMENT_LIVE_BASE_URL='https://cp.example/api/v1'  (optional override; default: config/environment.php)
  *
  * Uses in-memory Configuration stubs (does not mutate the live shop DB).
  * Never prints secrets or tokens.
@@ -85,6 +85,7 @@ final class PhpEncryption
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 use PrestaShop\Module\Unipayment\Api\ControlPanelClient;
+use PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment;
 use PrestaShop\Module\Unipayment\Api\CurlHttpTransport;
 use PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository;
 use PrestaShop\Module\Unipayment\Security\TokenRepository;
@@ -100,7 +101,12 @@ function assertLive(bool $condition, string $message): void
 $unicid = trim((string) getenv('UNIPAYMENT_LIVE_UNICID'));
 $secret = trim((string) getenv('UNIPAYMENT_LIVE_SECRET'));
 $shopName = rtrim(trim((string) getenv('UNIPAYMENT_LIVE_SHOP_NAME')), '/');
-$baseUrl = rtrim(trim((string) (getenv('UNIPAYMENT_LIVE_BASE_URL') ?: ControlPanelClient::DEFAULT_BASE_URL)), '/');
+$liveBase = getenv('UNIPAYMENT_LIVE_BASE_URL');
+$baseUrl = rtrim(trim((string) (
+    (is_string($liveBase) && $liveBase !== '')
+        ? $liveBase
+        : (new ModuleDeploymentEnvironment())->controlPanelApiBaseUrl()
+)), '/');
 
 assertLive($unicid !== '' && $secret !== '' && $shopName !== '', 'live credentials env vars are required');
 

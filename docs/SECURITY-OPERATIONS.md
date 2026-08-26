@@ -13,20 +13,27 @@ Related: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`TESTING.md`](TESTING.md)
 | **UNICID**              | Shop identity in Control Panel                                                                                             |
 | **Shared secret**       | HMAC for CP → module signed requests; CP auth login                                                                        |
 | **CP access token**     | Bearer for outbound CP calls (`TokenRepository`, encrypted)                                                                |
-| **mTLS key passphrase** | SmartUCF client private-key decryption (`UNIPAYMENT_MTLS_KEY_PASSPHRASE` runtime env only; never in Git, BO config, or DB) |
+| **mTLS key passphrase** | SmartUCF client private-key decryption (`secrets/smartucf-key.php` in the module ZIP only; never in env, BO config, or DB) |
 
 Never log secrets, tokens, Authorization headers, decrypted SECRET, or the mTLS private-key passphrase.
 
 ### mTLS private-key passphrase (AUD-021)
 
-Inject at the PHP-FPM / process environment (placeholder only — never commit the real value):
+ZIP-only deployment — edit before packaging (placeholder in Git; real value only in prepared ZIP):
 
-```text
-; PHP-FPM pool example
-env[UNIPAYMENT_MTLS_KEY_PASSPHRASE] = REPLACE_WITH_RUNTIME_SECRET
+```php
+<?php
+// secrets/smartucf-key.php
+return [
+    'passphrase' => 'REPLACE_WITH_DEPLOYMENT_PASSPHRASE',
+];
 ```
 
-Missing/empty value → certificate validation and SmartUCF mTLS fail closed. No hard-coded fallback.
+Missing/invalid file → certificate validation and SmartUCF mTLS fail closed. No environment-variable fallback.
+
+### Control Panel base URL
+
+Single authoritative host in `config/environment.php` (`control_panel_url`). Outbound API calls use `{control_panel_url}/api/v1`.
 
 ---
 
