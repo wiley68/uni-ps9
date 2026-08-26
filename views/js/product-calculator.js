@@ -240,8 +240,19 @@
         var refreshSequence = 0;
         var lastRequestKey = "";
         var redirectPending = false;
+        var postOrderFinal = false;
         var popupSubmissionToken = "";
         var preselectOperationToken = "";
+
+        function markPostOrderFinal() {
+            postOrderFinal = true;
+            root.unipaymentPostOrderFinal = true;
+        }
+
+        function clearPostOrderFinal() {
+            postOrderFinal = false;
+            root.unipaymentPostOrderFinal = false;
+        }
 
         function t(attribute, fallback) {
             return root.getAttribute(attribute) || fallback;
@@ -768,6 +779,7 @@
             calculateSequence += 1;
             lastCalculation = null;
             redirectPending = false;
+            clearPostOrderFinal();
             popupSubmissionToken = "";
             preselectOperationToken = "";
             root.unipaymentPopupSubmissionToken = "";
@@ -1320,6 +1332,9 @@
                                 { omitRetry: !!(body.final || body.cp_error) },
                             );
                             setStep(3);
+                            if (body.final || body.cp_error || body.smartucf_error) {
+                                markPostOrderFinal();
+                            }
                             return;
                         }
                         root.unipaymentOrderResult = body.order;
@@ -1336,6 +1351,7 @@
                                 },
                             );
                             setStep(3);
+                            markPostOrderFinal();
                             return;
                         }
                         showOrderConfirmation(
@@ -1343,9 +1359,14 @@
                             body.post_order_error || body.email_error || "",
                         );
                         setStep(3);
+                        markPostOrderFinal();
                     });
                 })
                 .catch(function () {
+                    if (postOrderFinal) {
+                        setProcessingState(false);
+                        return;
+                    }
                     redirectPending = false;
                     setProcessingState(false);
                     setStep(2);
@@ -1581,6 +1602,10 @@
         });
 
         root.unipaymentUpdate = function (next) {
+            // AUD-024: post-order final result must survive cart refresh / empty cart.
+            if (postOrderFinal || redirectPending) {
+                return;
+            }
             config = next;
             root.setAttribute("data-calculator", JSON.stringify(next || {}));
             root.hidden = !next;
@@ -1615,6 +1640,7 @@
         };
 
         root.unipaymentInvalidatePopup = function () {
+            if (postOrderFinal || redirectPending) return;
             if (modal.hidden) return;
             lastCalculation = null;
             popupSubmissionToken = "";

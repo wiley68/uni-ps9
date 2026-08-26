@@ -11,6 +11,10 @@
         if (!root || !root.isConnected) {
             return;
         }
+        // AUD-024: do not invalidate/reset a visible post-order final result.
+        if (root.unipaymentPostOrderFinal) {
+            return;
+        }
         if (typeof root.unipaymentInvalidatePopup === "function") {
             root.unipaymentInvalidatePopup();
         }

@@ -32,6 +32,8 @@ assertCartFrontend(strpos($jsCart, 'isConnected') !== false, 'ignore detached ro
 assertCartFrontend(strpos($jsCart, 'AbortController') !== false, 'abort stale cart refresh');
 assertCartFrontend(strpos($jsCart, 'refreshSequence') !== false, 'sequence guard for stale responses');
 assertCartFrontend(strpos($jsCart, 'unipaymentInvalidatePopup') !== false, 'invalidate popup token/state on cart change');
+assertCartFrontend(strpos($jsCart, 'unipaymentPostOrderFinal') !== false, 'AUD-024: cart refresh respects post-order final lock');
+assertCartFrontend(strpos($jsProduct, 'postOrderFinal') !== false, 'AUD-024: explicit postOrderFinal state');
 assertCartFrontend(!preg_match('/\$\s*\(|\bjQuery\b/', $jsCart), 'no jQuery in cart JS');
 assertCartFrontend(strpos($jsProduct, 'isCartSource') !== false, 'shared popup JS detects cart');
 assertCartFrontend(
