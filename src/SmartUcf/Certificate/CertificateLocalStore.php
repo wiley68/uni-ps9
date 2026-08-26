@@ -267,7 +267,7 @@ final class CertificateLocalStore
             $directory,
             $certPath,
             $keyPath,
-            CertificatePairValidator::PASSPHRASE
+            $this->validator->privateKeyPassphrase()
         );
     }
 

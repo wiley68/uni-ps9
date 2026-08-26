@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace PrestaShop\Module\Unipayment\SmartUcf;
 
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
+use PrestaShop\Module\Unipayment\Security\MtlsPrivateKeyPassphraseProvider;
 use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateConsumerLease;
-use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificatePairValidator;
 
 /**
  * HTTP client for SmartUCF sucfOnlineSessionStart.
@@ -26,14 +26,19 @@ final class SmartUcfSessionClient implements SmartUcfSessionGatewayInterface
     /** @var SmartUcfEndpointPolicy */
     private $endpointPolicy;
 
+    /** @var MtlsPrivateKeyPassphraseProvider */
+    private $passphrases;
+
     public function __construct(
         SmartUcfPayloadBuilder $payloadBuilder,
         ?string $keysDir = null,
-        ?SmartUcfEndpointPolicy $endpointPolicy = null
+        ?SmartUcfEndpointPolicy $endpointPolicy = null,
+        ?MtlsPrivateKeyPassphraseProvider $passphrases = null
     ) {
         $this->payloadBuilder = $payloadBuilder;
         $this->keysDir = $keysDir ?? dirname(__DIR__, 2) . '/keys';
         $this->endpointPolicy = $endpointPolicy ?? new SmartUcfEndpointPolicy();
+        $this->passphrases = $passphrases ?? new MtlsPrivateKeyPassphraseProvider();
     }
 
     /**
@@ -77,7 +82,7 @@ final class SmartUcfSessionClient implements SmartUcfSessionGatewayInterface
 
         $keyPath = null;
         $certPath = null;
-        $certPassword = CertificatePairValidator::PASSPHRASE;
+        $certPassword = null;
         if ($useCert) {
             if ($certificateLease !== null) {
                 $keyPath = $certificateLease->privateKeyPath();
@@ -86,6 +91,7 @@ final class SmartUcfSessionClient implements SmartUcfSessionGatewayInterface
             } else {
                 $keyPath = $this->keysDir . '/avalon_private_key.pem';
                 $certPath = $this->keysDir . '/avalon_cert.pem';
+                $certPassword = $this->passphrases->require();
             }
             if ($keyPath === '' || $certPath === '' || !is_readable($keyPath) || !is_readable($certPath)) {
                 throw new SmartUcfSessionException(
@@ -95,6 +101,10 @@ final class SmartUcfSessionClient implements SmartUcfSessionGatewayInterface
                     0,
                     SmartUcfSessionException::KIND_PRE_SEND
                 );
+            }
+            if (!is_string($certPassword) || $certPassword === '') {
+                // Lease/runtime must already fail closed via provider; belt-and-suspenders.
+                $certPassword = $this->passphrases->require();
             }
         }
 

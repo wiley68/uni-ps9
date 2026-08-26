@@ -4,12 +4,31 @@ declare(strict_types=1);
 
 namespace PrestaShop\Module\Unipayment\SmartUcf\Certificate;
 
+use PrestaShop\Module\Unipayment\Security\MtlsPrivateKeyPassphraseNotConfiguredException;
+use PrestaShop\Module\Unipayment\Security\MtlsPrivateKeyPassphraseProvider;
+
 /**
  * Validates SmartUCF client certificate + private key PEM pairs (OpenSSL).
  */
 final class CertificatePairValidator
 {
-    public const PASSPHRASE = '1234';
+    /** @var MtlsPrivateKeyPassphraseProvider */
+    private $passphrases;
+
+    public function __construct(?MtlsPrivateKeyPassphraseProvider $passphrases = null)
+    {
+        $this->passphrases = $passphrases ?? new MtlsPrivateKeyPassphraseProvider();
+    }
+
+    /**
+     * Runtime passphrase for encrypted SmartUCF private keys (never hard-coded).
+     *
+     * @throws MtlsPrivateKeyPassphraseNotConfiguredException
+     */
+    public function privateKeyPassphrase(): string
+    {
+        return $this->passphrases->require();
+    }
 
     /**
      * @return array{
@@ -102,11 +121,11 @@ final class CertificatePairValidator
             throw new \InvalidArgumentException('The private key is not a valid PEM.');
         }
 
-        foreach ([self::PASSPHRASE, ''] as $passphrase) {
-            $key = @openssl_pkey_get_private($privateKeyPem, $passphrase);
-            if ($key !== false) {
-                return $key;
-            }
+        // Encrypted SmartUCF keys require a non-empty runtime passphrase (fail closed).
+        $passphrase = $this->passphrases->require();
+        $key = @openssl_pkey_get_private($privateKeyPem, $passphrase);
+        if ($key !== false) {
+            return $key;
         }
 
         throw new \InvalidArgumentException('The private key could not be parsed.');

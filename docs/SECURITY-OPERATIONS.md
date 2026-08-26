@@ -8,13 +8,25 @@ Related: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`TESTING.md`](TESTING.md)
 
 ## 1. Secrets
 
-| Secret              | Role                                                        |
-| ------------------- | ----------------------------------------------------------- |
-| **UNICID**          | Shop identity in Control Panel                              |
-| **Shared secret**   | HMAC for CP → module signed requests; CP auth login         |
-| **CP access token** | Bearer for outbound CP calls (`TokenRepository`, encrypted) |
+| Secret                  | Role                                                                                                                       |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **UNICID**              | Shop identity in Control Panel                                                                                             |
+| **Shared secret**       | HMAC for CP → module signed requests; CP auth login                                                                        |
+| **CP access token**     | Bearer for outbound CP calls (`TokenRepository`, encrypted)                                                                |
+| **mTLS key passphrase** | SmartUCF client private-key decryption (`UNIPAYMENT_MTLS_KEY_PASSPHRASE` runtime env only; never in Git, BO config, or DB) |
 
-Never log secrets, tokens, Authorization headers, or decrypted SECRET.
+Never log secrets, tokens, Authorization headers, decrypted SECRET, or the mTLS private-key passphrase.
+
+### mTLS private-key passphrase (AUD-021)
+
+Inject at the PHP-FPM / process environment (placeholder only — never commit the real value):
+
+```text
+; PHP-FPM pool example
+env[UNIPAYMENT_MTLS_KEY_PASSPHRASE] = REPLACE_WITH_RUNTIME_SECRET
+```
+
+Missing/empty value → certificate validation and SmartUCF mTLS fail closed. No hard-coded fallback.
 
 ---
 
