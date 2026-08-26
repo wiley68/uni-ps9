@@ -32,7 +32,11 @@ assertCartPopupCtrl(strpos($ctrl, 'getOrderTotal') === false, 'controller must n
 assertCartPopupCtrl(strpos($ctrl, 'CartPopupApplyService') !== false, 'cart apply uses CartPopupApplyService');
 assertCartPopupCtrl(strpos($ctrl, 'ProductPopupCustomerValidator') !== false, 'reuse customer validator');
 assertCartPopupCtrl(strpos($ctrl, 'OrderOrchestrator') !== false, 'cart apply creates durable orders');
-assertCartPopupCtrl(strpos($ctrl, 'markOrderCreated') !== false, 'cart apply marks order_created');
+assertCartPopupCtrl(
+    strpos($ctrl, 'PopupSubmissionPostOrderBinder') !== false
+        || strpos($ctrl, 'markOrderCreated') !== false,
+    'cart apply marks order_created'
+);
 assertCartPopupCtrl(strpos($calc, 'CartContextFactory') !== false, 'cartcalculator uses factory');
 assertCartPopupCtrl(strpos($calc, "'calculator' => null") !== false, 'config/unavailable returns null calculator');
 

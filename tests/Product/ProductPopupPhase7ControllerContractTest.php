@@ -37,7 +37,11 @@ assertPopupCtrl(strpos($popup, 'ControlPanelOrder') !== false, 'CP order creatio
 assertPopupCtrl(strpos($popup, 'SmartUcfSessionCoordinator') !== false, 'SmartUCF outbound enabled');
 assertPopupCtrl(strpos($popup, 'FinancingSnapshot') !== false, 'financing snapshot enabled');
 assertPopupCtrl(strpos($popup, 'PostControlPanelLifecycleService') !== false, 'post-CP lifecycle enabled');
-assertPopupCtrl(strpos($popup, 'markOrderCreated') !== false, 'apply terminates at order_created');
+assertPopupCtrl(
+    strpos($popup, 'PopupSubmissionPostOrderBinder') !== false
+        || strpos($popup, 'markOrderCreated') !== false,
+    'apply terminates at order_created'
+);
 assertPopupCtrl(strpos($popup, 'markIdentityAccepted') === false, 'apply must not stop at identity_accepted');
 assertPopupCtrl(strpos($js, 'body.redirect_url') !== false, 'JS follows trusted/confirmation redirect');
 assertPopupCtrl(strpos($js, 'showOrderConfirmation') !== false, 'JS can show order confirmation');

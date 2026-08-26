@@ -44,7 +44,11 @@ assertRem001(strpos($productPopup, 'ProductPopupApplyService') !== false, 'A: pr
 assertRem001(strpos($productPopup, 'OrderOrchestrator') !== false, 'A: productpopup uses OrderOrchestrator');
 assertRem001(strpos($productPopup, 'PostControlPanelLifecycleService') !== false, 'A: productpopup uses post-CP lifecycle');
 assertRem001(strpos($productPopup, 'SmartUcfSessionCoordinator') !== false, 'A: productpopup can start SmartUCF');
-assertRem001(strpos($productPopup, 'markOrderCreated') !== false, 'A: productpopup marks order_created');
+assertRem001(
+    strpos($productPopup, 'PopupSubmissionPostOrderBinder') !== false
+        || strpos($productPopup, 'markOrderCreated') !== false,
+    'A: productpopup marks order_created'
+);
 assertRem001(strpos($productPopup, 'markIdentityAccepted') === false, 'A: product apply no longer stops at identity_accepted');
 assertRem001(strpos($productApply, "'product_popup'") !== false, 'A: product apply source marker');
 
@@ -52,7 +56,11 @@ assertRem001(strpos($cartPopup, 'CartPopupApplyService') !== false, 'C: cartpopu
 assertRem001(strpos($cartPopup, 'OrderOrchestrator') !== false, 'C: cartpopup uses OrderOrchestrator');
 assertRem001(strpos($cartPopup, 'PostControlPanelLifecycleService') !== false, 'C: cartpopup uses post-CP lifecycle');
 assertRem001(strpos($cartPopup, 'SmartUcfSessionCoordinator') !== false, 'C: cartpopup can start SmartUCF');
-assertRem001(strpos($cartPopup, 'markOrderCreated') !== false, 'C: cartpopup marks order_created');
+assertRem001(
+    strpos($cartPopup, 'PopupSubmissionPostOrderBinder') !== false
+        || strpos($cartPopup, 'markOrderCreated') !== false,
+    'C: cartpopup marks order_created'
+);
 assertRem001(strpos($cartPopup, 'PopupSubmissionRepository') !== false, 'E/F: cart keeps submission tokens');
 assertRem001(strpos($cartPopup, 'claimForProcessing') !== false, 'E/F: cart double-submit uses claim');
 assertRem001(strpos($cartApply, "'cart_popup'") !== false, 'C: cart apply source marker');

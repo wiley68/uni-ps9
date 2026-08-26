@@ -23,6 +23,7 @@ use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleContext;
 use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecyclePopupMapper;
 use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleService;
 use PrestaShop\Module\Unipayment\Order\PostOrderPopupFailureResponse;
+use PrestaShop\Module\Unipayment\Order\PopupSubmissionPostOrderBinder;
 use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 use PrestaShop\Module\Unipayment\Product\GuestCustomerFactory;
 use PrestaShop\Module\Unipayment\Product\PopupSubmissionBindingFactory;
@@ -279,7 +280,8 @@ final class UnipaymentCartPopupModuleFrontController extends ModuleFrontControll
 
             $result = $service->apply($shop, $posted, $cartContext, $this->context);
 
-            $submissions->markOrderCreated(
+            PopupSubmissionPostOrderBinder::bind(
+                $submissions,
                 $submissionId,
                 $result->attemptId,
                 $result->idOrder,
@@ -304,9 +306,17 @@ final class UnipaymentCartPopupModuleFrontController extends ModuleFrontControll
 
             return ['success' => false, 'message' => 'The financing selection is unavailable.'];
         } catch (OrderOrchestrationException $exception) {
-            PrestaShopLogger::addLog('UniPayment cart popup apply orchestration failed: ' . get_class($exception), 2);
+            PrestaShopLogger::addLog(
+                'UniPayment cart popup apply orchestration failed: ' . get_class($exception)
+                    . ' post_order=' . ($exception->isPostOrder() ? '1' : '0')
+                    . ' id_order=' . $exception->idOrder()
+                    . ' id_attempt=' . $exception->attemptId()
+                    . ' state=' . $exception->state(),
+                2
+            );
             if ($exception->isPostOrder()) {
-                $submissions->markOrderCreated(
+                PopupSubmissionPostOrderBinder::bind(
+                    $submissions,
                     $submissionId,
                     $exception->attemptId(),
                     $exception->idOrder(),
@@ -329,6 +339,21 @@ final class UnipaymentCartPopupModuleFrontController extends ModuleFrontControll
                 'UniPayment cart popup apply failed: ' . get_class($exception) . ' ' . $this->sanitizeExceptionMessage($exception),
                 2
             );
+            $recoveredOrderId = (int) Order::getIdByCartId((int) $cart->id);
+            if ($recoveredOrderId > 0) {
+                $order = new Order($recoveredOrderId);
+                $reference = Validate::isLoadedObject($order) ? (string) $order->reference : '';
+                PopupSubmissionPostOrderBinder::bind(
+                    $submissions,
+                    $submissionId,
+                    0,
+                    $recoveredOrderId,
+                    $reference,
+                    0
+                );
+
+                return PostOrderPopupFailureResponse::fromPersistedOrder($recoveredOrderId, $reference);
+            }
             $rowAfter = $submissions->findByToken($token);
             if (is_array($rowAfter) && (int) ($rowAfter['id_cart'] ?? 0) <= 0) {
                 $submissions->revertProcessingWithoutCart($submissionId);

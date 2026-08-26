@@ -19,6 +19,7 @@ use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleContext;
 use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecyclePopupMapper;
 use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleService;
 use PrestaShop\Module\Unipayment\Order\PostOrderPopupFailureResponse;
+use PrestaShop\Module\Unipayment\Order\PopupSubmissionPostOrderBinder;
 use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 use PrestaShop\Module\Unipayment\Product\GuestCustomerFactory;
 use PrestaShop\Module\Unipayment\Product\PopupSubmissionBindingFactory;
@@ -303,7 +304,8 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                 $reuseCartId
             );
 
-            $submissions->markOrderCreated(
+            PopupSubmissionPostOrderBinder::bind(
+                $submissions,
                 $submissionId,
                 $result->attemptId,
                 $result->idOrder,
@@ -329,9 +331,17 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
 
             return ['success' => false, 'message' => 'The financing selection is unavailable.'];
         } catch (OrderOrchestrationException $exception) {
-            PrestaShopLogger::addLog('UniPayment popup apply orchestration failed: ' . get_class($exception), 2);
+            PrestaShopLogger::addLog(
+                'UniPayment popup apply orchestration failed: ' . get_class($exception)
+                    . ' post_order=' . ($exception->isPostOrder() ? '1' : '0')
+                    . ' id_order=' . $exception->idOrder()
+                    . ' id_attempt=' . $exception->attemptId()
+                    . ' state=' . $exception->state(),
+                2
+            );
             if ($exception->isPostOrder()) {
-                $submissions->markOrderCreated(
+                PopupSubmissionPostOrderBinder::bind(
+                    $submissions,
                     $submissionId,
                     $exception->attemptId(),
                     $exception->idOrder(),
@@ -354,6 +364,21 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                 2
             );
             $this->logPopupSelectionFailure($exception);
+            $recoveredOrderId = $this->recoverPopupNativeOrderId($reuseCartId);
+            if ($recoveredOrderId > 0) {
+                $order = new Order($recoveredOrderId);
+                $reference = Validate::isLoadedObject($order) ? (string) $order->reference : '';
+                PopupSubmissionPostOrderBinder::bind(
+                    $submissions,
+                    $submissionId,
+                    0,
+                    $recoveredOrderId,
+                    $reference,
+                    0
+                );
+
+                return PostOrderPopupFailureResponse::fromPersistedOrder($recoveredOrderId, $reference);
+            }
             $rowAfter = $submissions->findByToken($token);
             if (is_array($rowAfter) && (int) ($rowAfter['id_cart'] ?? 0) <= 0) {
                 $submissions->revertProcessingWithoutCart($submissionId);
@@ -367,6 +392,15 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                 'message' => 'Заявката не може да бъде обработена. Моля, опитайте отново.',
             ];
         }
+    }
+
+    private function recoverPopupNativeOrderId(int $idCart): int
+    {
+        if ($idCart <= 0) {
+            return 0;
+        }
+
+        return (int) Order::getIdByCartId($idCart);
     }
 
     /**

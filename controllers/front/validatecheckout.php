@@ -189,7 +189,12 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
                 $lock->release($idShop, $idCart, $lockToken);
             }
             PrestaShopLogger::addLog(
-                'UniPayment order orchestration failed: ' . get_class($exception) . '; retryable=' . ($exception->isRetryable() ? '1' : '0'),
+                'UniPayment order orchestration failed: ' . get_class($exception)
+                    . '; retryable=' . ($exception->isRetryable() ? '1' : '0')
+                    . '; post_order=' . ($exception->isPostOrder() ? '1' : '0')
+                    . '; id_order=' . $exception->idOrder()
+                    . '; id_attempt=' . $exception->attemptId()
+                    . '; state=' . $exception->state(),
                 2
             );
             if ($exception->isPostOrder()) {
@@ -212,6 +217,17 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
         } catch (Throwable $exception) {
             $lock->release($idShop, $idCart, $lockToken);
             PrestaShopLogger::addLog('UniPayment checkout validation failed: ' . get_class($exception), 2);
+            $recoveredOrderId = (int) Order::getIdByCartId($idCart);
+            if ($recoveredOrderId > 0) {
+                (new CheckoutPreferenceStore())->clear($this->context->cookie);
+                /** @var Unipayment $module */
+                $module = $this->module;
+                Tools::redirect(
+                    (new OrderConfirmationUrlBuilder())->build($this->context, $module, $recoveredOrderId)
+                );
+
+                return;
+            }
             $this->showPreOrderError($this->module->getTranslator()->trans(
                 'Изборът на финансиране не може да бъде валидиран.',
                 [],

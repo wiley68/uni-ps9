@@ -246,6 +246,15 @@ final class PopupSubmissionRepository
         string $orderReference,
         int $controlPanelOrderId
     ): void {
+        $existing = $this->requireById($submissionId);
+        if (
+            (string) ($existing['state'] ?? '') === PopupSubmissionStates::ORDER_CREATED
+            && (int) ($existing['id_order'] ?? 0) === $idOrder
+            && $idOrder > 0
+        ) {
+            return;
+        }
+
         $now = gmdate('Y-m-d H:i:s');
         $expires = gmdate('Y-m-d H:i:s', time() + self::ORDER_CREATED_TTL_SECONDS);
         $ok = $this->database->update(

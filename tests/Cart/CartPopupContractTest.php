@@ -39,7 +39,11 @@ assertCartPopupContract(strpos($jsProduct, 'isCartSource') !== false, 'product p
 assertCartPopupContract(strpos($jsProduct, 'issue_submission_token') !== false, 'cart/product popup JS must issue submission tokens');
 assertCartPopupContract(strpos($controller, 'PopupSubmissionRepository') !== false, 'cartpopup must reuse Phase 7 submission repository');
 assertCartPopupContract(strpos($controller, 'claimForProcessing') !== false, 'cartpopup must claim submission for processing');
-assertCartPopupContract(strpos($controller, 'markOrderCreated') !== false, 'cart apply must reach order_created');
+assertCartPopupContract(
+    strpos($controller, 'PopupSubmissionPostOrderBinder') !== false
+        || strpos($controller, 'markOrderCreated') !== false,
+    'cart apply must reach order_created'
+);
 assertCartPopupContract(strpos($controller, 'OrderOrchestrator') !== false, 'cartpopup must create durable orders via orchestrator');
 assertCartPopupContract(strpos($controller, 'CartPopupApplyService') !== false, 'cartpopup must use CartPopupApplyService');
 assertCartPopupContract(strpos($controller, 'PostControlPanelLifecycleService') !== false, 'cartpopup must run post-CP lifecycle');

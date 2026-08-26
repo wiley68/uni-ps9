@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PrestaShop\Module\Unipayment\Order;
 
 use PrestaShop\Module\Unipayment\Api\Exception\ConnectionException;
+use PrestaShop\Module\Unipayment\Api\Exception\ControlPanelException;
 use PrestaShop\Module\Unipayment\Api\Exception\HttpException;
 use PrestaShop\Module\Unipayment\Checkout\ValidatedPaymentRequest;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
@@ -83,10 +84,36 @@ final class OrderOrchestrator
             throw new OrderOrchestrationException('The financing attempt is already being processed.', true);
         }
 
-        $snapshot = $this->snapshots->findByAttempt($attemptId);
-        if ((int) ($attempt['id_order'] ?? 0) > 0) {
-            $order = $this->orders->load((int) $attempt['id_order']);
-            if ($snapshot === null) {
+        /** @var CreatedOrder|null $order */
+        $order = null;
+
+        try {
+            $snapshot = $this->snapshots->findByAttempt($attemptId);
+            if ((int) ($attempt['id_order'] ?? 0) > 0) {
+                $order = $this->orders->load((int) $attempt['id_order']);
+                if ($snapshot === null) {
+                    if (abs($order->total - $request->calculation->price) > 0.01) {
+                        $this->attempts->update($attemptId, ['state' => self::TERMINAL_FAILED, 'last_error_class' => 'OrderTotalMismatch']);
+                        DeferredOrderMailQueue::discard();
+                        throw new OrderOrchestrationException(
+                            'The created order total does not match the validated cart total.',
+                            false,
+                            null,
+                            $order->idOrder,
+                            $attemptId,
+                            self::TERMINAL_FAILED,
+                            false,
+                            $order->reference
+                        );
+                    }
+                    $snapshot = $this->snapshotFactory->create($request, $order, $submissionSource);
+                    $this->persistSnapshot($attemptId, $snapshot, $order);
+                }
+            } else {
+                // Idempotent: gateway recovers via Order::getIdByCartId() when PS order exists.
+                // create() only throws when no native order exists (true pre-order failure).
+                $order = $this->orders->create($request, $shop);
+                $attempt = $this->attachNativeOrder($attemptId, $order);
                 if (abs($order->total - $request->calculation->price) > 0.01) {
                     $this->attempts->update($attemptId, ['state' => self::TERMINAL_FAILED, 'last_error_class' => 'OrderTotalMismatch']);
                     DeferredOrderMailQueue::discard();
@@ -102,37 +129,45 @@ final class OrderOrchestrator
                     );
                 }
                 $snapshot = $this->snapshotFactory->create($request, $order, $submissionSource);
-                $this->saveSnapshot($attemptId, $snapshot);
+                $this->persistSnapshot($attemptId, $snapshot, $order);
             }
-        } else {
-            // Idempotent: gateway recovers via Order::getIdByCartId() when PS order exists.
-            $order = $this->orders->create($request, $shop);
-            $attempt = $this->attempts->attachOrderIfReserved($attemptId, $order->idOrder, $order->reference);
-            if (abs($order->total - $request->calculation->price) > 0.01) {
-                $this->attempts->update($attemptId, ['state' => self::TERMINAL_FAILED, 'last_error_class' => 'OrderTotalMismatch']);
-                DeferredOrderMailQueue::discard();
-                throw new OrderOrchestrationException(
-                    'The created order total does not match the validated cart total.',
-                    false,
-                    null,
-                    $order->idOrder,
-                    $attemptId,
-                    self::TERMINAL_FAILED,
-                    false,
-                    $order->reference
-                );
-            }
-            $snapshot = $this->snapshotFactory->create($request, $order, $submissionSource);
-            $this->saveSnapshot($attemptId, $snapshot);
-        }
 
-        $payload = isset($attempt['cp_payload']) && is_string($attempt['cp_payload']) && $attempt['cp_payload'] !== '' ? json_decode($attempt['cp_payload'], true) : null;
-        if (!is_array($payload)) {
-            $payload = $this->payloads->build($snapshot, $shop);
-            $attempt = $this->attempts->update($attemptId, ['cp_payload' => json_encode($payload, JSON_THROW_ON_ERROR)]);
+            return $this->submitToControlPanel($attempt, $attemptId, $order, $snapshot, $idShop, $shop);
+        } catch (OrderOrchestrationException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            if ($order instanceof CreatedOrder || (int) ($attempt['id_order'] ?? 0) > 0) {
+                throw $this->normalizeEscapedThrowable($exception, $order, $attemptId, $attempt);
+            }
+
+            // True pre-order failure: no native order identity is known — preserve original.
+            throw $exception;
         }
-        $this->attempts->update($attemptId, ['state' => self::CP_SUBMITTING, 'last_error_class' => null]);
+    }
+
+    /**
+     * @param array<string, mixed> $attempt
+     * @param array<string, mixed> $snapshot
+     * @param array<string, mixed> $shop
+     */
+    private function submitToControlPanel(
+        array $attempt,
+        int $attemptId,
+        CreatedOrder $order,
+        array $snapshot,
+        int $idShop,
+        array $shop
+    ): OrderOrchestrationResult {
         try {
+            $payload = isset($attempt['cp_payload']) && is_string($attempt['cp_payload']) && $attempt['cp_payload'] !== ''
+                ? json_decode($attempt['cp_payload'], true)
+                : null;
+            if (!is_array($payload)) {
+                $payload = $this->payloads->build($snapshot, $shop);
+                $attempt = $this->attempts->update($attemptId, ['cp_payload' => json_encode($payload, JSON_THROW_ON_ERROR)]);
+            }
+            $this->attempts->update($attemptId, ['state' => self::CP_SUBMITTING, 'last_error_class' => null]);
+
             $response = $this->cp->createOrder($payload);
             $cpId = (int) ($response['data']['id'] ?? 0);
             if ($cpId <= 0) {
@@ -157,7 +192,10 @@ final class OrderOrchestrator
             }
             $attempt = $this->attempts->update($attemptId, ['state' => self::CP_CREATED, 'control_panel_order_id' => $cpId]);
             $this->snapshots->update($attemptId, ['control_panel_order_id' => $cpId, 'lifecycle_status' => self::CP_CREATED]);
+
             return $this->result($attempt);
+        } catch (OrderOrchestrationException $exception) {
+            throw $exception;
         } catch (ConnectionException $exception) {
             $this->recordControlPanelFailure(
                 $attemptId,
@@ -198,6 +236,143 @@ final class OrderOrchestrator
                 false,
                 $order->reference
             );
+        } catch (ControlPanelException $exception) {
+            // InvalidPayload / MalformedJson: remote create may have occurred — outcome unknown.
+            $this->recordControlPanelFailure(
+                $attemptId,
+                $order,
+                $idShop,
+                $shop,
+                self::CP_OUTCOME_UNKNOWN,
+                get_class($exception)
+            );
+            throw new OrderOrchestrationException(
+                'The Control Panel result is unknown and can be retried safely.',
+                true,
+                $exception,
+                $order->idOrder,
+                $attemptId,
+                self::CP_OUTCOME_UNKNOWN,
+                true,
+                $order->reference
+            );
+        } catch (\Throwable $exception) {
+            $this->recordControlPanelFailure(
+                $attemptId,
+                $order,
+                $idShop,
+                $shop,
+                self::CP_OUTCOME_UNKNOWN,
+                get_class($exception)
+            );
+            throw new OrderOrchestrationException(
+                'The Control Panel result is unknown and can be retried safely.',
+                true,
+                $exception,
+                $order->idOrder,
+                $attemptId,
+                self::CP_OUTCOME_UNKNOWN,
+                true,
+                $order->reference
+            );
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function attachNativeOrder(int $attemptId, CreatedOrder $order): array
+    {
+        try {
+            return $this->attempts->attachOrderIfReserved($attemptId, $order->idOrder, $order->reference);
+        } catch (\Throwable $exception) {
+            $this->logPostOrderBoundary($order->idOrder, $attemptId, $exception, 'attach');
+            throw new OrderOrchestrationException(
+                'The financing order was created but could not be attached to the attempt.',
+                true,
+                $exception,
+                $order->idOrder,
+                $attemptId,
+                self::PS_ORDER_CREATED,
+                false,
+                $order->reference
+            );
+        }
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private function persistSnapshot(int $attemptId, array $snapshot, CreatedOrder $order): void
+    {
+        try {
+            $this->saveSnapshot($attemptId, $snapshot);
+        } catch (\Throwable $exception) {
+            $this->logPostOrderBoundary($order->idOrder, $attemptId, $exception, 'snapshot');
+            throw new OrderOrchestrationException(
+                'The financing order was created but the snapshot could not be saved.',
+                true,
+                $exception,
+                $order->idOrder,
+                $attemptId,
+                self::PS_ORDER_CREATED,
+                false,
+                $order->reference
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $attempt
+     */
+    private function normalizeEscapedThrowable(
+        \Throwable $exception,
+        ?CreatedOrder $order,
+        int $attemptId,
+        array $attempt
+    ): OrderOrchestrationException {
+        if ($order instanceof CreatedOrder) {
+            $this->logPostOrderBoundary($order->idOrder, $attemptId, $exception, 'post-order');
+
+            return new OrderOrchestrationException(
+                'The financing order was created but a later step failed.',
+                true,
+                $exception,
+                $order->idOrder,
+                $attemptId,
+                self::PS_ORDER_CREATED,
+                false,
+                $order->reference
+            );
+        }
+
+        $idOrder = (int) ($attempt['id_order'] ?? 0);
+        $this->logPostOrderBoundary($idOrder, $attemptId, $exception, 'attempt-order');
+
+        return new OrderOrchestrationException(
+            'The financing order was created but a later step failed.',
+            true,
+            $exception,
+            $idOrder,
+            $attemptId,
+            (string) ($attempt['state'] ?? self::PS_ORDER_CREATED),
+            false,
+            (string) ($attempt['order_reference'] ?? '')
+        );
+    }
+
+    private function logPostOrderBoundary(int $idOrder, int $attemptId, \Throwable $exception, string $phase): void
+    {
+        if (!class_exists(\PrestaShopLogger::class, false) && !class_exists('PrestaShopLogger', false)) {
+            return;
+        }
+        try {
+            \PrestaShopLogger::addLog(
+                'UniPayment post-order boundary'
+                    . ' phase=' . $phase
+                    . ' id_order=' . $idOrder
+                    . ' id_attempt=' . $attemptId
+                    . ' exception=' . get_class($exception),
+                2
+            );
+        } catch (\Throwable $ignored) {
+            unset($ignored);
         }
     }
 

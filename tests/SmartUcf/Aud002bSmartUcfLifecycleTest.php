@@ -124,7 +124,11 @@ assertAud002b(strpos($client, 'KIND_PRE_SEND') !== false, 'client marks pre-send
 
 $popup = (string) file_get_contents($root . '/controllers/front/productpopup.php');
 assertAud002b(strpos($popup, 'SmartUcfSessionCoordinator') !== false, 'product popup runs SmartUCF via shared lifecycle');
-assertAud002b(strpos($popup, 'markOrderCreated') !== false, 'product popup completes order_created');
+assertAud002b(
+    strpos($popup, 'PopupSubmissionPostOrderBinder') !== false
+        || strpos($popup, 'markOrderCreated') !== false,
+    'product popup completes order_created'
+);
 assertAud002b(strpos($popup, 'PostControlPanelLifecycleService') !== false, 'product popup uses post-CP lifecycle');
 
 $checkout = (string) file_get_contents($root . '/controllers/front/validatecheckout.php');

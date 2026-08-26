@@ -72,7 +72,11 @@ assertAud002aContract(
 
 assertAud002aContract(strpos($controller, 'issue_submission_token') !== false, 'controller must issue submission tokens');
 assertAud002aContract(strpos($controller, 'claimForProcessing') !== false, 'apply must claim submission for processing');
-assertAud002aContract(strpos($controller, 'markOrderCreated') !== false, 'apply completes with order_created');
+assertAud002aContract(
+    strpos($controller, 'PopupSubmissionPostOrderBinder') !== false
+        || strpos($controller, 'markOrderCreated') !== false,
+    'apply completes with order_created'
+);
 assertAud002aContract(strpos($controller, 'OrderOrchestrator') !== false, 'popup must create durable orders');
 assertAud002aContract(strpos($controller, 'SmartUcfSessionCoordinator') !== false, 'popup may run SmartUCF after CP');
 assertAud002aContract(strpos($controller, 'revertProcessingWithoutCart') !== false, 'validation failure without cart must revert');
