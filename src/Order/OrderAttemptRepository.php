@@ -118,6 +118,26 @@ final class OrderAttemptRepository implements OrderAttemptStoreInterface
         throw new \RuntimeException('The financing attempt order could not be attached.');
     }
 
+    /**
+     * Latest durable attempt for a shop cart (lock-loser recovery observer).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findLatestByShopCart(int $idShop, int $idCart): ?array
+    {
+        if ($idShop <= 0 || $idCart <= 0) {
+            return null;
+        }
+        $row = $this->database->getRow(
+            'SELECT * FROM `' . _DB_PREFIX_ . self::TABLE . '`
+            WHERE `id_shop` = ' . (int) $idShop . '
+              AND `id_cart` = ' . (int) $idCart . '
+            ORDER BY `id_attempt` DESC'
+        );
+
+        return is_array($row) ? $row : null;
+    }
+
     /** @return array<string, mixed> */
     private function requireById(int $attemptId): array
     {

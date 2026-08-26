@@ -8,6 +8,7 @@ use PrestaShop\Module\Unipayment\Cart\CartContextFactory;
 use PrestaShop\Module\Unipayment\Cart\CartSchemeResolver;
 use PrestaShop\Module\Unipayment\Checkout\CartSnapshot;
 use PrestaShop\Module\Unipayment\Checkout\CartSnapshotSigner;
+use PrestaShop\Module\Unipayment\Checkout\CheckoutLockLoserRecovery;
 use PrestaShop\Module\Unipayment\Checkout\CheckoutPaymentValidator;
 use PrestaShop\Module\Unipayment\Checkout\CheckoutPreferenceStore;
 use PrestaShop\Module\Unipayment\Checkout\CheckoutSubmitLock;
@@ -57,11 +58,7 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
         $lock = new CheckoutSubmitLock();
         $lockToken = $lock->acquire($idShop, $idCart);
         if ($lockToken === null) {
-            $this->showPreOrderError($this->module->getTranslator()->trans(
-                'The request is already being processed. Please wait.',
-                [],
-                'Modules.Unipayment.Shop'
-            ));
+            $this->handleLockLoser($idShop, $idCart);
 
             return;
         }
@@ -248,6 +245,75 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
             'phone2' => (string) Tools::getValue('unipayment_phone2', ''),
             'consent' => Tools::getValue('unipayment_consent', []),
         ];
+    }
+
+    private function handleLockLoser(int $idShop, int $idCart): void
+    {
+        $recovery = (new CheckoutLockLoserRecovery())->resolve($idShop, $idCart);
+        $kind = (string) ($recovery['kind'] ?? CheckoutLockLoserRecovery::KIND_PROCESSING);
+
+        if ($kind === CheckoutLockLoserRecovery::KIND_SMARTUCF_REDIRECT) {
+            $url = (string) ($recovery['redirect_url'] ?? '');
+            if ($url !== '') {
+                (new CheckoutPreferenceStore())->clear($this->context->cookie);
+                Tools::redirect($url);
+
+                return;
+            }
+        }
+
+        if (
+            $kind === CheckoutLockLoserRecovery::KIND_CONFIRMATION
+            && (int) ($recovery['id_order'] ?? 0) > 0
+        ) {
+            (new CheckoutPreferenceStore())->clear($this->context->cookie);
+            /** @var Unipayment $module */
+            $module = $this->module;
+            Tools::redirect(
+                (new OrderConfirmationUrlBuilder())->build(
+                    $this->context,
+                    $module,
+                    (int) $recovery['id_order']
+                )
+            );
+
+            return;
+        }
+
+        if ((int) ($recovery['id_order'] ?? 0) > 0) {
+            (new CheckoutPreferenceStore())->clear($this->context->cookie);
+            $orderResult = [
+                'id_order' => (int) $recovery['id_order'],
+                'order_reference' => (string) ($recovery['order_reference'] ?? ''),
+                'control_panel_order_id' => (int) ($recovery['control_panel_order_id'] ?? 0),
+            ];
+            if ($kind === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN) {
+                $this->context->smarty->assign([
+                    'unipayment_order_result' => $orderResult,
+                    'unipayment_smartucf_outcome_unknown' => true,
+                    'unipayment_smartucf_message' => (string) ($recovery['message'] ?? ''),
+                ]);
+            } else {
+                $this->context->smarty->assign([
+                    'unipayment_order_result' => $orderResult,
+                    'unipayment_smartucf_processing' => true,
+                    'unipayment_smartucf_message' => (string) ($recovery['message'] ?? ''),
+                ]);
+            }
+            $this->setTemplate('module:unipayment/views/templates/front/checkout_validated.tpl');
+
+            return;
+        }
+
+        // True pre-order lock contention: neutral processing, no resubmit CTA.
+        $this->context->smarty->assign([
+            'unipayment_checkout_processing_message' => $this->module->getTranslator()->trans(
+                'Your financing request is currently being processed.',
+                [],
+                'Modules.Unipayment.Shop'
+            ),
+        ]);
+        $this->setTemplate('module:unipayment/views/templates/front/checkout_processing.tpl');
     }
 
     private function showPreOrderError(string $message): void

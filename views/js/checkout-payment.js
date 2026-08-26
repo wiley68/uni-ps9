@@ -2,7 +2,8 @@
     "use strict";
 
     var CALCULATE_DELAY = 900;
-    var submitting = false;
+    /** @type {"idle"|"click_accepted"|"submitting"} */
+    var submitState = "idle";
 
     function parseConfig(root) {
         try {
@@ -306,17 +307,7 @@
             return true;
         }
 
-        function validateBeforeSubmit() {
-            if (submitting) {
-                showError(
-                    t(
-                        root,
-                        "data-submitting-message",
-                        "Заявката вече се обработва. Моля, изчакайте.",
-                    ),
-                );
-                return false;
-            }
+        function validateFormFields() {
             if (!consentsOk()) {
                 showError(
                     t(
@@ -342,8 +333,34 @@
             return true;
         }
 
+        function validateBeforeSubmit() {
+            if (submitState === "submitting") {
+                showError(
+                    t(
+                        root,
+                        "data-submitting-message",
+                        "Заявката вече се обработва. Моля, изчакайте.",
+                    ),
+                );
+                return false;
+            }
+            return validateFormFields();
+        }
+
         function markSubmitting() {
-            submitting = true;
+            submitState = "submitting";
+            root.classList.add("unipayment-checkout--submitting");
+            var confirmBtn = document.querySelector(
+                "#payment-confirmation button",
+            );
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.classList.add("disabled");
+            }
+        }
+
+        function acceptFirstClick() {
+            submitState = "click_accepted";
             root.classList.add("unipayment-checkout--submitting");
             var confirmBtn = document.querySelector(
                 "#payment-confirmation button",
@@ -392,7 +409,25 @@
 
         if (form) {
             form.addEventListener("submit", function (event) {
-                if (!validateBeforeSubmit()) {
+                if (submitState === "submitting") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    showError(
+                        t(
+                            root,
+                            "data-submitting-message",
+                            "Заявката вече се обработва. Моля, изчакайте.",
+                        ),
+                    );
+                    return false;
+                }
+                if (submitState === "click_accepted") {
+                    // First valid confirmation click already validated + disabled the button.
+                    syncHidden();
+                    markSubmitting();
+                    return true;
+                }
+                if (!validateFormFields()) {
                     event.preventDefault();
                     event.stopPropagation();
                     return false;
@@ -415,10 +450,18 @@
                 );
                 if (!payment || !payment.checked) return;
                 if (!root.offsetParent && root.hidden) return;
-                if (!validateBeforeSubmit()) {
+                if (submitState !== "idle") {
                     event.preventDefault();
                     event.stopPropagation();
+                    return;
                 }
+                if (!validateFormFields()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
+                // Valid first click: acquire client guard before the second click can race.
+                acceptFirstClick();
             },
             true,
         );
