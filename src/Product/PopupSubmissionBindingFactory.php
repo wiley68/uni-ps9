@@ -108,12 +108,29 @@ final class PopupSubmissionBindingFactory
         ];
     }
 
-    private function resolveGuestId(Context $context): int
+    /**
+     * Canonical popup identity for issue and apply gates.
+     *
+     * @return array{id_guest: int, id_customer: int}
+     */
+    public function identityFromContext(Context $context): array
+    {
+        return [
+            'id_guest' => $this->resolveGuestId($context),
+            'id_customer' => $this->resolveCustomerId($context),
+        ];
+    }
+
+    public function resolveGuestId(Context $context): int
     {
         return (int) ($context->cookie->id_guest ?? 0);
     }
 
-    private function resolveCustomerId(Context $context): int
+    /**
+     * Authenticated customer id only when Customer::isLogged() is true.
+     * Guest customer objects (id > 0, isLogged() false / is_guest) resolve to 0.
+     */
+    public function resolveCustomerId(Context $context): int
     {
         $customer = $context->customer;
         if ($customer instanceof \Customer && method_exists($customer, 'isLogged') && $customer->isLogged()) {

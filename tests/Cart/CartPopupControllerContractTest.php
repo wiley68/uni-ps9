@@ -37,6 +37,7 @@ assertCartPopupCtrl(
         || strpos($ctrl, 'markOrderCreated') !== false,
     'cart apply marks order_created'
 );
+assertCartPopupCtrl(strpos($ctrl, 'identityFromContext') !== false, 'apply gate uses BindingFactory identity');
 assertCartPopupCtrl(strpos($calc, 'CartContextFactory') !== false, 'cartcalculator uses factory');
 assertCartPopupCtrl(strpos($calc, "'calculator' => null") !== false, 'config/unavailable returns null calculator');
 

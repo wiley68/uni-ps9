@@ -406,9 +406,9 @@ final class UnipaymentCartPopupModuleFrontController extends ModuleFrontControll
             ];
         }
 
-        $idGuest = (int) ($this->context->cookie->id_guest ?? 0);
-        $idCustomer = (int) ($this->context->customer->id ?? 0);
-        if (!PopupSubmissionRepository::identityMatches($row, $idGuest, $idCustomer)) {
+        // Same canonical identity as issueOrReuse / PopupSubmissionBindingFactory (isLogged only).
+        $identity = (new PopupSubmissionBindingFactory())->identityFromContext($this->context);
+        if (!PopupSubmissionRepository::identityMatches($row, $identity['id_guest'], $identity['id_customer'])) {
             http_response_code(403);
 
             return ['response' => ['success' => false, 'message' => 'Invalid popup submission token.']];

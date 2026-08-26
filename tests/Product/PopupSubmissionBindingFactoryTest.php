@@ -83,6 +83,16 @@ $poisonedContext->shop = (object) ['id' => 1];
 $notLogged = (new PopupSubmissionBindingFactory())->fromSelection($selection, $poisonedContext);
 assertBinding($notLogged['id_customer'] === 0, 'cookie id_customer leftover must not bind customer');
 
+$guestObj = new Customer();
+$guestObj->id = 4;
+$guestObj->logged = false;
+$guestObjCtx = new Context();
+$guestObjCtx->cookie = (object) ['id_guest' => 8967];
+$guestObjCtx->customer = $guestObj;
+$guestObjCtx->shop = (object) ['id' => 1];
+$viaIdentity = (new PopupSubmissionBindingFactory())->identityFromContext($guestObjCtx);
+assertBinding($viaIdentity === ['id_guest' => 8967, 'id_customer' => 0], 'identityFromContext matches issue semantics for PS guest customer');
+
 $otherQty = $selection;
 $otherQty['quantity'] = 2;
 $qtyHash = (new PopupSubmissionBindingFactory())->fromSelection($otherQty, $guestContext);
