@@ -707,6 +707,7 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                 new \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository()
             );
             $journal->record(
+                (int) ($this->context->shop->id ?? 0),
                 0,
                 'popup-selection',
                 422,
@@ -758,6 +759,7 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                 new \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository()
             );
             $journal->record(
+                (int) ($this->context->shop->id ?? 0),
                 $idOrder,
                 $orderReference,
                 500,

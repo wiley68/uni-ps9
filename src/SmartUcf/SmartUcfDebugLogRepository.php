@@ -21,6 +21,7 @@ final class SmartUcfDebugLogRepository implements SmartUcfDebugLogStoreInterface
     {
         $sql = 'CREATE TABLE IF NOT EXISTS `' . $this->tableName() . '` (
             `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `id_shop` INT UNSIGNED NOT NULL,
             `id_order` INT UNSIGNED NOT NULL,
             `order_id` VARCHAR(64) NOT NULL,
             `http_status` SMALLINT UNSIGNED NOT NULL DEFAULT 0,
@@ -29,7 +30,7 @@ final class SmartUcfDebugLogRepository implements SmartUcfDebugLogStoreInterface
             `transport_error` TEXT NULL,
             `created_at` DATETIME NOT NULL,
             PRIMARY KEY (`id`),
-            KEY `idx_unipayment_smartucf_order_id` (`order_id`),
+            KEY `idx_unipayment_smartucf_shop_order` (`id_shop`, `order_id`, `id`),
             KEY `idx_unipayment_smartucf_id_order` (`id_order`),
             KEY `idx_unipayment_smartucf_created_at` (`created_at`)
         ) ENGINE=' . constant('_MYSQL_ENGINE_') . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
@@ -45,10 +46,16 @@ final class SmartUcfDebugLogRepository implements SmartUcfDebugLogStoreInterface
     /** @param array<string, mixed> $entry */
     public function insert(array $entry): bool
     {
+        $idShop = (int) ($entry['id_shop'] ?? 0);
+        if ($idShop <= 0) {
+            return false;
+        }
+
         $this->ensureTable();
         $this->prune();
 
         return (bool) $this->database->insert(self::TABLE, [
+            'id_shop' => $idShop,
             'id_order' => max(0, (int) ($entry['ps_order_id'] ?? 0)),
             'order_id' => trim((string) ($entry['order_id'] ?? '')),
             'http_status' => max(0, (int) ($entry['http_code'] ?? 0)),
@@ -60,17 +67,18 @@ final class SmartUcfDebugLogRepository implements SmartUcfDebugLogStoreInterface
     }
 
     /** @return array<string, mixed>|null */
-    public function findLatestByOrderId(string $orderId): ?array
+    public function findLatestByOrderIdAndShop(string $orderId, int $idShop): ?array
     {
         $this->prune();
         $orderId = trim($orderId);
-        if ($orderId === '') {
+        if ($orderId === '' || $idShop <= 0) {
             return null;
         }
 
         $row = $this->database->getRow(sprintf(
-            "SELECT * FROM `%s` WHERE `order_id` = '%s' ORDER BY `id` DESC",
+            "SELECT * FROM `%s` WHERE `id_shop` = %d AND `order_id` = '%s' ORDER BY `id` DESC",
             $this->tableName(),
+            $idShop,
             pSQL($orderId)
         ));
         if (!is_array($row)) {
@@ -117,6 +125,7 @@ final class SmartUcfDebugLogRepository implements SmartUcfDebugLogStoreInterface
     {
         return [
             'id' => (int) $row['id'],
+            'id_shop' => (int) ($row['id_shop'] ?? 0),
             'order_id' => (string) $row['order_id'],
             'ps_order_id' => (int) $row['id_order'],
             'http_code' => (int) $row['http_status'],

@@ -13,6 +13,11 @@ final class UnipaymentSmartucfdebuglogModuleFrontController extends ModuleApiCon
     protected function handleAuthenticatedRequest(array $payload, string $unicid): array
     {
         unset($unicid);
+        $idShop = (int) ($this->context->shop->id ?? 0);
+        if ($idShop <= 0) {
+            throw new ModuleApiException('Контекстът на магазина е невалиден.', 400);
+        }
+
         $orderId = $payload['order_id'] ?? null;
         if (!is_string($orderId) && !is_int($orderId)) {
             throw new ModuleApiException('Полето order_id е задължително.', 400);
@@ -26,8 +31,9 @@ final class UnipaymentSmartucfdebuglogModuleFrontController extends ModuleApiCon
         $log = (new SmartUcfDiagnosticJournal(
             new ConfigurationRepository(),
             new SmartUcfDebugLogRepository()
-        ))->findLatestByOrderId($orderId);
+        ))->findLatestByOrderIdAndShop($orderId, $idShop);
         if ($log === null) {
+            // Same outward response whether missing locally or owned by another shop (no cross-tenant oracle).
             throw new ModuleApiException('Не е намерен SmartUCF диагностичен запис за тази поръчка.', 404);
         }
 

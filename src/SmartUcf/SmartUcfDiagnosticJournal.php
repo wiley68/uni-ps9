@@ -47,13 +47,21 @@ final class SmartUcfDiagnosticJournal
      * @param mixed $request
      * @param mixed $response
      */
-    public function record(int $idOrder, string $orderId, int $httpCode, $request, $response, ?string $transportError = null): bool
-    {
-        if (!$this->configuration->isDebugEnabled()) {
+    public function record(
+        int $idShop,
+        int $idOrder,
+        string $orderId,
+        int $httpCode,
+        $request,
+        $response,
+        ?string $transportError = null
+    ): bool {
+        if ($idShop <= 0 || !$this->configuration->isDebugEnabled()) {
             return false;
         }
 
         return $this->store->insert([
+            'id_shop' => $idShop,
             'ps_order_id' => max(0, $idOrder),
             'order_id' => trim($orderId),
             'http_code' => max(0, $httpCode),
@@ -65,9 +73,12 @@ final class SmartUcfDiagnosticJournal
     }
 
     /** @return array<string, mixed>|null */
-    public function findLatestByOrderId(string $orderId): ?array
+    public function findLatestByOrderIdAndShop(string $orderId, int $idShop): ?array
     {
-        $entry = $this->store->findLatestByOrderId($orderId);
+        if ($idShop <= 0) {
+            return null;
+        }
+        $entry = $this->store->findLatestByOrderIdAndShop($orderId, $idShop);
 
         return $entry === null ? null : $this->sanitizeEntry($entry);
     }

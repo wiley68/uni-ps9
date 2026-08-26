@@ -10,7 +10,7 @@ interface SmartUcfDebugLogStoreInterface
     public function insert(array $entry): bool;
 
     /** @return array<string, mixed>|null */
-    public function findLatestByOrderId(string $orderId): ?array;
+    public function findLatestByOrderIdAndShop(string $orderId, int $idShop): ?array;
 
     /** @return array<int, array<string, mixed>> */
     public function findAll(): array;

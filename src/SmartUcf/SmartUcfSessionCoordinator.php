@@ -429,6 +429,7 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
                 new SmartUcfDebugLogRepository()
             );
             $journal->record(
+                $this->authorizedShopId(),
                 $idOrder,
                 $orderReference,
                 (int) ($session['http_code'] ?? 0),
@@ -458,6 +459,7 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
             );
             $http = $exception instanceof SmartUcfSessionException ? $exception->httpCode() : 0;
             $journal->record(
+                $this->authorizedShopId(),
                 $idOrder,
                 $orderReference,
                 $http,

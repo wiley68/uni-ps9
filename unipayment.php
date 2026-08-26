@@ -422,9 +422,12 @@ class Unipayment extends PaymentModule
             $export['entries'] = array_values(array_filter(
                 is_array($export['entries'] ?? null) ? $export['entries'] : [],
                 static function (array $entry) use ($idShop): bool {
+                    if (isset($entry['id_shop'])) {
+                        return (int) $entry['id_shop'] === $idShop;
+                    }
                     $idOrder = (int) ($entry['ps_order_id'] ?? 0);
                     if ($idOrder <= 0) {
-                        return true;
+                        return false;
                     }
                     $order = new Order($idOrder);
                     if (!Validate::isLoadedObject($order)) {

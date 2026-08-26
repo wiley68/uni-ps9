@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+/**
+ * SmartUCF diagnostic journal gate, sanitization, and shop-scoped lookup API.
+ */
+
 if (PHP_SAPI !== 'cli') {
     exit(1);
 }
@@ -59,16 +63,22 @@ final class MemoryDebugStore implements SmartUcfDebugLogStoreInterface
 
     public function insert(array $entry): bool
     {
+        if ((int) ($entry['id_shop'] ?? 0) <= 0) {
+            return false;
+        }
         $entry['id'] = count($this->entries) + 1;
         $this->entries[] = $entry;
 
         return true;
     }
 
-    public function findLatestByOrderId(string $orderId): ?array
+    public function findLatestByOrderIdAndShop(string $orderId, int $idShop): ?array
     {
+        if ($idShop <= 0) {
+            return null;
+        }
         foreach (array_reverse($this->entries) as $entry) {
-            if ($entry['order_id'] === $orderId) {
+            if ($entry['order_id'] === $orderId && (int) ($entry['id_shop'] ?? 0) === $idShop) {
                 return $entry;
             }
         }
@@ -90,11 +100,12 @@ final class MemoryDebugStore implements SmartUcfDebugLogStoreInterface
 $configuration = new ConfigurationRepository();
 $store = new MemoryDebugStore();
 $journal = new SmartUcfDiagnosticJournal($configuration, $store);
-assertJournal(!$journal->record(1, 'ORDER-1', 200, ['secret' => 'do-not-store'], []), 'disabled debug journal persisted an entry');
+assertJournal(!$journal->record(1, 1, 'ORDER-1', 200, ['secret' => 'do-not-store'], []), 'disabled debug journal persisted an entry');
 assertJournal($store->entries === [], 'disabled debug journal reached persistence');
 
 Configuration::$values[ConfigurationRepository::DEBUG_ENABLED] = '1';
-assertJournal($journal->record(1, 'ORDER-1', 200, [
+assertJournal(!$journal->record(0, 1, 'ORDER-1', 200, ['a' => 1], []), 'zero id_shop must fail closed');
+assertJournal($journal->record(1, 1, 'ORDER-1', 200, [
     'user' => 'merchant',
     'pass' => 'password',
     'clientEmail' => 'person@example.com',
@@ -108,12 +119,18 @@ foreach (['merchant', 'password', 'person@example.com', 'token-value', 'abc.def'
 }
 assertJournal(strpos((string) $json, '[REDACTED]') !== false, 'debug export did not contain redaction markers');
 
-$latest = $journal->findLatestByOrderId('ORDER-1');
-assertJournal(is_array($latest), 'findLatest returns entry');
+$latest = $journal->findLatestByOrderIdAndShop('ORDER-1', 1);
+assertJournal(is_array($latest), 'findLatestByOrderIdAndShop returns entry');
+assertJournal($journal->findLatestByOrderIdAndShop('ORDER-1', 2) === null, 'other shop must not see journal row');
 
 $cutoff = PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository::retentionCutoff(
     new DateTimeImmutable('2026-08-18 12:00:00', new DateTimeZone('UTC'))
 );
 assertJournal($cutoff === '2026-05-18 12:00:00', 'three-month retention');
+
+$repoSrc = (string) file_get_contents(dirname(__DIR__, 2) . '/src/SmartUcf/SmartUcfDebugLogRepository.php');
+assertJournal(strpos($repoSrc, '`id_shop` INT UNSIGNED NOT NULL') !== false, 'schema must store id_shop');
+assertJournal(strpos($repoSrc, 'findLatestByOrderIdAndShop') !== false, 'repository shop-scoped lookup');
+assertJournal(!preg_match('/function\s+findLatestByOrderId\s*\(/', $repoSrc), 'global findLatestByOrderId must be removed');
 
 fwrite(STDOUT, "OK (SmartUCF diagnostic journal gate and sanitization)\n");

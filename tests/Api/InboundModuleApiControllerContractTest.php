@@ -51,7 +51,9 @@ assertCtrl(strpos($shopcache, 'hash_equals($unicid, $data[\'unicid\'])') !== fal
 
 $smart = (string) file_get_contents($root . '/controllers/front/smartucfdebuglog.php');
 assertCtrl(strpos($smart, 'SmartUcfDiagnosticJournal') !== false, 'smartucf uses journal');
-assertCtrl(strpos($smart, 'findLatestByOrderId') !== false, 'smartucf is read endpoint');
+assertCtrl(strpos($smart, 'findLatestByOrderIdAndShop') !== false, 'smartucf is shop-scoped read endpoint');
+assertCtrl(strpos($smart, 'context->shop->id') !== false, 'smartucf resolves authenticated shop from context');
+assertCtrl(!preg_match('/findLatestByOrderId\s*\(/', $smart), 'smartucf must not use global order_id lookup');
 
 $module = (string) file_get_contents($root . '/unipayment.php');
 assertCtrl(strpos($module, 'ApiNonceRepository') !== false, 'install wires nonce');
