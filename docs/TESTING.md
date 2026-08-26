@@ -64,7 +64,18 @@ Phase 10 durable order path:
 | `tests/Checkout/PaymentOptionContractTest.php`     | Phase 10 validatecheckout wiring                       |
 | `tests/Product/PopupSubmissionRepositoryTest.php`  | `markOrderCreated` strict `processing → order_created` |
 
-Current safe suite: **68 tests** (`composer test`).
+Current safe suite: **75 tests** (`composer test`).
+
+Phase 11 post-CP lifecycle:
+
+| Test                                                  | What it checks                                            |
+| ----------------------------------------------------- | --------------------------------------------------------- |
+| `tests/Order/Aud018PostControlPanelLifecycleTest.php` | Process 2 / SmartUCF normalize / resume / checkout wiring |
+| `tests/Order/Phase11BankStatusContractTest.php`       | bank_sent_process1/2 vs failed_cp/smartucf isolation      |
+| `tests/SmartUcf/Aud002bSmartUcfLifecycleTest.php`     | classifier + durable contracts                            |
+| `tests/SmartUcf/Aud002bPostSuccessBoundaryTest.php`   | no second createSession after remote success              |
+| `tests/SmartUcf/Aud003SmartUcfEndpointPolicyTest.php` | trusted redirect hosts                                    |
+| `tests/SmartUcf/Aud002bLifecycleRepositoryTest.php`   | SKIP unless runtime suite                                 |
 
 ```bash
 composer validate --no-check-publish

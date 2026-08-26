@@ -2,13 +2,13 @@
 
 Native PrestaShop 9 module for **UniCredit financing** (credit calculator, checkout payment method, order lifecycle, Control Panel integration, and SmartUCF).
 
-| Item                  | Value                                                                        |
-| --------------------- | ---------------------------------------------------------------------------- |
-| Module technical name | `unipayment`                                                                 |
-| Current version       | `2.0.1`                                                                      |
-| Repository            | `wiley68/uni-ps9`                                                            |
-| Repository root       | Module root (this directory)                                                 |
-| Current state         | **Phase 10 — durable checkout submission (PS order + snapshot + CP create)** |
+| Item                  | Value                                                             |
+| --------------------- | ----------------------------------------------------------------- |
+| Module technical name | `unipayment`                                                      |
+| Current version       | `2.0.1`                                                           |
+| Repository            | `wiley68/uni-ps9`                                                 |
+| Repository root       | Module root (this directory)                                      |
+| Current state         | **Phase 11 — post-CP lifecycle (SmartUCF Process 1 / Process 2)** |
 
 ## Purpose
 
@@ -28,21 +28,21 @@ Provide a PrestaShop 9-native adapter/port of the UniPayment product family:
 
 ## Current implementation status
 
-Phase 10 provides:
+Phase 11 provides:
 
-- Phases 0–9 (config, CP, calculator, product/cart FO, checkout PaymentOption);
-- atomic checkout lock + durable `order_attempt` + `financing_snapshot`;
-- exactly-once native PrestaShop order + CP `POST /api/v1/orders`;
-- `bank_send_failed_cp` on CP failure after PS order exists;
-- temporary post-order UX (`checkout_validated.tpl` / order-confirmation redirect).
+- Phases 0–10 (durable PS order + snapshot + CP create);
+- `PostControlPanelLifecycleService` after `cp_created`;
+- SmartUCF Process 1 (session create/resume) → `bank_sent_process1`;
+- Process 2 handoff (no SmartUCF) → `bank_sent_process2`;
+- `bank_send_failed_smartucf` when CP succeeded but SmartUCF failed;
+- deferred native `order_conf` flush via `Phase11DeferredMailDispatcher`.
 
 Still **not** implemented:
 
-- SmartUCF Process 1 / 2;
-- `PostControlPanelLifecycleService` / final bank statuses;
-- financing email lifecycle;
+- full financing customer/admin email presentation (Phase 12);
 - final Thank You redesign;
-- advertising FO.
+- advertising FO;
+- v2.0.2 scheme ordering.
 
 ## Documentation
 

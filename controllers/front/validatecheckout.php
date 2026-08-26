@@ -14,7 +14,6 @@ use PrestaShop\Module\Unipayment\Checkout\CheckoutSubmitLock;
 use PrestaShop\Module\Unipayment\Checkout\CheckoutValidationException;
 use PrestaShop\Module\Unipayment\Checkout\ConsentResolver;
 use PrestaShop\Module\Unipayment\Checkout\CustomerFieldValidator;
-use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
 use PrestaShop\Module\Unipayment\Order\ControlPanelOrderClientAdapter;
 use PrestaShop\Module\Unipayment\Order\ControlPanelOrderPayloadBuilder;
 use PrestaShop\Module\Unipayment\Order\FinancingSnapshotFactory;
@@ -24,12 +23,13 @@ use PrestaShop\Module\Unipayment\Order\OrderAttemptRepository;
 use PrestaShop\Module\Unipayment\Order\OrderConfirmationUrlBuilder;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrationException;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
-use PrestaShop\Module\Unipayment\Order\Phase10CheckoutOutcome;
+use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleContext;
+use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleService;
 use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
+use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfSessionCoordinator;
 
 /**
- * Phase 10 PaymentOption action: durable checkout submission through PS order,
- * financing snapshot, and Control Panel create-order (no SmartUCF yet).
+ * Phase 11 PaymentOption action: durable PS/CP order (Phase 10) then post-CP lifecycle.
  */
 final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontController
 {
@@ -61,7 +61,7 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
                 'The request is already being processed. Please wait.',
                 [],
                 'Modules.Unipayment.Shop'
-            ), Phase10CheckoutOutcome::CONCURRENT_REQUEST_IN_PROGRESS);
+            ));
 
             return;
         }
@@ -94,11 +94,12 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
             );
             $shop['_is_mobile'] = $this->context->isMobile();
             $cpApi = $module->getControlPanelClient();
+            $cpClient = new ControlPanelOrderClientAdapter($cpApi);
             $orchestrator = new OrderOrchestrator(
                 new OrderAttemptRepository(),
                 new FinancingSnapshotRepository(),
                 new NativePrestaShopOrderGateway($module, $this->context),
-                new ControlPanelOrderClientAdapter($cpApi),
+                $cpClient,
                 new FinancingSnapshotFactory(new SensitiveDataCipher()),
                 new ControlPanelOrderPayloadBuilder(),
                 new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository()
@@ -107,8 +108,79 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
             $result = $orchestrator->orchestrate($idShop, $idCart, $request, $shop, 'checkout');
             (new CheckoutPreferenceStore())->clear($this->context->cookie);
 
-            $outcome = Phase10CheckoutOutcome::fromOrchestrationResult($result);
-            $this->renderPostOrderSuccess($outcome, $shop);
+            // Phase 11: post-CP lifecycle only after durable CP order exists (cp_created).
+            $lifecycle = (new PostControlPanelLifecycleService())->handle(
+                $result,
+                $shop,
+                new PostControlPanelLifecycleContext(
+                    $idShop,
+                    (string) $this->context->currency->iso_code
+                ),
+                new SmartUcfSessionCoordinator(
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    $cpClient,
+                    $module,
+                    $this->context,
+                    $cpApi
+                )
+            );
+
+            if ($lifecycle->isProcess2()) {
+                Tools::redirect(
+                    (new OrderConfirmationUrlBuilder())->build($this->context, $module, $result->idOrder)
+                );
+
+                return;
+            }
+
+            if ($lifecycle->isCreated() && $lifecycle->redirectUrl() !== '') {
+                Tools::redirect($lifecycle->redirectUrl());
+
+                return;
+            }
+
+            if ($lifecycle->isFailed()) {
+                Tools::redirect(
+                    (new OrderConfirmationUrlBuilder())->build($this->context, $module, $result->idOrder)
+                );
+
+                return;
+            }
+
+            $orderResult = [
+                'id_order' => $result->idOrder,
+                'order_reference' => $result->orderReference,
+                'control_panel_order_id' => $result->controlPanelOrderId,
+            ];
+
+            if ($lifecycle->isProcessing()) {
+                $this->context->smarty->assign([
+                    'unipayment_order_result' => $orderResult,
+                    'unipayment_smartucf_processing' => true,
+                    'unipayment_smartucf_message' => $lifecycle->customerMessage(),
+                ]);
+                $this->setTemplate('module:unipayment/views/templates/front/checkout_validated.tpl');
+
+                return;
+            }
+
+            if ($lifecycle->isOutcomeUnknown()) {
+                $this->context->smarty->assign([
+                    'unipayment_order_result' => $orderResult,
+                    'unipayment_smartucf_outcome_unknown' => true,
+                    'unipayment_smartucf_message' => $lifecycle->customerMessage(),
+                ]);
+                $this->setTemplate('module:unipayment/views/templates/front/checkout_validated.tpl');
+
+                return;
+            }
+
+            $this->context->smarty->assign(['unipayment_order_result' => $orderResult]);
+            $this->setTemplate('module:unipayment/views/templates/front/checkout_validated.tpl');
         } catch (CheckoutValidationException $exception) {
             $lock->release($idShop, $idCart, $lockToken);
             $this->showPreOrderError($exception->getMessage());
@@ -122,8 +194,11 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
             );
             if ($exception->isPostOrder()) {
                 (new CheckoutPreferenceStore())->clear($this->context->cookie);
-                $outcome = Phase10CheckoutOutcome::fromOrchestrationException($exception);
-                $this->renderPostOrderFailure($outcome);
+                /** @var Unipayment $module */
+                $module = $this->module;
+                Tools::redirect(
+                    (new OrderConfirmationUrlBuilder())->build($this->context, $module, $exception->idOrder())
+                );
 
                 return;
             }
@@ -145,56 +220,6 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
         }
     }
 
-    /** @param array<string, mixed> $shop */
-    private function renderPostOrderSuccess(Phase10CheckoutOutcome $outcome, array $shop): void
-    {
-        /** @var Unipayment $module */
-        $module = $this->module;
-
-        if (ShopConfigurationFlags::isProcess2($shop)) {
-            Tools::redirect((new OrderConfirmationUrlBuilder())->build($this->context, $module, $outcome->idOrder));
-
-            return;
-        }
-
-        $this->context->smarty->assign([
-            'unipayment_order_result' => [
-                'id_order' => $outcome->idOrder,
-                'order_reference' => $outcome->orderReference,
-                'control_panel_order_id' => $outcome->controlPanelOrderId,
-            ],
-            'unipayment_phase10_recovered' => $outcome->code === Phase10CheckoutOutcome::RECOVERED_EXISTING_ORDER,
-        ]);
-        $this->setTemplate('module:unipayment/views/templates/front/checkout_validated.tpl');
-    }
-
-    private function renderPostOrderFailure(Phase10CheckoutOutcome $outcome): void
-    {
-        /** @var Unipayment $module */
-        $module = $this->module;
-
-        if ($outcome->outcomeUnknown) {
-            $this->context->smarty->assign([
-                'unipayment_order_result' => [
-                    'id_order' => $outcome->idOrder,
-                    'order_reference' => $outcome->orderReference,
-                    'control_panel_order_id' => 0,
-                ],
-                'unipayment_smartucf_outcome_unknown' => true,
-                'unipayment_smartucf_message' => $this->module->getTranslator()->trans(
-                    'Поръчката е създадена, но потвърждението от Control Panel не беше получено. Не изпращайте заявката повторно.',
-                    [],
-                    'Modules.Unipayment.Shop'
-                ),
-            ]);
-            $this->setTemplate('module:unipayment/views/templates/front/checkout_validated.tpl');
-
-            return;
-        }
-
-        Tools::redirect((new OrderConfirmationUrlBuilder())->build($this->context, $module, $outcome->idOrder));
-    }
-
     /** @return array<string, mixed> */
     private function postedSelection(): array
     {
@@ -209,9 +234,8 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
         ];
     }
 
-    private function showPreOrderError(string $message, string $outcomeCode = Phase10CheckoutOutcome::VALIDATION_FAILED_BEFORE_ORDER): void
+    private function showPreOrderError(string $message): void
     {
-        unset($outcomeCode);
         $this->context->smarty->assign([
             'unipayment_checkout_error' => $message,
             'unipayment_checkout_return_url' => $this->context->link->getPageLink('order', true),

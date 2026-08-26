@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes **intended** high-level boundaries and the **implemented Phase 10** state.
+This document describes **intended** high-level boundaries and the **implemented Phase 11** state.
 
 ---
 
@@ -48,7 +48,8 @@ Infrastructure
 | Popup identity / dedupe     | Phase 7 — `unipayment_popup_submission`, operation guard, Step 2 identity             |
 | Cart page FO                | Phase 8 — `displayShoppingCart` + cartcalculator/cartpopup + Phase 7 flow isolation   |
 | Checkout PaymentOption      | Phase 9 — `paymentOptions` + checkoutcalculate + preference/fingerprint handoff       |
-| Durable checkout submission | Phase 10 — lock + attempt + PS order + snapshot + CP create (no SmartUCF yet)         |
+| Durable checkout submission | Phase 10 — lock + attempt + PS order + snapshot + CP create                           |
+| Post-CP lifecycle           | Phase 11 — Process 1 SmartUCF / Process 2 handoff + bank status                       |
 
 ### Shop configuration cache flow
 
@@ -203,7 +204,38 @@ validatecheckout (Phase 10)
     → Phase10CheckoutOutcome / post-order template or order-confirmation redirect
 ```
 
-**Phase 10 boundary:** no SmartUCF Process 1/2, no `PostControlPanelLifecycleService`, no financing emails beyond native `order_conf` deferral for Process 1 via `DeferredOrderMailQueue` + `hookActionEmailSendBefore`.
+**Phase 10 boundary ends at `cp_created`.** Phase 11 continues:
+
+```text
+OrderOrchestrationResult (cp_created)
+    ↓
+PostControlPanelLifecycleService
+    ├─ Process 2 (uni_proces=1)
+    │     → bank_sent_process2
+    │     → Phase11DeferredMailDispatcher (flush order_conf)
+    │     → native order confirmation redirect
+    └─ Process 1
+          → SmartUcfSessionCoordinator::run/resume
+          → claim smartucf_state on financing_snapshot
+          → createSession (exactly-once via durable state)
+          → bank_sent_process1 | bank_send_failed_smartucf | processing | outcome_unknown
+          → flush deferred order_conf on terminal mail path
+```
+
+**Bank status meanings:**
+
+| Status                      | Trigger                                            |
+| --------------------------- | -------------------------------------------------- |
+| `bank_send_failed_cp`       | Phase 10: PS order exists, CP create failed        |
+| `bank_sent_process1`        | CP created **and** SmartUCF Process 1 succeeded    |
+| `bank_send_failed_smartucf` | CP created **and** SmartUCF Process 1 failed       |
+| `bank_sent_process2`        | CP created **and** Process 2 handoff (no SmartUCF) |
+
+**SmartUCF snapshot states:** `not_started` → `submitting` → `created` \| `failed` \| `outcome_unknown`.
+
+**UniPayment tables remain 8** (Phase 10 schema already includes `smartucf_*` columns).
+
+**Post-order UX:** Process 2 / SmartUCF failure → order confirmation; SmartUCF created → trusted bank redirect; processing/unknown → `checkout_validated.tpl`.
 
 **Attempt state machine** (`OrderOrchestrator`):
 
@@ -267,10 +299,9 @@ UNIPAYMENT_CP_TOKEN_EXPIRES_AT
 
 ## Explicitly not implemented yet
 
-| Area                                            | Phase |
-| ----------------------------------------------- | ----- |
-| SmartUCF Process 1 / 2                          | 11+   |
-| PostControlPanelLifecycle / bank_sent_process\* | 11+   |
-| Financing customer/admin/bank emails            | 11+   |
-| Final Thank You / confirmation redesign         | 12+   |
-| Advertising FO                                  | later |
+| Area                                    | Phase |
+| --------------------------------------- | ----- |
+| Full financing customer/admin email UX  | 12+   |
+| Final Thank You / confirmation redesign | 12+   |
+| Admin/order UI polish                   | 12+   |
+| Advertising FO                          | later |

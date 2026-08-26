@@ -180,8 +180,14 @@ assertModuleSkeleton(
     'Phase 10 post-order validated template must exist'
 );
 assertModuleSkeleton(
-    !preg_match('/SmartUcfSessionCoordinator|PostControlPanelLifecycleService/', (string) file_get_contents($root . '/controllers/front/validatecheckout.php')),
-    'validatecheckout must not wire SmartUCF or post-CP lifecycle'
+    is_file($root . '/src/Order/PostControlPanelLifecycleService.php')
+        && is_file($root . '/src/SmartUcf/SmartUcfSessionCoordinator.php'),
+    'Phase 11 post-CP lifecycle + SmartUCF coordinator must exist'
+);
+assertModuleSkeleton(
+    (bool) preg_match('/PostControlPanelLifecycleService/', (string) file_get_contents($root . '/controllers/front/validatecheckout.php'))
+        && (bool) preg_match('/SmartUcfSessionCoordinator/', (string) file_get_contents($root . '/controllers/front/validatecheckout.php')),
+    'validatecheckout must wire Phase 11 lifecycle after CP create'
 );
 
-fwrite(STDOUT, "OK (module skeleton Phase 10 contract)\n");
+fwrite(STDOUT, "OK (module skeleton Phase 11 contract)\n");

@@ -170,6 +170,10 @@ Do not log: raw `popup_submission_token`, EGN, session cookie, secrets, Bearer t
 
 Phase 10 financing snapshot stores EGN/phone2 only in encrypted `sensitive_payload` (`SensitiveDataCipher`); generic `customer_json` excludes EGN. Retention redaction via `FinancingSnapshotRetentionService` (6 months AUD-014 default).
 
+Phase 11 SmartUCF: do not log EGN, full SmartUCF customer payload, certificate/key material, or Bearer tokens. Safe: order reference, attempt id, SmartUCF state/error class.
+
+Phase 11 SmartUCF: do not log EGN, full SmartUCF customer payload, certificate/key material, or Bearer tokens. Safe: order reference, attempt id, SmartUCF state/error class.
+
 Expired / replayed / wrong-shop / wrong-identity operations return safe customer-facing JSON (no SQL, no token hash, no stack traces).
 
 Cleanup: opportunistic `DELETE` of expired `issued` / `failed` / `identity_accepted` rows (1/20 of issue attempts). `processing` and `order_created` are never purged here.

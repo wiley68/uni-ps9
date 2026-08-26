@@ -277,20 +277,20 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Phase 10 е **durable checkout submission** (PS order + financing snapshot + CP create).
+Phase 11 е **post-Control-Panel lifecycle** (SmartUCF Process 1 / Process 2 handoff).
 
 Разрешено:
 
-- всичко от Phase 0–9;
-- atomic checkout lock, order attempt, financing snapshot;
-- native `validateOrder()` + CP `POST /api/v1/orders`;
-- `bank_send_failed_cp` persistence;
-- temporary post-order customer boundary (`checkout_validated.tpl` / order confirmation redirect);
-- `DeferredOrderMailQueue` deferral of native `order_conf` for Process 1 only.
+- всичко от Phase 0–10;
+- `PostControlPanelLifecycleService` след durable `cp_created`;
+- `SmartUcfSessionCoordinator` Process 1 create/resume;
+- Process 2 → `bank_sent_process2` без SmartUCF;
+- `bank_send_failed_smartucf` при SmartUCF failure след CP success;
+- flush на deferred native `order_conf` (`Phase11DeferredMailDispatcher`).
 
-Не въвеждай SmartUCF Process 1/2, `PostControlPanelLifecycleService`, financing emails, final Thank You UX, advertising FO или v2.0.2 scheme ordering, докато съответната фаза не бъде изрично възложена.
+Не въвеждай full financing mail UX, final Thank You redesign, advertising FO или v2.0.2 scheme ordering, докато Phase 12 не бъде изрично възложена.
 
-Product/cart popup paths остават на `identity_accepted` — primary Phase 10 entry е checkout PaymentOption → `validatecheckout`.
+Product/cart popup paths остават на `identity_accepted` — primary entry е checkout → `validatecheckout`.
 
 ---
 

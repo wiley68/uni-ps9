@@ -32,6 +32,22 @@ Once `id_order` exists on the attempt, **never** start a fresh financing attempt
 
 Connection/timeout → `cp_outcome_unknown`, `bank_send_failed_cp`, retryable post-order outcome. Safe retry reuses stored `cp_payload` and relies on CP idempotency by shop/order reference.
 
+## Phase 11 post-CP lifecycle
+
+After durable `cp_created`:
+
+| Path                          | Recovery                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| Process 2                     | Persist `bank_sent_process2`; flush deferred native mail; no SmartUCF     |
+| Process 1 success             | Snapshot `smartucf_state=created`; `bank_sent_process1`; trusted redirect |
+| Process 1 retryable failure   | `smartucf_failed` + retryable=1; same attempt/CP; resume claim            |
+| Process 1 terminal failure    | `bank_send_failed_smartucf`; no new PS/CP order                           |
+| Process 1 ambiguous transport | `outcome_unknown`; do **not** mark `bank_sent_process1`                   |
+| Replay after created          | Coordinator returns durable session; no second `createSession`            |
+| CP missing / Phase 10 failure | Phase 11 must not run                                                     |
+
+Callback race: inbound `orderbankstatus` uses financing snapshot JOIN; local SmartUCF success writes `bank_sent_process1` first — do not regress success to SmartUCF failure on replay.
+
 ## Multishop
 
 All durable rows are scoped by `id_shop`. Inbound `orderbankstatus` authorizes via `order_reference + id_shop + financing_snapshot JOIN` (AUD-011).
