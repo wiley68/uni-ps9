@@ -51,21 +51,63 @@ function assertOrder(bool $condition, string $message): void
 }
 final class MemoryAttempts implements OrderAttemptStoreInterface
 {
+    /** @var array<string, array<string, mixed>> */
     public $rows = [];
+
     public function reserve(int $shop, int $cart, string $fingerprint): array
     {
         $key = "$shop:$cart:$fingerprint";
         $created = !isset($this->rows[$key]);
-        if ($created) $this->rows[$key] = ['id_attempt' => count($this->rows) + 1, 'id_shop' => $shop, 'id_cart' => $cart, 'cart_fingerprint' => $fingerprint, 'state' => 'reserved', 'id_order' => null, 'order_reference' => null, 'control_panel_order_id' => null, 'cp_payload' => null];
+        if ($created) {
+            $this->rows[$key] = [
+                'id_attempt' => count($this->rows) + 1,
+                'id_shop' => $shop,
+                'id_cart' => $cart,
+                'cart_fingerprint' => $fingerprint,
+                'state' => 'reserved',
+                'id_order' => null,
+                'order_reference' => null,
+                'control_panel_order_id' => null,
+                'cp_payload' => null,
+            ];
+        }
+
         return $this->rows[$key] + ['_reservation_created' => $created];
     }
+
     public function update(int $id, array $changes): array
     {
-        foreach ($this->rows as $key => $row) if ($row['id_attempt'] === $id) {
-            $this->rows[$key] = array_replace($row, $changes);
-            return $this->rows[$key];
+        foreach ($this->rows as $key => $row) {
+            if ($row['id_attempt'] === $id) {
+                $this->rows[$key] = array_replace($row, $changes);
+
+                return $this->rows[$key];
+            }
         }
-        throw new RuntimeException();
+        throw new RuntimeException('attempt not found');
+    }
+
+    public function attachOrderIfReserved(int $attemptId, int $idOrder, string $orderReference): array
+    {
+        foreach ($this->rows as $key => $row) {
+            if ((int) $row['id_attempt'] !== $attemptId) {
+                continue;
+            }
+            if ((string) $row['state'] === OrderOrchestrator::RESERVED && (int) ($row['id_order'] ?? 0) <= 0) {
+                $this->rows[$key] = array_replace($row, [
+                    'state' => OrderOrchestrator::PS_ORDER_CREATED,
+                    'id_order' => $idOrder,
+                    'order_reference' => substr($orderReference, 0, 13),
+                ]);
+
+                return $this->rows[$key];
+            }
+            if ((int) ($row['id_order'] ?? 0) === $idOrder) {
+                return $this->rows[$key];
+            }
+            throw new RuntimeException('The financing attempt order could not be attached.');
+        }
+        throw new RuntimeException('attempt not found');
     }
 }
 final class MemorySnapshots implements FinancingSnapshotStoreInterface
@@ -86,30 +128,52 @@ final class MemorySnapshots implements FinancingSnapshotStoreInterface
 }
 final class FakeOrders implements PrestaShopOrderGatewayInterface
 {
-    public $created = 0;
+    public int $created = 0;
+    public int $validateOrderCalls = 0;
+    public int $createCalls = 0;
+    public int $loadCalls = 0;
+    /** @var list<int> */
     public $failed = [];
+    /** @var list<int> */
     public $awaiting = [];
+    /** @var list<float> */
     public $amounts = [];
+    /** When true, create() recovers existing cart order without validateOrder (getIdByCartId path). */
+    public bool $orderAlreadyOnCart = false;
     /** @var CreatedOrder */
     public $order;
+
     public function __construct(CreatedOrder $order)
     {
         $this->order = $order;
     }
+
     public function create(ValidatedPaymentRequest $request, array $shop = []): CreatedOrder
     {
-        $this->created++;
+        ++$this->createCalls;
+        if ($this->orderAlreadyOnCart) {
+            return $this->load($this->order->idOrder);
+        }
+        ++$this->validateOrderCalls;
+        ++$this->created;
         $this->amounts[] = $request->calculation->price;
+        $this->orderAlreadyOnCart = true;
+
         return $this->order;
     }
+
     public function load(int $id): CreatedOrder
     {
+        ++$this->loadCalls;
+
         return $this->order;
     }
+
     public function markFailed(int $id): void
     {
         $this->failed[] = $id;
     }
+
     public function markAwaiting(int $id): void
     {
         $this->awaiting[] = $id;
@@ -179,17 +243,119 @@ assertOrder($snapshots->rows[1]['months'] === $calculation->scheme->months && $s
 assertOrder(array_keys($cp->calls[0]) === ['order_id', 'name', 'phone', 'email', 'address', 'address2', 'price', 'vnoska', 'gpr', 'vnoski', 'parva', 'products_id', 'products_name', 'products_q', 'type_client', 'currency', 'version'], 'Process 1 CP create must not claim SmartUCF success');
 assertOrder($cp->calls[0]['products_id'] === '3' && $cp->calls[0]['products_name'] === 'Product-Name' && $cp->calls[0]['products_q'] === '2', 'Woo product formatting differs');
 
-$lockedAttempts = new MemoryAttempts();
-$lockedAttempts->reserve(1, 99, $request->cartFingerprint);
-$lockedOrders = new FakeOrders($created);
-$lockedFlow = new OrderOrchestrator($lockedAttempts, new MemorySnapshots(), $lockedOrders, new FakeCp(), new FinancingSnapshotFactory(new SensitiveDataCipher()), new ControlPanelOrderPayloadBuilder());
-try {
-    $lockedFlow->orchestrate(1, 99, $request, $shop);
-    assertOrder(false, 'concurrent reservation accepted');
-} catch (OrderOrchestrationException $e) {
-    assertOrder($e->isRetryable(), 'concurrent reservation not retryable');
-}
-assertOrder($lockedOrders->created === 0, 'concurrent reservation created a second order');
+assertOrder($orders->validateOrderCalls === 1, 'fresh flow must call validateOrder once');
+
+// Crash window: reserved attempt, id_order NULL, PS order already exists on cart.
+$crashAttempts = new MemoryAttempts();
+$crashKey = '1:88:' . $request->cartFingerprint;
+$crashAttempts->rows[$crashKey] = [
+    'id_attempt' => 77,
+    'id_shop' => 1,
+    'id_cart' => 88,
+    'cart_fingerprint' => $request->cartFingerprint,
+    'state' => OrderOrchestrator::RESERVED,
+    'id_order' => null,
+    'order_reference' => null,
+    'control_panel_order_id' => null,
+    'cp_payload' => null,
+];
+$crashSnapshots = new MemorySnapshots();
+$crashOrders = new FakeOrders($created);
+$crashOrders->orderAlreadyOnCart = true;
+$crashCp = new FakeCp();
+$crashCp->queue[] = ['data' => ['id' => 911]];
+$crashFlow = new OrderOrchestrator(
+    $crashAttempts,
+    $crashSnapshots,
+    $crashOrders,
+    $crashCp,
+    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new ControlPanelOrderPayloadBuilder()
+);
+$crashResult = $crashFlow->orchestrate(1, 88, $request, $shop);
+assertOrder($crashResult->idOrder === 55 && $crashResult->controlPanelOrderId === 911, 'crash recovery must complete CP create');
+assertOrder($crashOrders->validateOrderCalls === 0, 'crash recovery must not call validateOrder');
+assertOrder($crashOrders->createCalls === 1, 'crash recovery must enter gateway create for getIdByCartId path');
+assertOrder((int) $crashAttempts->rows[$crashKey]['id_order'] === 55, 'crash recovery must attach existing id_order');
+assertOrder((string) $crashAttempts->rows[$crashKey]['state'] === OrderOrchestrator::PS_ORDER_CREATED
+    || (string) $crashAttempts->rows[$crashKey]['state'] === OrderOrchestrator::CP_CREATED, 'crash recovery must leave reserved');
+assertOrder(isset($crashSnapshots->rows[77]), 'crash recovery must create snapshot');
+
+// Second recovery retry: reuse attached order, no second validateOrder / CP.
+$crashCp->queue[] = ['data' => ['id' => 999]];
+$crashAgain = $crashFlow->orchestrate(1, 88, $request, $shop);
+assertOrder($crashAgain->idOrder === 55 && $crashAgain->controlPanelOrderId === 911, 'second recovery must reuse CP success');
+assertOrder($crashOrders->validateOrderCalls === 0 && $crashOrders->createCalls === 1, 'second recovery must not recreate PS order');
+assertOrder(count($crashCp->calls) === 1, 'second recovery must not POST CP again');
+
+// reserved + no PS order after stale lock takeover → create once.
+$staleAttempts = new MemoryAttempts();
+$staleKey = '1:89:' . $request->cartFingerprint;
+$staleAttempts->rows[$staleKey] = [
+    'id_attempt' => 78,
+    'id_shop' => 1,
+    'id_cart' => 89,
+    'cart_fingerprint' => $request->cartFingerprint,
+    'state' => OrderOrchestrator::RESERVED,
+    'id_order' => null,
+    'order_reference' => null,
+    'control_panel_order_id' => null,
+    'cp_payload' => null,
+];
+$staleOrders = new FakeOrders($created);
+$staleCp = new FakeCp();
+$staleCp->queue[] = ['data' => ['id' => 912]];
+$staleFlow = new OrderOrchestrator(
+    $staleAttempts,
+    new MemorySnapshots(),
+    $staleOrders,
+    $staleCp,
+    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new ControlPanelOrderPayloadBuilder()
+);
+$staleResult = $staleFlow->orchestrate(1, 89, $request, $shop);
+assertOrder($staleResult->controlPanelOrderId === 912, 'stale reserved without PS order must create');
+assertOrder($staleOrders->validateOrderCalls === 1, 'stale reserved without PS order must validateOrder once');
+assertOrder((int) $staleAttempts->rows[$staleKey]['id_order'] === 55, 'stale reserved must attach new order');
+
+// Retry after id_order already populated → load only.
+$attachedAttempts = new MemoryAttempts();
+$attachedKey = '1:90:' . $request->cartFingerprint;
+$attachedAttempts->rows[$attachedKey] = [
+    'id_attempt' => 79,
+    'id_shop' => 1,
+    'id_cart' => 90,
+    'cart_fingerprint' => $request->cartFingerprint,
+    'state' => OrderOrchestrator::PS_ORDER_CREATED,
+    'id_order' => 55,
+    'order_reference' => 'ABCD12345',
+    'control_panel_order_id' => null,
+    'cp_payload' => null,
+];
+$attachedOrders = new FakeOrders($created);
+$attachedCp = new FakeCp();
+$attachedCp->queue[] = ['data' => ['id' => 913]];
+$attachedFlow = new OrderOrchestrator(
+    $attachedAttempts,
+    new MemorySnapshots(),
+    $attachedOrders,
+    $attachedCp,
+    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new ControlPanelOrderPayloadBuilder()
+);
+$attachedResult = $attachedFlow->orchestrate(1, 90, $request, $shop);
+assertOrder($attachedResult->controlPanelOrderId === 913, 'attached attempt must resume CP');
+assertOrder($attachedOrders->createCalls === 0 && $attachedOrders->loadCalls >= 1, 'attached attempt must load, not create');
+assertOrder($attachedOrders->validateOrderCalls === 0, 'attached attempt must not validateOrder');
+
+// Live concurrency remains CheckoutSubmitLock (Aud-013), not attempt early-exit.
+$validateCtrl = (string) file_get_contents(dirname(__DIR__, 2) . '/controllers/front/validatecheckout.php');
+assertOrder(strpos($validateCtrl, 'CheckoutSubmitLock') !== false, 'validatecheckout must acquire checkout lock');
+assertOrder(strpos($validateCtrl, '$lockToken = $lock->acquire($idShop, $idCart);') !== false, 'lock acquire before orchestrate');
+assertOrder(
+    (bool) preg_match('/\$lockToken\s*=\s*\$lock->acquire[\s\S]*OrderOrchestrator/s', $validateCtrl),
+    'orchestrator runs only after lock ownership'
+);
 
 $a2 = new MemoryAttempts();
 $s2 = new MemorySnapshots();

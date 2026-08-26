@@ -13,12 +13,12 @@ Recovery is **state-first**: inspect `order_attempt` + `financing_snapshot` befo
 
 ## Crash windows
 
-| Window                                         | Recovery                                                                                          |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Before PS order                                | Release checkout lock; customer may retry checkout safely                                         |
-| After `validateOrder()`, before attempt update | Next request finds PS order by cart id; orchestrator loads order, skips second `validateOrder()`  |
-| After snapshot, during CP POST                 | Retry resumes CP create with same payload; timeout → `cp_outcome_unknown` + `bank_send_failed_cp` |
-| After CP success, before attempt update        | Retry finds CP id on success response or CP lookup by reference (Phase 11 may extend)             |
+| Window                                         | Recovery                                                                                                                                                                                                                                  |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Before PS order                                | Release checkout lock; customer may retry checkout safely                                                                                                                                                                                 |
+| After `validateOrder()`, before attempt update | Lock owner retries: `reserved` + `id_order NULL` is recoverable; gateway uses `Order::getIdByCartId()` (no second `validateOrder`); `attachOrderIfReserved` persists identity atomically. Live concurrency stays on `CheckoutSubmitLock`. |
+| After snapshot, during CP POST                 | Retry resumes CP create with same payload; timeout → `cp_outcome_unknown` + `bank_send_failed_cp`                                                                                                                                         |
+| After CP success, before attempt update        | Retry finds CP id on success response or CP lookup by reference (Phase 11 may extend)                                                                                                                                                     |
 
 ## Post-order rule
 

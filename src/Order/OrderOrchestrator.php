@@ -73,7 +73,13 @@ final class OrderOrchestrator
                 (string) ($attempt['order_reference'] ?? '')
             );
         }
-        if (empty($attempt['_reservation_created']) && (int) ($attempt['id_order'] ?? 0) <= 0) {
+        // reserved + no id_order is recoverable for the CheckoutSubmitLock owner
+        // (crash after validateOrder before attempt attach). Non-reserved mid-states
+        // without an order remain blocked. Live concurrency is enforced by the lock.
+        if (
+            (int) ($attempt['id_order'] ?? 0) <= 0
+            && (string) $attempt['state'] !== self::RESERVED
+        ) {
             throw new OrderOrchestrationException('The financing attempt is already being processed.', true);
         }
 
@@ -99,8 +105,9 @@ final class OrderOrchestrator
                 $this->saveSnapshot($attemptId, $snapshot);
             }
         } else {
+            // Idempotent: gateway recovers via Order::getIdByCartId() when PS order exists.
             $order = $this->orders->create($request, $shop);
-            $attempt = $this->attempts->update($attemptId, ['state' => self::PS_ORDER_CREATED, 'id_order' => $order->idOrder, 'order_reference' => $order->reference]);
+            $attempt = $this->attempts->attachOrderIfReserved($attemptId, $order->idOrder, $order->reference);
             if (abs($order->total - $request->calculation->price) > 0.01) {
                 $this->attempts->update($attemptId, ['state' => self::TERMINAL_FAILED, 'last_error_class' => 'OrderTotalMismatch']);
                 DeferredOrderMailQueue::discard();

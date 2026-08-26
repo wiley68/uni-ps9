@@ -7,9 +7,17 @@ namespace PrestaShop\Module\Unipayment\Order;
 final class OrderAttemptRepository implements OrderAttemptStoreInterface
 {
     public const TABLE = 'unipayment_order_attempt';
+
+    /** @var \Db|object */
     private $database;
 
-    public function __construct(?\Db $database = null) { $this->database = $database ?? \Db::getInstance(); }
+    /**
+     * @param \Db|object|null $database
+     */
+    public function __construct($database = null)
+    {
+        $this->database = $database ?? \Db::getInstance();
+    }
 
     public function install(): bool
     {
@@ -23,30 +31,102 @@ final class OrderAttemptRepository implements OrderAttemptStoreInterface
         ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
     }
 
-    public function uninstall(): bool { return (bool) $this->database->execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . self::TABLE . '`'); }
+    public function uninstall(): bool
+    {
+        return (bool) $this->database->execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . self::TABLE . '`');
+    }
 
     public function reserve(int $idShop, int $idCart, string $cartFingerprint): array
     {
         $now = gmdate('Y-m-d H:i:s');
-        $sql = sprintf("INSERT IGNORE INTO `%s%s` (`id_shop`,`id_cart`,`cart_fingerprint`,`state`,`created_at`,`updated_at`) VALUES (%d,%d,'%s','reserved','%s','%s')", _DB_PREFIX_, self::TABLE, $idShop, $idCart, pSQL($cartFingerprint), $now, $now);
-        if (!$this->database->execute($sql)) throw new \RuntimeException('The financing attempt could not be reserved.');
+        $sql = sprintf(
+            "INSERT IGNORE INTO `%s%s` (`id_shop`,`id_cart`,`cart_fingerprint`,`state`,`created_at`,`updated_at`) VALUES (%d,%d,'%s','reserved','%s','%s')",
+            _DB_PREFIX_,
+            self::TABLE,
+            $idShop,
+            $idCart,
+            pSQL($cartFingerprint),
+            $now,
+            $now
+        );
+        if (!$this->database->execute($sql)) {
+            throw new \RuntimeException('The financing attempt could not be reserved.');
+        }
         $created = (int) $this->database->Affected_Rows() === 1;
-        $row = $this->database->getRow(sprintf("SELECT * FROM `%s%s` WHERE `id_shop`=%d AND `id_cart`=%d AND `cart_fingerprint`='%s'", _DB_PREFIX_, self::TABLE, $idShop, $idCart, pSQL($cartFingerprint)));
-        if (!is_array($row)) throw new \RuntimeException('The financing attempt could not be loaded.');
+        $row = $this->database->getRow(sprintf(
+            "SELECT * FROM `%s%s` WHERE `id_shop`=%d AND `id_cart`=%d AND `cart_fingerprint`='%s'",
+            _DB_PREFIX_,
+            self::TABLE,
+            $idShop,
+            $idCart,
+            pSQL($cartFingerprint)
+        ));
+        if (!is_array($row)) {
+            throw new \RuntimeException('The financing attempt could not be loaded.');
+        }
 
         $row['_reservation_created'] = $created;
+
         return $row;
     }
 
     public function update(int $attemptId, array $changes): array
     {
-        $allowed = ['state','id_order','order_reference','control_panel_order_id','cp_payload','last_error_class'];
+        $allowed = ['state', 'id_order', 'order_reference', 'control_panel_order_id', 'cp_payload', 'last_error_class'];
         $data = [];
-        foreach ($changes as $key => $value) if (in_array($key, $allowed, true)) $data[$key] = $value;
+        foreach ($changes as $key => $value) {
+            if (in_array($key, $allowed, true)) {
+                $data[$key] = $value;
+            }
+        }
         $data['updated_at'] = gmdate('Y-m-d H:i:s');
-        if (!$this->database->update(self::TABLE, $data, '`id_attempt`=' . $attemptId)) throw new \RuntimeException('The financing attempt could not be updated.');
-        $row = $this->database->getRow('SELECT * FROM `' . _DB_PREFIX_ . self::TABLE . '` WHERE `id_attempt`=' . $attemptId);
-        if (!is_array($row)) throw new \RuntimeException('The financing attempt could not be reloaded.');
+        if (!$this->database->update(self::TABLE, $data, '`id_attempt`=' . $attemptId)) {
+            throw new \RuntimeException('The financing attempt could not be updated.');
+        }
+
+        return $this->requireById($attemptId);
+    }
+
+    public function attachOrderIfReserved(int $attemptId, int $idOrder, string $orderReference): array
+    {
+        if ($attemptId <= 0 || $idOrder <= 0) {
+            throw new \RuntimeException('The financing attempt order could not be attached.');
+        }
+
+        $reference = substr($orderReference, 0, 13);
+        $now = gmdate('Y-m-d H:i:s');
+        $this->database->execute(
+            'UPDATE `' . _DB_PREFIX_ . self::TABLE . '`
+            SET `state` = \'' . pSQL(OrderOrchestrator::PS_ORDER_CREATED) . '\',
+                `id_order` = ' . (int) $idOrder . ',
+                `order_reference` = \'' . pSQL($reference) . '\',
+                `updated_at` = \'' . pSQL($now) . '\'
+            WHERE `id_attempt` = ' . (int) $attemptId . '
+              AND `state` = \'' . pSQL(OrderOrchestrator::RESERVED) . '\'
+              AND (`id_order` IS NULL OR `id_order` = 0)'
+        );
+
+        if ((int) $this->database->Affected_Rows() === 1) {
+            return $this->requireById($attemptId);
+        }
+
+        $row = $this->requireById($attemptId);
+        if ((int) ($row['id_order'] ?? 0) === $idOrder) {
+            return $row;
+        }
+
+        throw new \RuntimeException('The financing attempt order could not be attached.');
+    }
+
+    /** @return array<string, mixed> */
+    private function requireById(int $attemptId): array
+    {
+        $row = $this->database->getRow(
+            'SELECT * FROM `' . _DB_PREFIX_ . self::TABLE . '` WHERE `id_attempt`=' . (int) $attemptId
+        );
+        if (!is_array($row)) {
+            throw new \RuntimeException('The financing attempt could not be reloaded.');
+        }
 
         return $row;
     }
