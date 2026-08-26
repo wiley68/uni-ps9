@@ -23,7 +23,11 @@ if (!function_exists('pSQL')) {
     }
 }
 
-final class Aud013FakeDb
+if (!class_exists('PrestaShopDatabaseException', false)) {
+    class PrestaShopDatabaseException extends Exception {}
+}
+
+class Aud013FakeDb
 {
     /** @var array<string, array<string, string>> */
     public array $rows = [];
@@ -38,6 +42,30 @@ final class Aud013FakeDb
     public function execute(string $sql): bool
     {
         $this->affectedRows = 0;
+
+        if (preg_match(
+            '/INSERT IGNORE INTO `[^`]+`\s*\(`id_shop`,\s*`id_cart`,\s*`owner_token`,\s*`expires_at`,\s*`created_at`\)\s*VALUES\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*\'([^\']+)\'\s*,\s*\'([^\']+)\'\s*,\s*\'([^\']+)\'\s*\)/s',
+            $sql,
+            $matches
+        )) {
+            $key = $this->key((int) $matches[1], (int) $matches[2]);
+            if (isset($this->rows[$key])) {
+                $this->affectedRows = 0;
+
+                return true;
+            }
+
+            $this->rows[$key] = [
+                'id_shop' => (string) $matches[1],
+                'id_cart' => (string) $matches[2],
+                'owner_token' => $matches[3],
+                'expires_at' => $matches[4],
+                'created_at' => $matches[5],
+            ];
+            $this->affectedRows = 1;
+
+            return true;
+        }
 
         if (preg_match(
             '/UPDATE `[^`]+`\s+SET `owner_token` = \'([^\']+)\',\s+`expires_at` = \'([^\']+)\',\s+`created_at` = \'([^\']+)\'\s+WHERE `id_shop` = (\d+)\s+AND `id_cart` = (\d+)\s+AND `expires_at` <= \'([^\']+)\'/s',
@@ -80,29 +108,17 @@ final class Aud013FakeDb
         return true;
     }
 
+    /**
+     * Must not be used by acquire() — PS9 Db::insert throws on UNIQUE duplicate.
+     *
+     * @param array<string, mixed> $data
+     */
     public function insert(string $table, array $data, $nullValues = false, $useCache = true, $type = 1): bool
     {
-        unset($table, $nullValues, $useCache, $type);
-
-        $idShop = (int) ($data['id_shop'] ?? 0);
-        $idCart = (int) ($data['id_cart'] ?? 0);
-        $key = $this->key($idShop, $idCart);
-        if (isset($this->rows[$key])) {
-            $this->affectedRows = 0;
-
-            return false;
-        }
-
-        $this->rows[$key] = [
-            'id_shop' => (string) $idShop,
-            'id_cart' => (string) $idCart,
-            'owner_token' => (string) ($data['owner_token'] ?? ''),
-            'expires_at' => (string) ($data['expires_at'] ?? ''),
-            'created_at' => (string) ($data['created_at'] ?? ''),
-        ];
-        $this->affectedRows = 1;
-
-        return true;
+        unset($table, $data, $nullValues, $useCache, $type);
+        throw new PrestaShopDatabaseException(
+            "Duplicate entry '1-18' for key 'unipayment_checkout_lock.uniq_unipayment_checkout_lock'"
+        );
     }
 
     /** @return array<string, string>|false */
@@ -292,5 +308,52 @@ assertAud013(strpos($module, 'CheckoutSubmitLockRepository') !== false, 'install
 
 $lockSrc = (string) file_get_contents($root . '/src/Checkout/CheckoutSubmitLock.php');
 assertAud013(strpos($lockSrc, 'Configuration::') === false, 'CheckoutSubmitLock must not use Configuration');
+
+$repoSrc = (string) file_get_contents($root . '/src/Checkout/CheckoutSubmitLockRepository.php');
+assertAud013(strpos($repoSrc, 'INSERT IGNORE') !== false, 'acquire must use INSERT IGNORE');
+assertAud013(!preg_match('/function acquire\s*\([^)]*\)[^{]*\{[^}]*\$this->database->insert\s*\(/s', $repoSrc), 'acquire must not use Db::insert()');
+assertAud013(strpos($repoSrc, 'uniq_unipayment_checkout_lock') !== false, 'UNIQUE(id_shop,id_cart) must remain');
+assertAud013(strpos($repoSrc, 'REPLACE INTO') === false, 'must not use REPLACE INTO');
+assertAud013(strpos($repoSrc, 'ON DUPLICATE KEY UPDATE') === false, 'must not overwrite live lock via ON DUPLICATE KEY');
+
+// Regression: duplicate UNIQUE must not escape as PrestaShopDatabaseException
+$dbDup = new Aud013FakeDb();
+$repoDup = new CheckoutSubmitLockRepository($dbDup);
+assertAud013($repoDup->acquire(1, 18, $now, str_repeat('d', 32)) === true, 'L: first acquire on 1-18');
+$dupEscaped = false;
+$dupResult = null;
+try {
+    $dupResult = $repoDup->acquire(1, 18, $now, str_repeat('e', 32));
+} catch (PrestaShopDatabaseException $exception) {
+    $dupEscaped = true;
+}
+assertAud013(!$dupEscaped, 'L: duplicate UNIQUE must not throw PrestaShopDatabaseException');
+assertAud013($dupResult === false, 'L: active duplicate must return false');
+$storedDup = row($dbDup, 1, 18);
+assertAud013(is_array($storedDup) && $storedDup['owner_token'] === str_repeat('d', 32), 'L: active lock owner must be unchanged');
+
+// Generic DB failure must surface (not silent contention)
+final class Aud013FailingInsertDb extends Aud013FakeDb
+{
+    public function execute(string $sql): bool
+    {
+        if (stripos($sql, 'INSERT IGNORE') !== false) {
+            return false;
+        }
+
+        return parent::execute($sql);
+    }
+}
+$dbFail = new Aud013FailingInsertDb();
+$repoFail = new CheckoutSubmitLockRepository($dbFail);
+$failThrown = false;
+try {
+    $repoFail->acquire(1, 999, $now, str_repeat('f', 32));
+} catch (RuntimeException $exception) {
+    $failThrown = true;
+    assertAud013(strpos($exception->getMessage(), 'checkout submit lock') !== false, 'M: failure message');
+}
+assertAud013($failThrown, 'M: generic INSERT failure must throw, not return false');
+assertAud013($dbFail->rows === [], 'M: failed acquire must not leave a lock row');
 
 fwrite(STDOUT, "OK (AUD-013 atomic checkout submit lock)\n");

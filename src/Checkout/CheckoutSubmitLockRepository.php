@@ -52,14 +52,23 @@ final class CheckoutSubmitLockRepository
         $expiresAt = date('Y-m-d H:i:s', $now + self::TTL_SECONDS);
         $createdAt = date('Y-m-d H:i:s', $now);
 
-        $inserted = $this->database->insert(self::TABLE, [
-            'id_shop' => $idShop,
-            'id_cart' => $idCart,
-            'owner_token' => $ownerToken,
-            'expires_at' => $expiresAt,
-            'created_at' => $createdAt,
-        ]);
-        if ($inserted) {
+        // INSERT IGNORE: duplicate UNIQUE(id_shop,id_cart) is expected concurrency on PS9.
+        // Db::insert() throws PrestaShopDatabaseException on duplicate — never use it here.
+        $insertSql = 'INSERT IGNORE INTO `' . $this->tableName() . '`
+            (`id_shop`, `id_cart`, `owner_token`, `expires_at`, `created_at`)
+            VALUES (
+                ' . (int) $idShop . ',
+                ' . (int) $idCart . ',
+                \'' . pSQL($ownerToken) . '\',
+                \'' . pSQL($expiresAt) . '\',
+                \'' . pSQL($createdAt) . '\'
+            )';
+
+        if (!$this->database->execute($insertSql)) {
+            throw new \RuntimeException('The checkout submit lock could not be acquired.');
+        }
+
+        if ((int) $this->database->Affected_Rows() === 1) {
             return true;
         }
 
