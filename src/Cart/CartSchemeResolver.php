@@ -6,6 +6,8 @@ namespace PrestaShop\Module\Unipayment\Cart;
 
 use PrestaShop\Module\Unipayment\Calculator\AvailableScheme;
 use PrestaShop\Module\Unipayment\Calculator\Calculator;
+use PrestaShop\Module\Unipayment\Calculator\SchemePresentationCategory;
+use PrestaShop\Module\Unipayment\Calculator\UnavailableSchemeException;
 
 final class CartSchemeResolver
 {
@@ -40,38 +42,54 @@ final class CartSchemeResolver
             $promoSets[] = $promo;
         }
 
-        $standard = $this->intersect($standardSets);
-        $promo = $this->intersect($promoSets);
+        $standard = $this->intersect($standardSets, $shop);
+        $promo = $this->intersect($promoSets, $shop);
+        $preferredMonths = (int) ($shop['uni_shema_current'] ?? 0);
 
         return new CartResolution(
             $standard,
             $promo,
-            $this->preferred($standard, $cart->total, 'standard', (int) ($shop['uni_shema_current'] ?? 0)),
-            $this->preferred($promo, $cart->total, 'promo', (int) ($shop['uni_shema_current'] ?? 0))
+            $this->preferred($standard, $shop, $cart->total, 'standard', $preferredMonths, $standardSets),
+            $this->preferred($promo, $shop, $cart->total, 'promo', $preferredMonths, $promoSets)
         );
     }
 
-    /** @return AvailableScheme[] */
-    public function unifiedSchemes(CartResolution $resolution): array
+    /**
+     * Calculable / presentable unified list for Checkout (excludes ambiguous first-installment policy).
+     *
+     * @param array<string, mixed> $shop
+     *
+     * @return AvailableScheme[]
+     */
+    public function unifiedSchemes(CartResolution $resolution, array $shop = []): array
     {
-        $schemes = $resolution->standardSchemes;
+        $schemes = [];
         $seen = [];
-        foreach ($schemes as $scheme) {
+        foreach ($resolution->standardSchemes as $scheme) {
+            if ($scheme->firstInstallmentAmbiguous) {
+                continue;
+            }
+            $schemes[] = $scheme;
             $seen[$this->key($scheme)] = true;
         }
         foreach ($resolution->promoSchemes as $scheme) {
-            if (isset($seen[$this->key($scheme)])) {
+            if ($scheme->firstInstallmentAmbiguous || isset($seen[$this->key($scheme)])) {
                 continue;
             }
             $schemes[] = $scheme;
             $seen[$this->key($scheme)] = true;
         }
 
-        return $schemes;
+        return SchemePresentationCategory::sort($schemes, $shop);
     }
 
-    /** @param array<int, AvailableScheme[]> $sets @return AvailableScheme[] */
-    public function intersect(array $sets): array
+    /**
+     * @param array<int, AvailableScheme[]> $sets
+     * @param array<string, mixed> $shop
+     *
+     * @return AvailableScheme[]
+     */
+    public function intersect(array $sets, array $shop = []): array
     {
         if ($sets === []) {
             return [];
@@ -135,34 +153,144 @@ final class CartSchemeResolver
                 $existing[$key] = true;
             }
         }
-        usort($common, static function (AvailableScheme $a, AvailableScheme $b): int {
-            if ($a->months !== $b->months) {
-                return $a->months <=> $b->months;
-            }
-            $typeOrder = ['standard' => 0, 'promo' => 1];
-            $typeComparison = ($typeOrder[$a->type] ?? 99) <=> ($typeOrder[$b->type] ?? 99);
 
-            return $typeComparison !== 0 ? $typeComparison : $a->filterId <=> $b->filterId;
-        });
+        $common = array_map(function (AvailableScheme $scheme) use ($sets): AvailableScheme {
+            return $this->reconcileCommonScheme($scheme, $sets);
+        }, $common);
 
-        return $common;
+        return SchemePresentationCategory::sort($common, $shop);
     }
 
-    /** @param AvailableScheme[] $schemes */
-    private function preferred(array $schemes, float $total, string $buttonType, int $preferredMonths)
+    /**
+     * Order-independent metadata for a common type|KOP|months identity.
+     * Conflicting uni_parva → ambiguous (no authoritative filter); agreeing policies → lowest filterId.
+     *
+     * @param array<int, AvailableScheme[]> $sets
+     */
+    private function reconcileCommonScheme(AvailableScheme $seed, array $sets): AvailableScheme
     {
+        $contributors = [];
+        $key = $this->key($seed);
+        foreach ($sets as $set) {
+            foreach ($set as $candidate) {
+                if ($this->key($candidate) === $key) {
+                    $contributors[] = $candidate;
+                }
+            }
+        }
+        if ($contributors === []) {
+            return $seed;
+        }
+
+        $policies = [];
+        foreach ($contributors as $candidate) {
+            $policies[] = is_array($candidate->filter) && (int) ($candidate->filter['uni_parva'] ?? 0) === 1 ? 1 : 0;
+        }
+        $uniquePolicies = array_values(array_unique($policies));
+        if (count($uniquePolicies) > 1) {
+            return new AvailableScheme(
+                $seed->type,
+                $seed->kopCode,
+                $seed->months,
+                0,
+                null,
+                $seed->coefficient,
+                true
+            );
+        }
+
+        usort($contributors, static function (AvailableScheme $left, AvailableScheme $right): int {
+            return $left->filterId <=> $right->filterId;
+        });
+        $chosen = $contributors[0];
+
+        return new AvailableScheme(
+            $chosen->type,
+            $chosen->kopCode,
+            $chosen->months,
+            $chosen->filterId,
+            $chosen->filter,
+            $chosen->coefficient,
+            false
+        );
+    }
+
+    /**
+     * @param AvailableScheme[] $schemes
+     * @param array<string, mixed> $shop
+     * @param array<int, AvailableScheme[]> $lineSets
+     */
+    private function preferred(
+        array $schemes,
+        array $shop,
+        float $total,
+        string $buttonType,
+        int $preferredMonths,
+        array $lineSets
+    ) {
         $offers = [];
         foreach ($schemes as $scheme) {
             if ($buttonType === 'promo' && abs((float) ($scheme->coefficient['interestPercent'] ?? -1)) > 0.00001) {
                 continue;
             }
-            $offer = $this->calculator->createButtonOffer($scheme, $total, $buttonType);
+            // Standard cart button: standard + non-zero promo only; never zero_promo.
+            if (
+                $buttonType === 'standard'
+                && SchemePresentationCategory::classify($scheme, $shop) === SchemePresentationCategory::ZERO_PROMO
+            ) {
+                continue;
+            }
+            if ($scheme->firstInstallmentAmbiguous || $this->hasConflictingAutomaticFirstInstallment($scheme, $lineSets)) {
+                continue;
+            }
+            try {
+                $calculation = $this->calculator->calculateScheme($shop, $total, $scheme);
+            } catch (UnavailableSchemeException $exception) {
+                continue;
+            }
+            // Match Product / popup: financed amount already reflects automatic first installment.
+            $offer = $this->calculator->createButtonOffer($scheme, $calculation->financedAmount, $buttonType);
             if ($offer !== null) {
                 $offers[] = $offer;
             }
         }
 
         return $this->calculator->selectPreferredOffer($offers, $preferredMonths);
+    }
+
+    /**
+     * When multiple cart lines contribute different uni_parva policies for the same
+     * type|KOP|months identity, do not pick a line-order-dependent representative.
+     *
+     * @param array<int, AvailableScheme[]> $lineSets
+     */
+    private function hasConflictingAutomaticFirstInstallment(AvailableScheme $scheme, array $lineSets): bool
+    {
+        if ($lineSets === []) {
+            return false;
+        }
+
+        $policies = [];
+        $key = $this->key($scheme);
+        foreach ($lineSets as $set) {
+            $linePolicies = [];
+            foreach ($set as $candidate) {
+                if ($this->key($candidate) !== $key) {
+                    continue;
+                }
+                $linePolicies[] = is_array($candidate->filter) && (int) ($candidate->filter['uni_parva'] ?? 0) === 1 ? 1 : 0;
+            }
+            if ($linePolicies === []) {
+                continue;
+            }
+            $unique = array_values(array_unique($linePolicies));
+            if (count($unique) !== 1) {
+                return true;
+            }
+            $policies[] = $unique[0];
+        }
+
+        return count(array_unique($policies)) > 1;
     }
 
     private function key(AvailableScheme $scheme): string

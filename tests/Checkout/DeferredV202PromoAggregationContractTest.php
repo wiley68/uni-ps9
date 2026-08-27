@@ -3,11 +3,8 @@
 declare(strict_types=1);
 
 /**
- * Deferred v2.0.2 documentation: do NOT broaden standard selection with promo in Phase 9.
- *
- * Current v2.0.1 audited behavior (Woo / PS8 / PS9 cart+checkout) uses CartSchemeResolver
- * intersection and CheckoutPaymentPresenter::unifiedSchemes as-is.
- * Coordinated fix across platforms is deferred to v2.0.2.
+ * v2.0.2 documentation: Checkout continues to use CartSchemeResolver::unifiedSchemes
+ * (now with presentation sort + ambiguity exclusion). Do not invent ad-hoc merges.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -25,13 +22,19 @@ function assertDeferred(bool $ok, string $message): void
 $root = dirname(__DIR__, 2);
 $presenter = (string) file_get_contents($root . '/src/Checkout/CheckoutPaymentPresenter.php');
 $resolver = (string) file_get_contents($root . '/src/Cart/CartSchemeResolver.php');
-$docs = (string) file_get_contents($root . '/docs/ARCHITECTURE.md');
 
 assertDeferred(strpos($presenter, 'unifiedSchemes') !== false, 'checkout still uses unifiedSchemes from cart resolver');
 assertDeferred(
     !preg_match('/standardSchemes\s*=\s*array_merge\s*\(\s*\$resolution->standardSchemes\s*,\s*\$resolution->promoSchemes/', $presenter),
-    'Phase 9 must not merge promo into standard lists ad-hoc'
+    'must not merge promo into standard lists ad-hoc in presenter'
 );
-assertDeferred(strpos($docs, 'v2.0.2') !== false, 'deferred v2.0.2 must be documented in ARCHITECTURE');
+assertDeferred(
+    strpos($resolver, 'SchemePresentationCategory::sort') !== false,
+    'v2.0.2 unified/intersect schemes use presentation sort'
+);
+assertDeferred(
+    strpos($resolver, 'firstInstallmentAmbiguous') !== false,
+    'v2.0.2 excludes ambiguous first-installment schemes from calculable membership'
+);
 
-fwrite(STDOUT, "OK (Phase 9 deferred v2.0.2 standard/promo documentation)\n");
+fwrite(STDOUT, "OK (v2.0.2 unifiedSchemes presentation contract)\n");

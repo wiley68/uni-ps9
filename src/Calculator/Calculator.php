@@ -183,6 +183,9 @@ final class Calculator
     /** @param array<string, mixed> $shop */
     public function calculateScheme(array $shop, float $price, AvailableScheme $scheme, float $requestedFirstInstallment = 0.0): CalculationResult
     {
+        if ($scheme->firstInstallmentAmbiguous) {
+            throw new UnavailableSchemeException('The selected financing scheme has an ambiguous first-installment policy.');
+        }
         $first = $this->firstInstallment->resolve($shop, $price, $scheme->months, $requestedFirstInstallment, $scheme->filter);
         $financed = round($price - $first->amount, 2);
         $kimb = (float) ($scheme->coefficient['coeff'] ?? 0);

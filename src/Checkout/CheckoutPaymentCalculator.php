@@ -49,7 +49,7 @@ final class CheckoutPaymentCalculator
         }
         $selection = SchemeSelection::fromPosted($posted);
         $scheme = $this->findScheme(
-            $this->cartResolver->unifiedSchemes($this->cartResolver->resolve($shop, $cart)),
+            $this->cartResolver->unifiedSchemes($this->cartResolver->resolve($shop, $cart), $shop),
             $selection
         );
         if ($scheme === null) {

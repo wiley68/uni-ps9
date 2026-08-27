@@ -51,7 +51,7 @@ final class CheckoutPaymentValidator
         }
         $resolution = $this->cartResolver->resolve($shop, $cart);
         $selection = SchemeSelection::fromPosted($posted);
-        $scheme = $this->findScheme($this->cartResolver->unifiedSchemes($resolution), $selection);
+        $scheme = $this->findScheme($this->cartResolver->unifiedSchemes($resolution, $shop), $selection);
         if ($scheme === null) {
             throw new CheckoutValidationException('The selected financing scheme is no longer available.');
         }
@@ -77,7 +77,8 @@ final class CheckoutPaymentValidator
     private function findScheme(array $schemes, SchemeSelection $selection): ?AvailableScheme
     {
         foreach ($schemes as $scheme) {
-            if ($scheme->type === $selection->schemeType
+            if (
+                $scheme->type === $selection->schemeType
                 && $scheme->months === $selection->months
                 && $scheme->filterId === $selection->filterId
                 && hash_equals($scheme->kopCode, $selection->kopCode)

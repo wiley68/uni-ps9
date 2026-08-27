@@ -7,6 +7,7 @@ namespace PrestaShop\Module\Unipayment\Product;
 use PrestaShop\Module\Unipayment\Calculator\AvailableScheme;
 use PrestaShop\Module\Unipayment\Calculator\Calculator;
 use PrestaShop\Module\Unipayment\Calculator\ProductContext;
+use PrestaShop\Module\Unipayment\Calculator\SchemePresentationCategory;
 
 final class ProductPopupSchemeList
 {
@@ -22,16 +23,19 @@ final class ProductPopupSchemeList
     public function schemes(array $shop, ProductContext $product, string $popupType): array
     {
         if ($popupType === 'promo') {
-            return $this->sorted($this->calculator->availableSchemes($shop, $product, 'promo'));
+            return SchemePresentationCategory::sort(
+                $this->calculator->availableSchemes($shop, $product, 'promo'),
+                $shop
+            );
         }
         if ($popupType !== 'standard') {
             return [];
         }
 
-        return $this->sorted(array_merge(
+        return SchemePresentationCategory::sort(array_merge(
             $this->calculator->availableSchemes($shop, $product, 'standard'),
             $this->calculator->availableSchemes($shop, $product, 'promo')
-        ));
+        ), $shop);
     }
 
     public static function key(AvailableScheme $scheme): string
@@ -58,25 +62,5 @@ final class ProductPopupSchemeList
         $settings = is_array($shop['kop']['by_default'] ?? null) ? $shop['kop']['by_default'] : [];
 
         return trim((string) ($settings[$scheme->type === 'promo' ? 'uni_kop_promo_desc' : 'uni_kop_default_desc'] ?? ''));
-    }
-
-    /** @param AvailableScheme[] $schemes @return AvailableScheme[] */
-    private function sorted(array $schemes): array
-    {
-        usort($schemes, static function (AvailableScheme $left, AvailableScheme $right): int {
-            if ($left->months !== $right->months) {
-                return $left->months <=> $right->months;
-            }
-            if ($left->type !== $right->type) {
-                return $left->type === 'standard' ? -1 : 1;
-            }
-            if ($left->filterId !== $right->filterId) {
-                return $left->filterId <=> $right->filterId;
-            }
-
-            return strcmp($left->kopCode, $right->kopCode);
-        });
-
-        return $schemes;
     }
 }

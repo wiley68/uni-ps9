@@ -7,6 +7,7 @@ namespace PrestaShop\Module\Unipayment\Checkout;
 use PrestaShop\Module\Unipayment\Calculator\AmountDisplayFormatter;
 use PrestaShop\Module\Unipayment\Calculator\Calculator;
 use PrestaShop\Module\Unipayment\Calculator\CurrencyGate;
+use PrestaShop\Module\Unipayment\Calculator\SchemePresentationCategory;
 use PrestaShop\Module\Unipayment\Calculator\UnavailableSchemeException;
 use PrestaShop\Module\Unipayment\Cart\CartContext;
 use PrestaShop\Module\Unipayment\Cart\CartSchemeResolver;
@@ -57,20 +58,24 @@ final class CheckoutPaymentPresenter
         $schemes = [];
         $zeroInterestPromoKey = null;
         $zeroInterestPromoMonths = -1;
-        // v2.0.1 parity: unifiedSchemes preserves audited aggregation.
-        // Deferred v2.0.2 (Woo+PS8+PS9): standard list should also expose eligible promo schemes.
-        foreach ($this->cartResolver->unifiedSchemes($resolution) as $scheme) {
+        $nonzeroPromoKey = null;
+        $nonzeroPromoMonths = -1;
+        foreach ($this->cartResolver->unifiedSchemes($resolution, $shop) as $scheme) {
             try {
                 $result = $this->calculator->calculateScheme($shop, $cart->total, $scheme);
             } catch (UnavailableSchemeException $exception) {
                 continue;
             }
             $key = SchemeSelection::key($scheme->type, $scheme->months, $scheme->filterId);
-            $zeroInterest = $scheme->type === 'promo'
-                && abs((float) ($scheme->coefficient['interestPercent'] ?? -1)) <= 0.00001;
+            $category = SchemePresentationCategory::classify($scheme, $shop);
+            $zeroInterest = $category === SchemePresentationCategory::ZERO_PROMO;
             if ($zeroInterest && $scheme->months > $zeroInterestPromoMonths) {
                 $zeroInterestPromoMonths = $scheme->months;
                 $zeroInterestPromoKey = $key;
+            }
+            if ($category === SchemePresentationCategory::NONZERO_PROMO && $scheme->months > $nonzeroPromoMonths) {
+                $nonzeroPromoMonths = $scheme->months;
+                $nonzeroPromoKey = $key;
             }
             $schemes[] = [
                 'key' => $key,
@@ -79,6 +84,7 @@ final class CheckoutPaymentPresenter
                 'months' => $scheme->months,
                 'filter_id' => $scheme->filterId,
                 'description' => ProductPopupSchemeList::description($shop, $scheme),
+                'presentation_category' => $category,
                 'zero_interest' => $zeroInterest,
                 'first_installment' => $result->firstInstallment->amount,
                 'first_installment_locked' => $result->firstInstallment->locked,
@@ -98,10 +104,13 @@ final class CheckoutPaymentPresenter
         if ($schemes === []) {
             return null;
         }
-        // Default: longest available 0% promo scheme. Fallback: CP preferred months, then first scheme.
+        // Priority: longest 0% → longest non-zero promo → CP preferred → first scheme.
+        // Explicit preference (below, via CheckoutSchemeIdentity) overrides when valid.
         $defaultKey = $schemes[0]['key'];
         if ($zeroInterestPromoKey !== null) {
             $defaultKey = $zeroInterestPromoKey;
+        } elseif ($nonzeroPromoKey !== null) {
+            $defaultKey = $nonzeroPromoKey;
         } else {
             $preferred = $resolution->standardOffer ?? $resolution->promoOffer;
             if ($preferred !== null) {

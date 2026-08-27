@@ -43,6 +43,9 @@ final class CartCalculatorPresenter
             }
             $rows = [];
             foreach ($schemes as $scheme) {
+                if ($scheme->firstInstallmentAmbiguous) {
+                    continue;
+                }
                 try {
                     $result = $this->calculator->calculateScheme($shop, $cart->total, $scheme);
                 } catch (UnavailableSchemeException $exception) {

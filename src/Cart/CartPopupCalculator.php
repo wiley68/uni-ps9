@@ -69,20 +69,33 @@ final class CartPopupCalculator
     {
         $resolution = $this->resolver->resolve($shop, $cart);
         if ($popupType === 'promo') {
-            return $resolution->promoSchemes;
+            return $this->presentableSchemes($resolution->promoSchemes);
         }
         if ($popupType === 'standard') {
-            return $resolution->standardSchemes;
+            return $this->presentableSchemes($resolution->standardSchemes);
         }
 
         return [];
+    }
+
+    /** @param AvailableScheme[] $schemes @return AvailableScheme[] */
+    private function presentableSchemes(array $schemes): array
+    {
+        return array_values(array_filter($schemes, static function (AvailableScheme $scheme): bool {
+            return !$scheme->firstInstallmentAmbiguous;
+        }));
     }
 
     /** @param AvailableScheme[] $schemes */
     private function findScheme(array $schemes, string $kopCode, int $months, int $filterId): ?AvailableScheme
     {
         foreach ($schemes as $scheme) {
-            if ($scheme->kopCode === $kopCode && $scheme->months === $months && $scheme->filterId === $filterId) {
+            if (
+                !$scheme->firstInstallmentAmbiguous
+                && $scheme->kopCode === $kopCode
+                && $scheme->months === $months
+                && $scheme->filterId === $filterId
+            ) {
                 return $scheme;
             }
         }

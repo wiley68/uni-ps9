@@ -172,7 +172,14 @@
 
 .unipayment-checkout__select option {
   text-align: right;
-  color: #000;
+  color: var(--unipayment-checkout-red);
+}
+
+.unipayment-checkout__select:disabled,
+.unipayment-checkout__select[aria-disabled="true"] {
+  color: var(--unipayment-checkout-red);
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .unipayment-checkout__select:focus,
@@ -184,6 +191,7 @@
   border-bottom-color: #b0b0b0;
   background-color: #fff;
   box-shadow: none;
+  color: var(--unipayment-checkout-red);
 }
 
 .unipayment-checkout__input[readonly] {

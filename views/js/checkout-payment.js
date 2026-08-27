@@ -70,6 +70,8 @@
         var calculateSequence = 0;
         var lastCalculation = null;
 
+        var previousFirstLocked = null;
+
         function showError(message) {
             if (!errorBox) return;
             if (!message) {
@@ -106,12 +108,17 @@
             if (!scheme) return;
             syncHidden();
             if (first) {
-                first.readOnly = !!scheme.first_installment_locked;
-                if (scheme.first_installment_locked) {
+                var locked = !!scheme.first_installment_locked;
+                first.readOnly = locked;
+                if (locked) {
                     first.value = String(Math.trunc(scheme.first_installment));
+                } else if (previousFirstLocked === true) {
+                    // locked → editable: do not carry the previous locked amount
+                    first.value = "0";
                 } else if (first.value === "") {
                     first.value = "0";
                 }
+                previousFirstLocked = locked;
             }
             if (firstRow) {
                 firstRow.classList.toggle(
