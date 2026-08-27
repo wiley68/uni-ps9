@@ -209,6 +209,6 @@ assertRem001(strpos($journalSrc, 'SENSITIVE_KEYS') !== false, 'S: journal has se
 assertRem001(strpos($journalSrc, 'Bearer') !== false, 'S: journal redacts Bearer tokens');
 assertRem001(strpos($module, 'id_shop') !== false && strpos($module, 'handleDebugJournalDownload') !== false, 'T: journal shop scope filter');
 
-assertRem001(strpos($module, "'2.0.1'") !== false || strpos($module, '"2.0.1"') !== false, 'version remains 2.0.1');
+assertRem001(strpos($module, "'2.0.2'") !== false || strpos($module, '"2.0.2"') !== false, 'version remains 2.0.2');
 
 fwrite(STDOUT, "OK (PRE-AUDIT REMEDIATION BATCH 001 contracts)\n");

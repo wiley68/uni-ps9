@@ -21,6 +21,6 @@ assertAud009(strpos($template, 'UNIPAYMENT_SYNC_BANK_REJECTION_STATE') === false
 foreach (['bank_sent_process1', 'bank_sent_process2', 'bank_send_failed_smartucf', '05', '60', '65', '85', '90', '91', '94'] as $statusId) {
     assertAud009(strpos($controller, "'{$statusId}'") === false, "status {$statusId} has native state policy in callback");
 }
-assertAud009(strpos((string) file_get_contents($root . '/unipayment.php'), "version = '2.0.1'") !== false, 'version 2.0.1');
+assertAud009(strpos((string) file_get_contents($root . '/unipayment.php'), "version = '2.0.2'") !== false, 'version 2.0.2');
 assertAud009((glob($root . '/upgrade/upgrade-*.php') ?: []) === [], 'schema-free remediation must not add an upgrade script');
 fwrite(STDOUT, "OK (bank and PrestaShop order status lifecycles are separated)\n");

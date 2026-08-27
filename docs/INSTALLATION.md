@@ -99,7 +99,7 @@ Confirm dialog warns that local UniPayment settings and data will be removed.
 ## 6. Development policy
 
 - No upgrade scripts until first production release packaging cycle
-- Current module version metadata: **2.0.1** (do not invent upgrade-\*.php for interim schema)
+- Current module version metadata: **2.0.2** (do not invent upgrade-\*.php without schema change)
 - Do not commit secrets, Bearer tokens, private keys, or production `.env`
 - Schema-changing development used uninstall/reinstall where appropriate (no production upgrade path invented yet)
 

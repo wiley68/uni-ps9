@@ -55,7 +55,7 @@ final class FinancingSnapshotFactory
             'order_total' => $order->total,
             'currency_iso' => $order->currencyIso,
             'id_currency' => $order->idCurrency,
-            'module_version' => '2.0.1',
+            'module_version' => '2.0.2',
             'submission_source' => $submissionSource,
             'customer_json' => $customer,
             'address_json' => $order->addresses,

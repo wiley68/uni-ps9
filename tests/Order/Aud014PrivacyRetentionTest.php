@@ -425,7 +425,7 @@ assertAud014($serviceP->maybeRun() === 0, 'P: cleanup failure returns zero witho
 
 $orchestratorSrc = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Order/OrderOrchestrator.php');
 assertAud014(strpos($orchestratorSrc, 'FinancingSnapshotRetentionService') !== false, 'retention triggered after snapshot save');
-assertAud014(strpos((string) file_get_contents(dirname(__DIR__, 2) . '/unipayment.php'), "version = '2.0.1'") !== false, 'version is 2.0.1');
+assertAud014(strpos((string) file_get_contents(dirname(__DIR__, 2) . '/unipayment.php'), "version = '2.0.2'") !== false, 'version is 2.0.2');
 
 $redactedSnapshot = aud014Process2Snapshot($cipher);
 $redactedSnapshot['customer_json'] = [];

@@ -277,15 +277,16 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Модул **2.0.1** — Phase 0–13 са реализирани; final audit remediations (AUD-019…AUD-023 и cart guest fixes) са приети в кода.
+Модул **2.0.2** — scheme presentation / Cart representative / Checkout parity (одобрена Woo/PS8 семантика върху PS9 архитектура). Phase 0–13 и final audit remediations (AUD-019…AUD-023) остават в сила.
 
 Разрешено / в сила:
 
-- всичко от Phase 0–13;
+- всичко от Phase 0–13 + AUD remediations;
 - durable financing от checkout **и** product/cart popup (`OrderOrchestrator` → CP → SmartUCF/Process 2);
 - `HomepageAdvertisingGate` / `HomepageAdvertisingPresenter` + `displayFooter` (index only) през `getCachedOnly()`;
 - `ModuleDataPurger` uninstall (AUD-006);
 - ZIP deployment: `config/environment.php` + `secrets/smartucf-key.php` (без server env);
+- **v2.0.2** canonical scheme ordering, Cart button/popup first-installment parity, `zero_promo` exclusion from standard Cart representative, cross-line `uni_parva` ambiguity, Checkout priority/transitions, red selector;
 - documentation: README / INSTALLATION / ARCHITECTURE / SECURITY / RECOVERY / RELEASE / TESTING / CHANGELOG.
 
 Критични инварианти (не регресирай):
@@ -297,7 +298,8 @@ Deleted files трябва да бъдат изрично обяснени.
 - FO advertising никога не вика CP синхронно (AUD-022);
 - не логвай PII / secrets / EGN;
 - не променяй CP без доказана нужда;
-- **v2.0.2** scheme aggregation/sorting остава deferred (uni-woo + uni-ps8 + uni-ps9);
+- `CheckoutSchemeIdentity` / `preference_unresolved` остават authoritative за Product→Checkout handoff;
+- Cart intersection identity остава `type|KOP|months` (`filterId` = metadata);
 - rejection sync остава dormant без proven CP codes;
 - не създавай release tag/package без изрично указание.
 

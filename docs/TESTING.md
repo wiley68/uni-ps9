@@ -69,5 +69,5 @@ Historical phase STOP gates (7–13) are **completed** delivery milestones; they
 
 ## Deferred product behavior
 
-- Coordinated **v2.0.2** scheme aggregation (`tests/Checkout/DeferredV202PromoAggregationContractTest.php` documents the deferral)
 - Bank-rejection → native PS order-state sync remains dormant (AUD-009)
+- Non-blocking test-quality follow-ups (DOM JS transition tests, forged-selection validator coverage, SKIP accounting in the runner)

@@ -2,13 +2,13 @@
 
 Native PrestaShop 9 module for **UniCredit financing** (credit calculator, checkout payment method, order lifecycle, Control Panel integration, SmartUCF, and homepage advertising).
 
-| Item                  | Value                                                                |
-| --------------------- | -------------------------------------------------------------------- |
-| Module technical name | `unipayment`                                                         |
-| Current version       | `2.0.1` (pre-release; **not** tagged/packaged for production yet)    |
-| Repository            | `wiley68/uni-ps9`                                                    |
-| Repository root       | Module root (this directory)                                         |
-| Current state         | Final audit remediation complete — **final regression gate** pending |
+| Item                  | Value                                                                 |
+| --------------------- | --------------------------------------------------------------------- |
+| Module technical name | `unipayment`                                                          |
+| Current version       | `2.0.2`                                                               |
+| Repository            | `wiley68/uni-ps9`                                                     |
+| Repository root       | Module root (this directory)                                          |
+| Current state         | **2.0.2** scheme presentation / Cart representative / Checkout parity |
 
 ## Purpose
 
@@ -79,8 +79,8 @@ See [`docs/SECURITY-OPERATIONS.md`](docs/SECURITY-OPERATIONS.md).
 
 ## Deferred
 
-- Production release tag / package (after final regression gate)
-- Coordinated **v2.0.2** scheme aggregation (`months ASC`; same months: standard before promo)
+- Production release tag / package (operator-driven)
+- Bank-rejection → native PS order-state sync (AUD-009; dormant until proven CP status codes)
 
 ## Documentation
 

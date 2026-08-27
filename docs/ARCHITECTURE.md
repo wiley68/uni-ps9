@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes high-level boundaries and the **current accepted implementation** for module **2.0.1** (pre-release / final audit remediation). Phase numbers below are historical delivery milestones; they are all implemented unless marked deferred.
+This document describes high-level boundaries and the **current accepted implementation** for module **2.0.2** (scheme presentation / Cart representative / Checkout parity). Phase numbers below are historical delivery milestones; they are all implemented unless marked deferred.
 
 ---
 
@@ -294,7 +294,9 @@ Empty/invalid promo → render nothing. Failures fail closed (no FO 500). No bro
 
 **Uninstall (AUD-006):** `ModuleDataPurger` drops 8 tables, config keys, tokens, cert runtime artifacts; preserves referenced custom order states; never deletes native PS orders.
 
-**Deferred (not released yet):** release tag/package, coordinated **v2.0.2** scheme aggregation (`months ASC`; same months: standard before promo).
+**Released in 2.0.2:** coordinated scheme presentation ordering (`months ASC`; same months: standard → non-zero promo → 0%), Cart representative/`uni_parva` safety, and Checkout default priority / first-installment transitions.
+
+**Deferred (not tagged yet):** production release tag/package remains an explicit operator step.
 
 **Attempt state machine** (`OrderOrchestrator`):
 
@@ -317,7 +319,7 @@ checkout_state{id_cart, carrier_id, delivery_option, shipping_total, cart_rules[
 
 Lines sorted by product/attribute; cart_rules sorted by `id_cart_rule`.
 
-Deferred **v2.0.2** (Woo + PS8 + PS9 coordinated): standard popup/list should expose eligible promo schemes inside standard selection. Current code preserves audited v2.0.1 aggregation via `CartSchemeResolver` / `unifiedSchemes` — **do not change** without coordinated release.
+**v2.0.2 presentation ordering** is implemented via `SchemePresentationCategory` and `CartSchemeResolver::unifiedSchemes` / Product popup list sort. Intersection identity remains `type|KOP|months`; `filterId` remains metadata.
 
 ### Authentication lifecycle
 
@@ -363,10 +365,9 @@ Maintainer prepares development / test / production ZIPs by editing **only** tho
 
 ---
 
-## Explicitly deferred (not in v2.0.1 release scope)
+## Explicitly deferred (not in v2.0.2 release scope)
 
 | Area                                        | Notes                                |
 | ------------------------------------------- | ------------------------------------ |
-| Production release tag / package            | After final regression gate          |
-| Coordinated v2.0.2 scheme aggregation       | uni-woo + uni-ps8 + uni-ps9          |
+| Production release tag / package            | Operator-driven; not part of commit  |
 | Bank-rejection → native PS order-state sync | Dormant until proven CP status codes |

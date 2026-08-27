@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+    <name>unipayment</name>
+    <displayName><![CDATA[УниКредит покупки на Кредит]]></displayName>
+    <version><![CDATA[2.0.2]]></version>
+    <description><![CDATA[Дава възможност на Вашите клиенти да закупуват стока на изплащане с УниКредит.]]></description>
+    <author><![CDATA[Avalon Ltd]]></author>
+    <tab><![CDATA[payments_gateways]]></tab>
+    <confirmUninstall><![CDATA[Сигурни ли сте, че искате да деинсталирате модула? Настройките и локалните данни на UniPayment ще бъдат изтрити. Съществуващите поръчки в PrestaShop няма да бъдат засегнати.]]></confirmUninstall>
+    <is_configurable>1</is_configurable>
+    <need_instance>0</need_instance>
+</module>

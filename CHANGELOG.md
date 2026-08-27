@@ -1,8 +1,22 @@
 # Changelog
 
-Notable notes for the UniPayment PrestaShop **9** development line. This file does **not** claim a production release tag or package.
+Notable notes for the UniPayment PrestaShop **9** development line.
 
-## Unreleased — 2.0.1 (pre-release / final audit remediation)
+## 2.0.2 — 2026-08-27
+
+- Canonical financing scheme ordering for equal month counts: standard → non-zero promo → 0%.
+- Product, Cart, and Checkout presentation ordering parity.
+- Correct Cart promotional standard-button representative; `zero_promo` cannot represent the standard Cart button while remaining available in popup/unified membership and the dedicated 0% flow.
+- Cart automatic-first-installment preview parity (`button monthly == popup monthly`).
+- Cross-line conflicting `uni_parva` safety: ambiguous common schemes are not line-order-dependent calculable/submittable offers.
+- Deterministic non-conflicting cross-line metadata normalization (lowest `filterId` when `uni_parva` agrees).
+- Checkout automatic priority: valid explicit → longest 0% → longest non-zero promo → CP preferred standard → deterministic fallback.
+- PS9 `CheckoutSchemeIdentity` and `preference_unresolved` preserved.
+- Checkout first-installment transitions: locked → editable = 0; editable → locked = automatic amount; locked A → locked B = B amount.
+- UniCredit red Checkout scheme selector styling.
+- No database schema change and no upgrade script.
+
+## 2.0.1 — final audit remediation
 
 ### Final audit remediations
 
@@ -29,5 +43,5 @@ Notable notes for the UniPayment PrestaShop **9** development line. This file do
 
 ## Deferred
 
-- Production tag/package (after final regression gate)
-- v2.0.2 scheme aggregation/sorting parity
+- Production tag/package (operator-driven; not created by this release commit)
+- Bank-rejection → native PS order-state sync (AUD-009; dormant until proven CP status codes)
