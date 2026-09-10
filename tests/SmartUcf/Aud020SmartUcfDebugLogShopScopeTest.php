@@ -67,7 +67,18 @@ final class FakeSmartUcfDb
     {
         unset($table);
         $id = $this->nextId++;
-        $row = $data;
+        $row = [];
+        foreach ($data as $key => $value) {
+            if (is_array($value) && isset($value['type']) && $value['type'] === 'sql') {
+                $row[$key] = (($value['value'] ?? null) === 'NULL') ? null : $value['value'];
+                continue;
+            }
+            if (is_string($value)) {
+                $row[$key] = stripslashes($value);
+                continue;
+            }
+            $row[$key] = $value;
+        }
         $row['id'] = $id;
         $this->rows[$id] = $row;
 
@@ -179,7 +190,8 @@ assertAud020($repo->findLatestByOrderIdAndShop($sameRef, 0) === null, 'id_shop 0
 
 // G: controller must not call global lookup
 $controller = (string) file_get_contents(dirname(__DIR__, 2) . '/controllers/front/smartucfdebuglog.php');
-assertAud020(strpos($controller, 'findLatestByOrderIdAndShop') !== false, 'controller uses shop-scoped lookup');
+assertAud020(strpos($controller, 'resolveAuthorizedFinancingOrder') !== false, 'controller authorizes via financing order');
+assertAud020(strpos($controller, 'findLatestForAuthorizedOrder') !== false, 'controller uses authorized journal lookup');
 assertAud020(!preg_match('/findLatestByOrderId\s*\(/', $controller), 'controller must not call global findLatestByOrderId');
 assertAud020(strpos($controller, 'context->shop->id') !== false, 'controller resolves shop from context');
 assertAud020(strpos($controller, "payload['id_shop']") === false, 'controller must not trust request id_shop');

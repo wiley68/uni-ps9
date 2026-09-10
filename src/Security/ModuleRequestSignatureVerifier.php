@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PrestaShop\Module\Unipayment\Security;
 
 use PrestaShop\Module\Unipayment\Api\Exception\ModuleApiException;
+use PrestaShop\Module\Unipayment\Api\ModuleApiError;
 
 final class ModuleRequestSignatureVerifier
 {
@@ -27,6 +28,7 @@ final class ModuleRequestSignatureVerifier
 
         $this->assertFreshTimestamp($timestamp);
         $this->assertNonceFormat($nonce);
+        $this->assertSignatureFormat($signature);
 
         $expected = ModuleRequestSignatureProtocol::computeSignature($secret, $timestamp, $nonce, $rawBody);
         if (!hash_equals($expected, $signature)) {
@@ -84,13 +86,24 @@ final class ModuleRequestSignatureVerifier
 
     private function assertNonceFormat(string $nonce): void
     {
-        if (!preg_match('/\A[0-9a-fA-F]{' . ModuleRequestSignatureProtocol::NONCE_HEX_LENGTH . '}\z/', $nonce)) {
+        if (!preg_match('/\A[0-9a-f]{' . ModuleRequestSignatureProtocol::NONCE_HEX_LENGTH . '}\z/', $nonce)) {
+            throw $this->authFailure();
+        }
+    }
+
+    private function assertSignatureFormat(string $signature): void
+    {
+        if (!preg_match('/\A[0-9a-f]{64}\z/', $signature)) {
             throw $this->authFailure();
         }
     }
 
     private function authFailure(): ModuleApiException
     {
-        return new ModuleApiException(ModuleRequestSignatureProtocol::AUTH_FAILURE_MESSAGE, 401);
+        return new ModuleApiException(
+            ModuleRequestSignatureProtocol::AUTH_FAILURE_MESSAGE,
+            401,
+            ModuleApiError::INVALID_SIGNATURE
+        );
     }
 }

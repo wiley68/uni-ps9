@@ -74,6 +74,20 @@ final class OrderOrchestrator
                 (string) ($attempt['order_reference'] ?? '')
             );
         }
+        // Ambiguous CP create: never blind-resend POST /orders. Frozen payload/identity remain
+        // authoritative for later proven reconciliation (operator/CP), not automatic create retry.
+        if ((string) $attempt['state'] === self::CP_OUTCOME_UNKNOWN) {
+            throw new OrderOrchestrationException(
+                'The Control Panel create outcome remains unknown; automatic resend is blocked.',
+                true,
+                null,
+                (int) ($attempt['id_order'] ?? 0),
+                $attemptId,
+                self::CP_OUTCOME_UNKNOWN,
+                true,
+                (string) ($attempt['order_reference'] ?? '')
+            );
+        }
         // reserved + no id_order is recoverable for the CheckoutSubmitLock owner
         // (crash after validateOrder before attempt attach). Non-reserved mid-states
         // without an order remain blocked. Live concurrency is enforced by the lock.
@@ -222,23 +236,25 @@ final class OrderOrchestrator
 
             $response = $this->cp->createOrder($payload);
             $cpId = (int) ($response['data']['id'] ?? 0);
+            // Identity echo is enforced by ControlPanelClient; defensive guard only.
             if ($cpId <= 0) {
                 $this->recordControlPanelFailure(
                     $attemptId,
                     $order,
                     $idShop,
                     $shop,
-                    self::TERMINAL_FAILED,
-                    'MissingControlPanelOrderId'
+                    self::CP_OUTCOME_UNKNOWN,
+                    'MissingControlPanelOrderId',
+                    false
                 );
                 throw new OrderOrchestrationException(
-                    'The Control Panel did not return an order identifier.',
-                    false,
+                    'The Control Panel result is unknown and can be retried safely.',
+                    true,
                     null,
                     $order->idOrder,
                     $attemptId,
-                    self::TERMINAL_FAILED,
-                    false,
+                    self::CP_OUTCOME_UNKNOWN,
+                    true,
                     $order->reference
                 );
             }
@@ -255,7 +271,8 @@ final class OrderOrchestrator
                 $idShop,
                 $shop,
                 self::CP_OUTCOME_UNKNOWN,
-                get_class($exception)
+                get_class($exception),
+                false
             );
             throw new OrderOrchestrationException(
                 'The Control Panel result is unknown and can be retried safely.',
@@ -268,35 +285,38 @@ final class OrderOrchestrator
                 $order->reference
             );
         } catch (HttpException $exception) {
-            $retryable = $exception->getStatusCode() >= 500;
-            $state = $retryable ? self::CP_FAILED_RETRYABLE : self::TERMINAL_FAILED;
+            $classification = $this->classifyControlPanelCreateFailure($exception);
             $this->recordControlPanelFailure(
                 $attemptId,
                 $order,
                 $idShop,
                 $shop,
-                $state,
-                get_class($exception)
+                $classification['state'],
+                $classification['error_class'],
+                $classification['definitive_local_failure']
             );
             throw new OrderOrchestrationException(
-                'The Control Panel rejected the financing order.',
-                $retryable,
+                $classification['definitive_local_failure']
+                    ? 'The Control Panel rejected the financing order.'
+                    : 'The Control Panel result is unknown and can be retried safely.',
+                $classification['retryable'],
                 $exception,
                 $order->idOrder,
                 $attemptId,
-                $state,
-                false,
+                $classification['state'],
+                !$classification['definitive_local_failure'],
                 $order->reference
             );
         } catch (ControlPanelException $exception) {
-            // InvalidPayload / MalformedJson: remote create may have occurred — outcome unknown.
+            // InvalidPayload / MalformedJson / Authentication: remote create may have occurred — outcome unknown.
             $this->recordControlPanelFailure(
                 $attemptId,
                 $order,
                 $idShop,
                 $shop,
                 self::CP_OUTCOME_UNKNOWN,
-                get_class($exception)
+                get_class($exception),
+                false
             );
             throw new OrderOrchestrationException(
                 'The Control Panel result is unknown and can be retried safely.',
@@ -315,7 +335,8 @@ final class OrderOrchestrator
                 $idShop,
                 $shop,
                 self::CP_OUTCOME_UNKNOWN,
-                get_class($exception)
+                get_class($exception),
+                false
             );
             throw new OrderOrchestrationException(
                 'The Control Panel result is unknown and can be retried safely.',
@@ -328,6 +349,70 @@ final class OrderOrchestrator
                 $order->reference
             );
         }
+    }
+
+    /**
+     * Classify outbound CP create HTTP failures.
+     *
+     * Ambiguous transport/application outcomes must remain distinguishable from definitive
+     * rejection and must not be reported as bank_send_failed_cp.
+     *
+     * @return array{state: string, error_class: string, retryable: bool, definitive_local_failure: bool}
+     */
+    private function classifyControlPanelCreateFailure(HttpException $exception): array
+    {
+        $status = $exception->getStatusCode();
+        $response = $exception->getResponse();
+        $error = isset($response['error']) && is_string($response['error']) ? $response['error'] : '';
+
+        $definitiveErrors = [
+            'invalid_payload',
+            'semantic_conflict',
+            'unsupported_status',
+            'shop_not_found',
+        ];
+
+        if ($error !== '' && in_array($error, $definitiveErrors, true)) {
+            return [
+                'state' => self::TERMINAL_FAILED,
+                'error_class' => 'cp_create_' . $error,
+                'retryable' => false,
+                'definitive_local_failure' => true,
+            ];
+        }
+
+        // Auth, rate limit, server errors, unknown 4xx, and missing machine codes stay non-definitive.
+        if ($status === 401 || $error === 'authentication_failed' || $error === 'token_expired') {
+            return [
+                'state' => self::CP_OUTCOME_UNKNOWN,
+                'error_class' => 'cp_create_auth_ambiguous',
+                'retryable' => true,
+                'definitive_local_failure' => false,
+            ];
+        }
+        if ($status === 429 || $error === 'rate_limited') {
+            return [
+                'state' => self::CP_OUTCOME_UNKNOWN,
+                'error_class' => 'cp_create_rate_limited',
+                'retryable' => true,
+                'definitive_local_failure' => false,
+            ];
+        }
+        if ($status >= 500 || $error === 'internal_error') {
+            return [
+                'state' => self::CP_FAILED_RETRYABLE,
+                'error_class' => 'cp_create_server_ambiguous',
+                'retryable' => true,
+                'definitive_local_failure' => false,
+            ];
+        }
+
+        return [
+            'state' => self::CP_OUTCOME_UNKNOWN,
+            'error_class' => $error !== '' ? 'cp_create_' . $error : 'cp_create_http_' . $status,
+            'retryable' => true,
+            'definitive_local_failure' => false,
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -411,7 +496,7 @@ final class OrderOrchestrator
 
     private function logPostOrderBoundary(int $idOrder, int $attemptId, \Throwable $exception, string $phase): void
     {
-        if (!class_exists(\PrestaShopLogger::class, false) && !class_exists('PrestaShopLogger', false)) {
+        if (!class_exists(\PrestaShopLogger::class) && !class_exists('PrestaShopLogger')) {
             return;
         }
         try {
@@ -420,12 +505,28 @@ final class OrderOrchestrator
                     . ' phase=' . $phase
                     . ' id_order=' . $idOrder
                     . ' id_attempt=' . $attemptId
-                    . ' exception=' . get_class($exception),
-                2
+                    . ' exception=' . get_class($exception)
+                    . ' message=' . $this->sanitizeBoundaryMessage($exception),
+                2,
+                null,
+                null,
+                null,
+                true
             );
         } catch (\Throwable $ignored) {
             unset($ignored);
         }
+    }
+
+    private function sanitizeBoundaryMessage(\Throwable $exception): string
+    {
+        $message = trim(strip_tags($exception->getMessage()));
+        // Never persist raw SQL dumps (may contain customer/product payloads).
+        $message = preg_replace('/\b(INSERT|UPDATE|DELETE|SELECT)\b.*/is', '[sql-redacted]', $message) ?? $message;
+        $message = preg_replace('/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i', '[redacted-email]', $message) ?? $message;
+        $message = preg_replace('/\d{10}/', '[redacted-digits]', $message) ?? $message;
+
+        return mb_substr($message, 0, 240);
     }
 
     /** @param array<string, mixed> $attempt */
@@ -442,7 +543,10 @@ final class OrderOrchestrator
     }
 
     /**
-     * Persist attempt/snapshot/admin UniCredit status after PS order exists and CP create failed.
+     * Persist attempt/snapshot after PS order exists and CP create failed or outcome is ambiguous.
+     *
+     * Local bank_send_failed_cp is only written for definitive CP rejection — never for
+     * ambiguous outcomes (timeout / malformed / echo mismatch / auth / rate limit / unknown 4xx).
      *
      * @param array<string, mixed> $shop
      */
@@ -452,12 +556,13 @@ final class OrderOrchestrator
         int $idShop,
         array $shop,
         string $state,
-        string $errorClass
+        string $errorClass,
+        bool $definitiveLocalFailure = true
     ): void {
         $this->attempts->update($attemptId, ['state' => $state, 'last_error_class' => $errorClass]);
         $this->snapshots->update($attemptId, ['lifecycle_status' => $state]);
         DeferredOrderMailQueue::discard();
-        if ($this->bankStatus === null || $order->reference === '') {
+        if (!$definitiveLocalFailure || $this->bankStatus === null || $order->reference === '') {
             return;
         }
 

@@ -86,15 +86,18 @@ Cache scope key is **`unicid`** (UNIQUE), not PrestaShop `id_shop` — same as a
 ```text
 POST /module/unipayment/{shopcache|orderbankstatus|smartucfdebuglog}
         ↓
-raw body (php://input) + signature headers
+bounded raw body (≤1 MiB) + signature headers
         ↓
 ModuleRequestAuthenticator
-  (unicid match → HMAC on raw body → atomic nonce claim)
+  (HMAC on exact raw body → JSON → UNICID bind → atomic nonce claim)
         ↓
-endpoint handler
+assert endpoint operation (shop-cache | order-bank-status | smartucf-debug-log)
+        ↓
+endpoint handler → canonical envelope {success,error,message,data}
 ```
 
-See [`SECURITY-OPERATIONS.md`](SECURITY-OPERATIONS.md) for HMAC/nonce details.
+See [`SECURITY-OPERATIONS.md`](SECURITY-OPERATIONS.md) for HMAC/nonce, lowercase nonce, durable CP status sync, and baselines
+(`CP 0facb672…`, `PS8 c62c3be…`).
 
 ### Financing calculator domain
 
@@ -222,15 +225,19 @@ OrderOrchestrationResult (cp_created)
     ↓
 PostControlPanelLifecycleService
     ├─ Process 2 (uni_proces=1)
-    │     → persist bank_sent_process2 (always; independent of mail flag)
+    │     → durable CP status sync target bank_sent_process2 (pending → PATCH via wired CP client → confirmed)
+    │     → persist local bank_sent_process2 (always; independent of mail flag)
     │     → FinancingOrderMailDispatcher (if sendLeasingEmail)
     │           → DeferredOrderMailQueue::flush (native order_conf + leasing vars)
     │           → LeasingEmailNotifier (customer + admin; leasing_email_sent once)
     │     → native order confirmation redirect
+    │     → replay retries pending CP PATCH only (no second CP create / handoff / successful email)
     └─ Process 1
+          → retryPending CP sync if previously pending
           → SmartUcfSessionCoordinator::run/resume
           → claim smartucf_state on financing_snapshot
           → createSession (exactly-once via durable state; mTLS passphrase from secrets/smartucf-key.php)
+          → on proven success: durable CP sync bank_sent_process1 + local bank_sent_process1
           → bank_sent_process1 | bank_send_failed_smartucf | processing | outcome_unknown
           → FinancingOrderMailDispatcher on terminal mail path
                 → flush deferred order_conf + audience leasing mails
@@ -238,12 +245,12 @@ PostControlPanelLifecycleService
 
 **Bank status meanings:**
 
-| Status                      | Trigger                                                   |
-| --------------------------- | --------------------------------------------------------- |
-| `bank_send_failed_cp`       | PS order exists, CP create failed (no confirmed CP order) |
-| `bank_sent_process1`        | CP created **and** SmartUCF Process 1 succeeded           |
-| `bank_send_failed_smartucf` | CP created **and** SmartUCF Process 1 failed              |
-| `bank_sent_process2`        | CP created **and** Process 2 handoff (no SmartUCF)        |
+| Status                      | Trigger                                                       |
+| --------------------------- | ------------------------------------------------------------- |
+| `bank_send_failed_cp`       | Definitive CP create rejection only (not transport ambiguity) |
+| `bank_sent_process1`        | CP created **and** SmartUCF Process 1 succeeded               |
+| `bank_send_failed_smartucf` | CP created **and** SmartUCF Process 1 failed                  |
+| `bank_sent_process2`        | CP created **and** Process 2 handoff (no SmartUCF)            |
 
 **SmartUCF snapshot states:** `not_started` → `submitting` → `created` \| `failed` \| `outcome_unknown`.
 
@@ -300,15 +307,15 @@ Empty/invalid promo → render nothing. Failures fail closed (no FO 500). No bro
 
 **Attempt state machine** (`OrderOrchestrator`):
 
-| State                 | Meaning                                                        |
-| --------------------- | -------------------------------------------------------------- |
-| `reserved`            | Attempt row created (UNIQUE shop/cart/fingerprint)             |
-| `ps_order_created`    | Native PS order attached                                       |
-| `cp_submitting`       | CP POST in flight                                              |
-| `cp_created`          | CP order id persisted — terminal success for durable CP create |
-| `cp_failed_retryable` | CP 5xx — retry without new PS order                            |
-| `cp_outcome_unknown`  | CP timeout/connection — retry; bank `bank_send_failed_cp`      |
-| `terminal_failed`     | Non-retryable CP/validation failure after PS order             |
+| State                 | Meaning                                                                                                                     |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `reserved`            | Attempt row created (UNIQUE shop/cart/fingerprint)                                                                          |
+| `ps_order_created`    | Native PS order attached                                                                                                    |
+| `cp_submitting`       | CP POST in flight                                                                                                           |
+| `cp_created`          | CP order id persisted — terminal success for durable CP create                                                              |
+| `cp_failed_retryable` | CP 5xx — retry without new PS order                                                                                         |
+| `cp_outcome_unknown`  | CP transport/response ambiguity — **no blind second POST /orders**; frozen payload preserved; **not** `bank_send_failed_cp` |
+| `terminal_failed`     | Non-retryable CP/validation failure after PS order                                                                          |
 
 Checkout fingerprint canonical payload (non-PII):
 
@@ -343,6 +350,8 @@ Login payload to CP:
 POST /api/v1/auth/login
 { unicid, name: shopUrl, secret }
 ```
+
+Canonical CP success responses nest application fields under `response.data` (tokens, shop, create/PATCH echoes). Legacy top-level `access_token` is rejected. Malformed 2xx envelopes are protocol failures. POST `/orders` create payload never includes `status` / `status_id` / EGN / phone2 — CP owns initial `cp_sent`.
 
 ### Token Configuration keys
 

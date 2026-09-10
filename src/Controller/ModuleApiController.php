@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace PrestaShop\Module\Unipayment\Controller;
 
 use PrestaShop\Module\Unipayment\Api\Exception\ModuleApiException;
+use PrestaShop\Module\Unipayment\Api\ModuleApiError;
+use PrestaShop\Module\Unipayment\Api\ModuleApiResponse;
 use PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository;
+use PrestaShop\Module\Unipayment\Security\BoundedRawBodyReader;
 use PrestaShop\Module\Unipayment\Security\ModuleRequestAuthenticator;
+use PrestaShop\Module\Unipayment\Security\ModuleRequestSignatureProtocol;
 
 abstract class ModuleApiController extends \ModuleFrontController
 {
@@ -23,68 +27,132 @@ abstract class ModuleApiController extends \ModuleFrontController
     {
         try {
             if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
-                throw new ModuleApiException('Разрешени са само POST заявки.', 405);
-            }
-
-            [$payload, $rawBody] = $this->readJsonRequest();
-            $headers = $this->extractRequestHeaders();
-            $unicid = (new ModuleRequestAuthenticator(new ConfigurationRepository()))->authenticate($payload, $rawBody, $headers);
-            $response = $this->handleAuthenticatedRequest($payload, $unicid);
-            $this->sendJson($response, 200);
-        } catch (ModuleApiException $exception) {
-            $body = [
-                'success' => false,
-                'message' => $exception->getMessage(),
-            ];
-            if ($exception->getErrorCode() !== null) {
-                $body['error'] = $exception->getErrorCode();
-            }
-            if ($exception->getResponseData() !== null) {
-                $body['data'] = $exception->getResponseData();
-            }
-            $this->sendJson($body, $exception->getStatusCode());
-        } catch (\Throwable $exception) {
-            if (class_exists('\PrestaShopLogger', false)) {
-                \PrestaShopLogger::addLog(
-                    sprintf('UniPayment module API failure in %s.', static::class),
-                    3
+                throw new ModuleApiException(
+                    'Only POST requests are allowed.',
+                    405,
+                    ModuleApiError::METHOD_NOT_ALLOWED
                 );
             }
-            $this->sendJson([
-                'success' => false,
-                'message' => 'Модулът не можа да обработи заявката.',
-            ], 500);
+
+            $rawBody = $this->readRawBody();
+            $headers = $this->extractRequestHeaders();
+            [$payload, $unicid] = (new ModuleRequestAuthenticator(new ConfigurationRepository()))
+                ->authenticate($rawBody, $headers);
+            $this->assertExpectedOperation($payload);
+            $response = $this->handleAuthenticatedRequest($payload, $unicid);
+            $this->sendJson($this->normalizeSuccessEnvelope($response), 200);
+        } catch (ModuleApiException $exception) {
+            $this->sendJson(
+                ModuleApiResponse::failure(
+                    $exception->getErrorCode() ?? ModuleApiError::INTERNAL_ERROR,
+                    $exception->getMessage(),
+                    $exception->getResponseData() ?? []
+                ),
+                $exception->getStatusCode()
+            );
+        } catch (\Throwable $exception) {
+            \PrestaShopLogger::addLog(
+                sprintf('UniPayment module API failure in %s.', static::class),
+                3
+            );
+            $this->sendJson(
+                ModuleApiResponse::failure(
+                    ModuleApiError::INTERNAL_ERROR,
+                    'The module could not process the request.'
+                ),
+                500
+            );
         }
     }
 
     /**
+     * Code-defined expected canonical operation for this endpoint.
+     * Must not be derived from caller input.
+     */
+    abstract protected function expectedOperation(): string;
+
+    /**
      * @param array<string, mixed> $payload
-     *
      * @return array<string, mixed>
      */
     abstract protected function handleAuthenticatedRequest(array $payload, string $unicid): array;
 
-    /**
-     * @return array{0: array<string, mixed>, 1: string}
-     */
-    private function readJsonRequest(): array
+    private function readRawBody(): string
     {
-        $rawBody = file_get_contents('php://input');
-        if (!is_string($rawBody) || $rawBody === '') {
-            throw new ModuleApiException('Изисква се JSON тяло на заявката.', 400);
+        $maxBytes = ModuleRequestSignatureProtocol::MAX_REQUEST_BODY_BYTES;
+        $contentLengthHeader = $_SERVER['CONTENT_LENGTH'] ?? null;
+        if (is_string($contentLengthHeader) && $contentLengthHeader !== '' && ctype_digit($contentLengthHeader)) {
+            if ((int) $contentLengthHeader > $maxBytes) {
+                throw new ModuleApiException(
+                    'The request body exceeds the maximum allowed size.',
+                    413,
+                    ModuleApiError::PAYLOAD_TOO_LARGE
+                );
+            }
+        }
+
+        $stream = fopen('php://input', 'rb');
+        if ($stream === false) {
+            throw new ModuleApiException(
+                'A JSON request body is required.',
+                400,
+                ModuleApiError::INVALID_PAYLOAD
+            );
         }
 
         try {
-            $payload = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $exception) {
-            throw new ModuleApiException('JSON тялото на заявката е невалидно.', 400);
+            $read = BoundedRawBodyReader::read($stream, $maxBytes);
+        } finally {
+            fclose($stream);
         }
 
-        if (!is_array($payload)) {
-            throw new ModuleApiException('JSON тялото на заявката трябва да бъде обект.', 400);
+        if ($read['oversized']) {
+            throw new ModuleApiException(
+                'The request body exceeds the maximum allowed size.',
+                413,
+                ModuleApiError::PAYLOAD_TOO_LARGE
+            );
         }
 
-        return [$payload, $rawBody];
+        if ($read['body'] === '') {
+            throw new ModuleApiException(
+                'A JSON request body is required.',
+                400,
+                ModuleApiError::INVALID_PAYLOAD
+            );
+        }
+
+        return $read['body'];
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function assertExpectedOperation(array $payload): void
+    {
+        $operation = $payload['operation'] ?? null;
+        $expected = $this->expectedOperation();
+        if (!is_string($operation) || $operation === '' || $operation !== $expected) {
+            throw new ModuleApiException(
+                'The request operation is not supported by this endpoint.',
+                400,
+                ModuleApiError::UNSUPPORTED_OPERATION
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     * @return array{success: true, error: null, message: string, data: array<string, mixed>|\stdClass}
+     */
+    private function normalizeSuccessEnvelope(array $response): array
+    {
+        $message = isset($response['message']) && is_string($response['message'])
+            ? $response['message']
+            : 'OK';
+        $data = isset($response['data']) && is_array($response['data'])
+            ? $response['data']
+            : [];
+
+        return ModuleApiResponse::success($message, $data);
     }
 
     /** @return array<string, string> */
@@ -127,7 +195,7 @@ abstract class ModuleApiController extends \ModuleFrontController
             echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         } catch (\JsonException $exception) {
             http_response_code(500);
-            echo '{"success":false,"message":"Модулът не можа да кодира отговора."}';
+            echo '{"success":false,"error":"internal_error","message":"The module could not encode its response.","data":{}}';
         }
 
         exit;

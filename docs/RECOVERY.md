@@ -21,7 +21,7 @@ Applies to checkout (`validatecheckout`) and product/cart popup apply paths that
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Before PS order                                | Release checkout lock / abandon popup processing; customer may retry safely when no `id_order` exists                                                                                                                                                       |
 | After `validateOrder()`, before attempt update | Lock owner retries: `reserved` + `id_order NULL` is recoverable; gateway recovers existing same-cart authoritative order (no second `validateOrder`); `attachOrderIfReserved` persists identity atomically. Live concurrency stays on `CheckoutSubmitLock`. |
-| After snapshot, during CP POST                 | Retry resumes CP create with same payload; timeout → `cp_outcome_unknown` + `bank_send_failed_cp`                                                                                                                                                           |
+| After snapshot, during CP POST                 | Ambiguous outcome → `cp_outcome_unknown` (not `bank_send_failed_cp`); **no blind second POST /orders**; frozen payload preserved for proven reconciliation                                                                                                  |
 | After CP success, before attempt update        | Retry finds CP id on success response or CP lookup by reference                                                                                                                                                                                             |
 
 ## Post-order rule (AUD-019)
@@ -34,21 +34,23 @@ Once `id_order` exists on the attempt, **never** start a fresh financing attempt
 
 ## CP ambiguous timeout
 
-Connection/timeout → `cp_outcome_unknown`, `bank_send_failed_cp`, retryable post-order outcome. Safe retry reuses stored `cp_payload` and relies on CP idempotency by shop/order reference.
+Connection/timeout/malformed success/echo mismatch/auth/rate-limit/unknown 4xx → `cp_outcome_unknown` (or `cp_failed_retryable` for 5xx), **without** definitive local `bank_send_failed_cp`. Automatic replay must **not** issue a blind second POST `/orders` after an ambiguous create outcome. Frozen `cp_payload` / attempt identity remain authoritative for later proven reconciliation (operator/CP). Definitive CP machine-code rejection may still map to `bank_send_failed_cp`.
 
 ## Post-CP lifecycle
 
 After durable `cp_created`:
 
-| Path                          | Recovery                                                                  |
-| ----------------------------- | ------------------------------------------------------------------------- |
-| Process 2                     | Persist `bank_sent_process2` (always); mail is separate side effect       |
-| Process 1 success             | Snapshot `smartucf_state=created`; `bank_sent_process1`; trusted redirect |
-| Process 1 retryable failure   | `smartucf_failed` + retryable=1; same attempt/CP; resume claim            |
-| Process 1 terminal failure    | `bank_send_failed_smartucf`; no new PS/CP order                           |
-| Process 1 ambiguous transport | `outcome_unknown`; do **not** mark `bank_sent_process1`                   |
-| Replay after created          | Coordinator returns durable session; no second `createSession`            |
-| CP missing / pre-CP failure   | Post-CP lifecycle must not run                                            |
+| Path                          | Recovery                                                                                                         |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Process 2                     | Persist local `bank_sent_process2` + durable CP sync; mail is separate side effect                               |
+| Process 1 success             | Snapshot `smartucf_state=created`; local `bank_sent_process1` + durable CP sync; trusted redirect                |
+| Process 1 retryable failure   | `smartucf_failed` + retryable=1; same attempt/CP; resume claim                                                   |
+| Process 1 terminal failure    | `bank_send_failed_smartucf`; no new PS/CP order                                                                  |
+| Process 1 ambiguous transport | `outcome_unknown`; do **not** mark `bank_sent_process1`                                                          |
+| Ambiguous CP create           | `cp_outcome_unknown` — **not** `bank_send_failed_cp`; **no blind second POST /orders**; frozen payload preserved |
+| P1 ↔ P2 CP sync targets       | Mutually incompatible; conflict → no PATCH                                                                       |
+| Replay after created          | Coordinator returns durable session; no second `createSession`                                                   |
+| CP missing / pre-CP failure   | Post-CP lifecycle must not run                                                                                   |
 
 Callback race: inbound `orderbankstatus` uses financing snapshot JOIN; local SmartUCF success writes `bank_sent_process1` first — do not regress success to SmartUCF failure on replay.
 

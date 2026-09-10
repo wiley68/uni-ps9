@@ -13,7 +13,7 @@ final class OrderBankStatusRepository implements BankStatusPersistencePort, Bank
 
     public function __construct(?\Db $database = null)
     {
-        $this->database = $database ?? \DbCore::getInstance();
+        $this->database = $database ?? \Db::getInstance();
     }
 
     public function install(): bool
@@ -43,47 +43,74 @@ final class OrderBankStatusRepository implements BankStatusPersistencePort, Bank
     /** @return array<string, mixed>|null */
     public function updateByOrderIdentifier(int $idShop, string $orderReference, string $statusId, string $statusLabel): ?array
     {
-        $order = $this->findAuthorizedFinancingOrder($idShop, $orderReference);
+        $order = $this->resolveAuthorizedFinancingOrder($idShop, $orderReference);
         if ($order === null) {
             return null;
         }
 
+        $idOrder = (int) $order['id_order'];
         $resolvedReference = (string) $order['order_reference'];
-        $values = [
-            'id_order' => (string) $order['id_order'],
-            'id_shop' => (string) $order['id_shop'],
-            'order_id' => $resolvedReference,
-            'status_id' => $statusId,
-            'status_label' => $statusLabel,
-            'updated_at' => gmdate('Y-m-d H:i:s'),
-        ];
-        $columns = [];
-        $sqlValues = [];
-        $updates = [];
-        foreach ($values as $column => $value) {
-            $columns[] = '`' . $column . '`';
-            $sqlValues[] = "'" . pSQL($value, true) . "'";
-            if ($column !== 'id_order') {
-                $updates[] = '`' . $column . '` = VALUES(`' . $column . '`)';
-            }
-        }
+        $updatedAt = gmdate('Y-m-d H:i:s');
+        $progression = new BankStatusProgression();
+
+        // Atomic write: incompatible P1↔P2 terminal replacement keeps the existing row
+        // (no read-then-unconditional-write race). Compatible / same-status updates apply.
+        $p1 = pSQL(BankStatus::SENT_PROCESS1);
+        $p2 = pSQL(BankStatus::SENT_PROCESS2);
+        $conflictGuard = sprintf(
+            "((`status_id` = '%s' AND VALUES(`status_id`) = '%s') OR (`status_id` = '%s' AND VALUES(`status_id`) = '%s'))",
+            $p1,
+            $p2,
+            $p2,
+            $p1
+        );
 
         $saved = $this->database->execute(sprintf(
-            'INSERT INTO `%s` (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s',
+            "INSERT INTO `%s`
+                (`id_order`, `id_shop`, `order_id`, `status_id`, `status_label`, `updated_at`)
+             VALUES (%d, %d, '%s', '%s', '%s', '%s')
+             ON DUPLICATE KEY UPDATE
+                `id_shop` = IF(%s, `id_shop`, VALUES(`id_shop`)),
+                `order_id` = IF(%s, `order_id`, VALUES(`order_id`)),
+                `status_label` = IF(%s, `status_label`, VALUES(`status_label`)),
+                `updated_at` = IF(%s, `updated_at`, VALUES(`updated_at`)),
+                `status_id` = IF(%s, `status_id`, VALUES(`status_id`))",
             $this->tableName(),
-            implode(', ', $columns),
-            implode(', ', $sqlValues),
-            implode(', ', $updates)
+            $idOrder,
+            (int) $order['id_shop'],
+            pSQL($resolvedReference, true),
+            pSQL($statusId, true),
+            pSQL($statusLabel, true),
+            pSQL($updatedAt),
+            $conflictGuard,
+            $conflictGuard,
+            $conflictGuard,
+            $conflictGuard,
+            $conflictGuard
         ));
         if (!$saved) {
             throw new \RuntimeException('The bank status could not be stored.');
         }
 
+        $current = $this->findByOrderId($idOrder);
+        if (!is_array($current)) {
+            throw new \RuntimeException('The bank status could not be reloaded after write.');
+        }
+
+        $persistedStatusId = (string) ($current['status_id'] ?? '');
+        if ($progression->isIncompatibleTerminalSentPair($persistedStatusId, $statusId)
+            && $persistedStatusId !== $statusId
+        ) {
+            throw new OrderBankStatusSemanticConflictException(
+                'Incompatible terminal bank status progression.'
+            );
+        }
+
         return [
             'order_id' => $resolvedReference,
-            'ps_order_id' => (int) $order['id_order'],
-            'status' => $statusLabel,
-            'status_id' => $statusId,
+            'ps_order_id' => $idOrder,
+            'status' => (string) ($current['status_label'] ?? $statusLabel),
+            'status_id' => $persistedStatusId !== '' ? $persistedStatusId : $statusId,
         ];
     }
 
@@ -107,15 +134,14 @@ final class OrderBankStatusRepository implements BankStatusPersistencePort, Bank
      * Resolve a UniPayment financing order in the authorized shop by shop order reference.
      *
      * Incoming order_id from Control Panel is always ps_orders.reference, never id_order,
-     * even when the reference consists only of digits (AUD-011).
+     * even when the reference consists only of digits.
      *
-     * Phase 4 does not install unipayment_financing_snapshot. If that table is absent,
-     * return null (controller → 404) without querying it. When a later phase creates the
-     * table, the audited JOIN below becomes active automatically.
+     * Fail-closed: 0 candidates → null; 1 → continue; 2+ → OrderBankStatusAmbiguousException.
+     * Never collapses duplicates via getRow().
      *
-     * @return array{id_order: int, id_shop: int, order_reference: string}|null
+     * @return array{id_order: int, id_shop: int, order_reference: string, smartucf_state: string}|null
      */
-    private function findAuthorizedFinancingOrder(int $idShop, string $orderReference): ?array
+    public function resolveAuthorizedFinancingOrder(int $idShop, string $orderReference): ?array
     {
         if ($idShop <= 0) {
             return null;
@@ -130,8 +156,8 @@ final class OrderBankStatusRepository implements BankStatusPersistencePort, Bank
             return null;
         }
 
-        $row = $this->database->getRow(sprintf(
-            'SELECT o.`id_order`, o.`id_shop`, o.`reference`
+        $rows = $this->database->executeS(sprintf(
+            'SELECT o.`id_order`, o.`id_shop`, o.`reference`, s.`smartucf_state`
              FROM `%1$sorders` o
              INNER JOIN `%2$s` s ON s.`id_order` = o.`id_order`
              WHERE o.`reference` = \'%3$s\'
@@ -141,6 +167,16 @@ final class OrderBankStatusRepository implements BankStatusPersistencePort, Bank
             pSQL($orderReference, true),
             $idShop
         ));
+        if (!is_array($rows) || $rows === []) {
+            return null;
+        }
+        if (count($rows) > 1) {
+            throw new OrderBankStatusAmbiguousException(
+                'Multiple financing orders match this shop reference.'
+            );
+        }
+
+        $row = $rows[0];
         if (!is_array($row)) {
             return null;
         }
@@ -149,6 +185,7 @@ final class OrderBankStatusRepository implements BankStatusPersistencePort, Bank
             'id_order' => (int) $row['id_order'],
             'id_shop' => (int) $row['id_shop'],
             'order_reference' => (string) $row['reference'],
+            'smartucf_state' => (string) ($row['smartucf_state'] ?? 'not_started'),
         ];
     }
 

@@ -45,7 +45,9 @@ Maintainer switches development / test / production CP hosts by editing **only**
 
 ## 2. CP → module signed request protocol
 
-Implementation: `ModuleRequestSignatureProtocol`, `ModuleRequestSignatureVerifier`, `ModuleRequestAuthenticator`, `ApiNonceRepository`.
+Implementation: `ModuleRequestSignatureProtocol`, `ModuleRequestSignatureVerifier`, `ModuleRequestAuthenticator`, `BoundedRawBodyReader`, `ApiNonceRepository`.
+
+Authoritative CP baseline: `0facb6721c0b9199078ce4b6404ed89c00de680c`. Verified PS8 reference: `c62c3be399fd7adeb820d89a0d4e4cc78885e194`.
 
 ### Headers (required)
 
@@ -61,9 +63,19 @@ X-UniPayment-Signature
 {timestamp}\n{nonce}\n{raw_request_body}
 ```
 
-`raw_request_body` is the **exact** HTTP body bytes (`php://input`). Do not re-encode JSON before HMAC.
+`raw_request_body` is the **exact** HTTP body bytes (bounded reader over `php://input`). Do not re-encode JSON before HMAC. Do not include method/route outside the body.
 
-JSON payload must include `unicid` matching the configured shop UNICID.
+JSON payload must include `unicid` matching the configured shop UNICID and canonical `operation` matching the endpoint (covered by HMAC because it is inside the raw body).
+
+### Operations and endpoint binding
+
+| Operation            | PrestaShop front controller |
+| -------------------- | --------------------------- |
+| `shop-cache`         | `shopcache`                 |
+| `order-bank-status`  | `orderbankstatus`           |
+| `smartucf-debug-log` | `smartucfdebuglog`          |
+
+A valid signed body for one operation must not execute on another endpoint (`unsupported_operation`).
 
 ### Signature
 
@@ -75,32 +87,85 @@ JSON payload must include `unicid` matching the configured shop UNICID.
 ### Timestamp
 
 - Numeric (`ctype_digit`)
-- Window: **±300 seconds**
+- Window: **±300 seconds** inclusive
 
 ### Nonce
 
-- Format: **64 hex characters** (`[0-9a-fA-F]{64}`) — 32 random bytes hex-encoded
+- Format: **64 lowercase hexadecimal characters** (`^[0-9a-f]{64}$`) — 32 random bytes hex-encoded
+- Uppercase hex is rejected
 - Retention: **900 seconds**
 - Stored as `sha256(nonce)` under unique `(unicid, nonce_hash)`
+- Replay storage failure fails closed
+
+### Body size
+
+- Maximum inbound JSON body: **1 MiB** (`1048576` bytes)
+- Read via `BoundedRawBodyReader` with hard cap `MAX+1` bytes (no unbounded `file_get_contents('php://input')`)
+- Declared `Content-Length` > 1 MiB may fail early; the stream bound remains authoritative
+- Oversized requests fail before HMAC / nonce claim / JSON decode (`payload_too_large`, HTTP 413)
 
 ### Ordering (audited)
 
 ```text
-module enabled / configured
+POST only
+→ bounded raw body (413 if oversized)
+→ module enabled / configured
+→ validate timestamp + lowercase nonce + signature format
+→ verify HMAC on exact raw body
+→ JSON object decode
 → payload unicid matches store
-→ validate timestamp + nonce format
-→ verify HMAC on raw body
 → atomically claim nonce
+→ assert expected operation
 → endpoint handler
 ```
 
 Invalid signature **must not** consume a nonce.
 
+### Canonical response envelope
+
+Every inbound module API JSON response uses all four fields:
+
+```json
+{
+    "success": true,
+    "error": null,
+    "message": "...",
+    "data": {}
+}
+```
+
+Failures set `success` to `false` and `error` to a stable snake_case machine code. `data` is always a JSON object (never a list).
+
+### Local bank status vs durable CP status sync
+
+Local `bank_sent_process1` / `bank_sent_process2` mean **business handoff proven**.
+
+Outbound CP `PATCH /orders/status` confirmation is tracked on `unipayment_financing_snapshot` (`cp_status_sync_*`):
+
+| State             | Meaning                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------------------- |
+| `not_needed`      | No sync target admitted                                                                                  |
+| `pending`         | Target persisted; PATCH not yet confirmed                                                                |
+| `confirmed`       | Canonical CP success + echo validated                                                                    |
+| `terminal_failed` | Positive allowlist only: `invalid_payload`, `semantic_conflict`, `unsupported_status`, `order_not_found` |
+
+`bank_sent_process1` and `bank_sent_process2` are mutually incompatible terminal outcomes (not sequential stages). Conflicting admission does not PATCH.
+
 ### Auth failure
 
-HTTP **401**, message: `Невалидна или изтекла заявка към модула.` (generic; no oracle for guessing).
+HTTP **401**, machine code `invalid_signature`, message: `Invalid or expired module request.` (generic; no oracle).
 
-Disabled module: **403**. Not configured: **401**.
+Disabled module: **403** `module_disabled`. Not configured: **401** `authentication_failed`.
+
+### Contract test vector (synthetic)
+
+| Field              | Value                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Secret             | `test_shared_secret_123`                                                                                            |
+| Timestamp          | `1787380000`                                                                                                        |
+| Nonce              | `0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`                                                  |
+| Raw body           | `{"operation":"order-bank-status","unicid":"TEST-UNICID","order_id":"ABC123","status":"approved","status_id":"10"}` |
+| Expected signature | `012e8545e84e43b45ae05a828bb487932454313ace1729d846cc3bd05a41c6a0`                                                  |
 
 ---
 
@@ -112,29 +177,29 @@ Disabled module: **403**. Not configured: **401**.
 | `/module/unipayment/orderbankstatus`  | Persist bank status for financing order (AUD-011)     |
 | `/module/unipayment/smartucfdebuglog` | CP **reads** latest SmartUCF diagnostic journal entry |
 
-All: **POST** only, JSON body, signed headers.
+All: **POST** only, JSON body, signed headers, bound `operation`.
 
 ### shopcache
 
+- Body: `operation`, `unicid`, non-empty JSON object `data`
 - Full replacement only (no merge)
-- Invalid snapshot → HTTP 422, **keep** previous valid cache
+- Invalid snapshot → HTTP 422 `shop_snapshot_invalid`, **keep** previous valid cache
 - Snapshot `unicid` must match authenticated shop when present
 
 ### orderbankstatus
 
-- Lookup: `orders.reference` + `id_shop` + INNER JOIN `unipayment_financing_snapshot` (AUD-011)
-- Phase 10 installs `unipayment_financing_snapshot`. The repository still gates with `SHOW TABLES LIKE` for shops not yet upgraded via BO Configure.
+- Body: `operation`, `unicid`, string `order_id` (max **13**, never coerced from integer), `status_id`, `status` (no wire `status_label`)
+- Lookup: unique `orders.reference` + `id_shop` + INNER JOIN `unipayment_financing_snapshot` via `executeS` (0 → 404, 2+ → 409 `order_ambiguous`)
 - No customer-facing order-state changes (`ps_order_state_changed: false`) — AUD-009
 - `BankStatusOrderStateMapper` is **not** wired into the callback; rejection whitelist empty until proven CP codes
-- `SYNC_BANK_REJECTION_STATE` remains a dormant config key (not shown in BO UI)
 
 ### smartucfdebuglog
 
-- Read path via `SmartUcfDiagnosticJournal`
-- Lookup is **shop-scoped**: latest entry for `(id_shop, order_id)` from the authenticated shop context (AUD-020)
+- Body: `operation`, `unicid`, string `order_id` (max 13)
+- Authorize unique financing order + Process 1 / SmartUCF ownership before any journal disclosure
+- Lookup is **shop-scoped** and bound to authorized `ps_order_id` (AUD-020)
+- Absent / wrong-shop / non-financing / non-P1 / missing log → opaque **404** `order_not_found`
 - Writes go through `record()` only when `UNIPAYMENT_DEBUG_ENABLED`
-- Responses sanitize secrets / PII keys
-- Do not look up journal rows by order id alone across shops
 
 ---
 
@@ -144,7 +209,7 @@ All: **POST** only, JSON body, signed headers.
 {prefix}unipayment_api_nonce
 ```
 
-Unique: `(unicid, nonce_hash)`. Probabilistic purge of expired rows on claim.
+Unique: `(unicid, nonce_hash)`. Probabilistic purge of expired rows on claim. Storage failure fails closed.
 
 ---
 

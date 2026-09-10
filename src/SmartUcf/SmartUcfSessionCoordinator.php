@@ -9,6 +9,7 @@ use PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
 use PrestaShop\Module\Unipayment\Order\BankStatus;
 use PrestaShop\Module\Unipayment\Order\ControlPanelOrderClientAdapter;
+use PrestaShop\Module\Unipayment\Order\ControlPanelStatusSyncService;
 use PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository;
 use PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository;
 use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateConsumerLease;
@@ -51,6 +52,8 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
     private $module;
     /** @var \Context|null */
     private $context;
+    /** @var ControlPanelStatusSyncService|null */
+    private $statusSync;
 
     public function __construct(
         ?SmartUcfLifecycleRepository $lifecycle = null,
@@ -62,7 +65,8 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
         $module = null,
         ?\Context $context = null,
         ?ControlPanelClient $controlPanelApi = null,
-        ?CertificateSynchronizer $certificateSynchronizer = null
+        ?CertificateSynchronizer $certificateSynchronizer = null,
+        ?ControlPanelStatusSyncService $statusSync = null
     ) {
         $this->payloadBuilder = $payloadBuilder ?? new SmartUcfPayloadBuilder();
         $this->lifecycle = $lifecycle ?? new SmartUcfLifecycleRepository();
@@ -74,6 +78,16 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
         $this->context = $context;
         $this->controlPanelApi = $controlPanelApi;
         $this->certificateSynchronizer = $certificateSynchronizer;
+        $this->statusSync = $statusSync;
+    }
+
+    private function statusSync(): ControlPanelStatusSyncService
+    {
+        if ($this->statusSync === null) {
+            $this->statusSync = new ControlPanelStatusSyncService($this->snapshots, $this->cpClient);
+        }
+
+        return $this->statusSync;
     }
 
     /**
@@ -206,7 +220,10 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
         }
 
         try {
-            $this->persistSuccessfulBankStatus((string) ($snapshot['order_reference'] ?? ''));
+            $this->persistSuccessfulBankStatus(
+                $attemptId,
+                (string) ($snapshot['order_reference'] ?? '')
+            );
             $this->logSession(
                 (int) ($snapshot['id_order'] ?? 0),
                 (string) ($snapshot['order_reference'] ?? ''),
@@ -322,6 +339,11 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
     {
         $state = (string) ($row['smartucf_state'] ?? SmartUcfLifecycleStates::NOT_STARTED);
         if ($state === SmartUcfLifecycleStates::CREATED) {
+            $attemptId = (int) ($row['id_attempt'] ?? 0);
+            $orderReference = (string) ($row['order_reference'] ?? '');
+            if ($attemptId > 0 && $orderReference !== '') {
+                $this->statusSync()->retryPending($attemptId, $orderReference);
+            }
             $redirect = (string) ($row['smartucf_redirect_url'] ?? '');
             $sessionId = (string) ($row['smartucf_session_id'] ?? '');
             if ($redirect !== '' && (new SmartUcfEndpointPolicy())->isTrustedApplicationRedirect($redirect)) {
@@ -352,26 +374,13 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
         return null;
     }
 
-    private function persistSuccessfulBankStatus(string $orderReference): void
+    private function persistSuccessfulBankStatus(int $attemptId, string $orderReference): void
     {
         if ($orderReference === '') {
             return;
         }
         $status = BankStatus::successfulSend(false);
-        if ($this->cpClient !== null) {
-            try {
-                $this->cpClient->updateOrderStatus(
-                    substr($orderReference, 0, 13),
-                    $status['status_label'],
-                    $status['status_id']
-                );
-            } catch (\Throwable $exception) {
-                \PrestaShopLogger::addLog(
-                    'UniPayment CP status update failed after SmartUCF created: ' . get_class($exception),
-                    2
-                );
-            }
-        }
+        $this->statusSync()->synchronizeAfterHandoff($attemptId, $orderReference, $status);
         try {
             (new OrderBankStatusRepository())->updateByOrderIdentifier(
                 $this->authorizedShopId(),

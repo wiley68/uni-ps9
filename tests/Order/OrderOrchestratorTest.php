@@ -24,6 +24,7 @@ require dirname(__DIR__) . '/Calculator/fixtures.php';
 
 use PrestaShop\Module\Unipayment\Api\Exception\ConnectionException;
 use PrestaShop\Module\Unipayment\Api\Exception\HttpException;
+use PrestaShop\Module\Unipayment\Api\Exception\InvalidPayloadException;
 use PrestaShop\Module\Unipayment\Calculator\Calculator;
 use PrestaShop\Module\Unipayment\Calculator\ProductContext;
 use PrestaShop\Module\Unipayment\Cart\CartContext;
@@ -191,7 +192,7 @@ final class FakeCp implements ControlPanelOrderClientInterface
         return $next;
     }
 
-    public function updateOrderStatus(string $orderId, string $status, ?string $statusId = null): array
+    public function updateOrderStatus(string $orderId, string $status, string $statusId): array
     {
         $this->calls[] = ['orderId' => $orderId, 'status' => $status, 'statusId' => $statusId];
 
@@ -362,7 +363,6 @@ $s2 = new MemorySnapshots();
 $o2 = new FakeOrders($created);
 $c2 = new FakeCp();
 $c2->queue[] = new ConnectionException('timeout');
-$c2->queue[] = ['data' => ['id' => 902]];
 $bank2 = new MemoryBankStatus();
 $flow2 = new OrderOrchestrator($a2, $s2, $o2, $c2, new FinancingSnapshotFactory(new SensitiveDataCipher()), new ControlPanelOrderPayloadBuilder(), $bank2);
 try {
@@ -374,13 +374,47 @@ try {
     assertOrder($e->isOutcomeUnknown() && $e->state() === OrderOrchestrator::CP_OUTCOME_UNKNOWN, 'timeout must be outcome unknown');
 }
 assertOrder(($s2->rows[1]['lifecycle_status'] ?? '') === OrderOrchestrator::CP_OUTCOME_UNKNOWN, 'timeout must persist snapshot outcome unknown');
-assertOrder($bank2->updates !== [] && $bank2->updates[0]['statusId'] === BankStatus::SEND_FAILED_CP, 'timeout must persist Woo bank_send_failed_cp');
-$recovered = $flow2->orchestrate(1, 10, $request, $shop);
-assertOrder($recovered->controlPanelOrderId === 902, 'ambiguous retry did not recover CP ID');
-assertOrder($o2->created === 1, 'ambiguous retry created another PS order');
-assertOrder(json_encode($c2->calls[0]) === json_encode($c2->calls[1]), 'ambiguous retry changed CP payload');
+assertOrder($bank2->updates === [], 'timeout must NOT write bank_send_failed_cp');
+assertOrder(count($c2->calls) === 1, 'timeout must perform exactly one createOrder');
+$ambiguousAttempt = null;
+foreach ($a2->rows as $row) {
+    if ((int) ($row['id_attempt'] ?? 0) === 1) {
+        $ambiguousAttempt = $row;
+        break;
+    }
+}
+assertOrder(is_array($ambiguousAttempt), 'timeout attempt row missing');
+assertOrder(isset($ambiguousAttempt['cp_payload']) && is_string($ambiguousAttempt['cp_payload']) && $ambiguousAttempt['cp_payload'] !== '', 'timeout must preserve frozen CP payload');
+try {
+    $flow2->orchestrate(1, 10, $request, $shop);
+    assertOrder(false, 'ambiguous replay must not auto-recover via blind create');
+} catch (OrderOrchestrationException $e) {
+    assertOrder($e->isOutcomeUnknown() && $e->state() === OrderOrchestrator::CP_OUTCOME_UNKNOWN, 'ambiguous replay must remain outcome unknown');
+    assertOrder($e->isPostOrder() && $e->idOrder() === 55, 'ambiguous replay must stay post-order');
+    assertOrder($e->isRetryable(), 'ambiguous replay remains operator-recoverable');
+}
+assertOrder(count($c2->calls) === 1, 'ambiguous replay must NOT issue a second POST /orders');
+assertOrder($o2->created === 1, 'ambiguous replay must not create another PS order');
+assertOrder($bank2->updates === [], 'ambiguous replay must NOT write bank_send_failed_cp');
+assertOrder((int) ($s2->rows[1]['control_panel_order_id'] ?? 0) === 0, 'ambiguous replay must not fabricate CP id');
+assertOrder(($s2->rows[1]['lifecycle_status'] ?? '') === OrderOrchestrator::CP_OUTCOME_UNKNOWN, 'ambiguous replay must preserve durable unknown state');
+$ambiguousAttemptAfter = null;
+foreach ($a2->rows as $row) {
+    if ((int) ($row['id_attempt'] ?? 0) === 1) {
+        $ambiguousAttemptAfter = $row;
+        break;
+    }
+}
+assertOrder(is_array($ambiguousAttemptAfter), 'ambiguous replay attempt row missing');
+assertOrder((string) ($ambiguousAttemptAfter['state'] ?? '') === OrderOrchestrator::CP_OUTCOME_UNKNOWN, 'ambiguous replay must preserve attempt state');
+assertOrder(json_encode(json_decode((string) $ambiguousAttemptAfter['cp_payload'], true)) === json_encode($c2->calls[0]), 'frozen payload must remain authoritative');
 
-foreach ([[404, false, OrderOrchestrator::TERMINAL_FAILED], [409, false, OrderOrchestrator::TERMINAL_FAILED], [422, false, OrderOrchestrator::TERMINAL_FAILED], [500, true, OrderOrchestrator::CP_FAILED_RETRYABLE]] as [$status, $retryable, $state]) {
+foreach ([
+    [404, true, OrderOrchestrator::CP_OUTCOME_UNKNOWN, true],
+    [409, true, OrderOrchestrator::CP_OUTCOME_UNKNOWN, true],
+    [422, true, OrderOrchestrator::CP_OUTCOME_UNKNOWN, true],
+    [500, true, OrderOrchestrator::CP_FAILED_RETRYABLE, true],
+] as [$status, $retryable, $state, $outcomeUnknown]) {
     $a = new MemoryAttempts();
     $s = new MemorySnapshots();
     $o = new FakeOrders($created);
@@ -395,13 +429,40 @@ foreach ([[404, false, OrderOrchestrator::TERMINAL_FAILED], [409, false, OrderOr
         assertOrder($e->isRetryable() === $retryable, "HTTP $status classification differs");
         assertOrder($e->isPostOrder() && $e->idOrder() === 55, "HTTP $status must expose existing PS order");
         assertOrder($e->state() === $state, "HTTP $status attempt state differs");
-        assertOrder(!$e->isOutcomeUnknown(), "HTTP $status must not be collapsed into outcome unknown");
+        assertOrder($e->isOutcomeUnknown() === $outcomeUnknown, "HTTP $status outcome-unknown flag differs");
     }
     assertOrder($o->created === 1, "HTTP $status created duplicate");
     assertOrder($o->failed === [], "HTTP $status changed the native order state");
     assertOrder(($s->rows[1]['lifecycle_status'] ?? '') === $state, "HTTP $status snapshot lifecycle differs");
-    assertOrder($bank->updates !== [] && $bank->updates[0]['statusId'] === BankStatus::SEND_FAILED_CP, "HTTP $status must persist bank_send_failed_cp");
+    assertOrder($bank->updates === [], "HTTP $status without machine code must NOT write bank_send_failed_cp");
     assertOrder((int) ($s->rows[1]['control_panel_order_id'] ?? 0) === 0, "HTTP $status must not fabricate a CP id");
+}
+
+foreach ([
+    ['invalid_payload', 422],
+    ['semantic_conflict', 409],
+    ['unsupported_status', 422],
+    ['shop_not_found', 404],
+] as [$code, $status]) {
+    $a = new MemoryAttempts();
+    $s = new MemorySnapshots();
+    $o = new FakeOrders($created);
+    $c = new FakeCp();
+    $bank = new MemoryBankStatus();
+    $c->queue[] = new HttpException($status, ['error' => $code]);
+    $flow = new OrderOrchestrator($a, $s, $o, $c, new FinancingSnapshotFactory(new SensitiveDataCipher()), new ControlPanelOrderPayloadBuilder(), $bank);
+    try {
+        $flow->orchestrate(3, $status + strlen($code), $request, $shop);
+        assertOrder(false, "definitive $code accepted");
+    } catch (OrderOrchestrationException $e) {
+        assertOrder(!$e->isRetryable() && $e->state() === OrderOrchestrator::TERMINAL_FAILED, "definitive $code must be terminal");
+        assertOrder(!$e->isOutcomeUnknown(), "definitive $code must not be outcome unknown");
+        assertOrder($e->isPostOrder(), "definitive $code is post-order");
+    }
+    assertOrder(
+        $bank->updates !== [] && $bank->updates[0]['statusId'] === BankStatus::SEND_FAILED_CP,
+        "definitive $code must persist bank_send_failed_cp"
+    );
 }
 
 $missingIdAttempts = new MemoryAttempts();
@@ -415,10 +476,40 @@ try {
     $missingIdFlow->orchestrate(4, 12, $request, $shop);
     assertOrder(false, 'missing CP id accepted');
 } catch (OrderOrchestrationException $e) {
-    assertOrder(!$e->isRetryable() && $e->state() === OrderOrchestrator::TERMINAL_FAILED, 'missing CP id must be terminal');
+    assertOrder($e->isRetryable() && $e->state() === OrderOrchestrator::CP_OUTCOME_UNKNOWN, 'missing CP id must stay outcome unknown');
+    assertOrder($e->isOutcomeUnknown(), 'missing CP id is ambiguous');
     assertOrder($e->isPostOrder(), 'missing CP id is post-order');
 }
-assertOrder($missingIdBank->updates !== [] && $missingIdBank->updates[0]['statusId'] === BankStatus::SEND_FAILED_CP, 'missing CP id must persist bank_send_failed_cp');
+assertOrder($missingIdBank->updates === [], 'missing CP id must NOT write bank_send_failed_cp');
+try {
+    $missingIdFlow->orchestrate(4, 12, $request, $shop);
+    assertOrder(false, 'missing CP id replay must not blind-resend create');
+} catch (OrderOrchestrationException $e) {
+    assertOrder($e->isOutcomeUnknown() && $e->state() === OrderOrchestrator::CP_OUTCOME_UNKNOWN, 'missing CP id replay stays unknown');
+}
+assertOrder(count($missingIdCp->calls) === 1, 'missing CP id replay createOrder count must remain 1');
+
+$echoAttempts = new MemoryAttempts();
+$echoSnapshots = new MemorySnapshots();
+$echoOrders = new FakeOrders($created);
+$echoCp = new FakeCp();
+$echoBank = new MemoryBankStatus();
+$echoCp->queue[] = new InvalidPayloadException('echo mismatch');
+$echoFlow = new OrderOrchestrator($echoAttempts, $echoSnapshots, $echoOrders, $echoCp, new FinancingSnapshotFactory(new SensitiveDataCipher()), new ControlPanelOrderPayloadBuilder(), $echoBank);
+try {
+    $echoFlow->orchestrate(5, 15, $request, $shop);
+    assertOrder(false, 'echo mismatch accepted');
+} catch (OrderOrchestrationException $e) {
+    assertOrder($e->isOutcomeUnknown() && $e->state() === OrderOrchestrator::CP_OUTCOME_UNKNOWN, 'echo mismatch is outcome unknown');
+}
+assertOrder($echoBank->updates === [], 'echo mismatch must NOT write bank_send_failed_cp');
+try {
+    $echoFlow->orchestrate(5, 15, $request, $shop);
+    assertOrder(false, 'echo mismatch replay must not blind-resend');
+} catch (OrderOrchestrationException $e) {
+    assertOrder($e->isOutcomeUnknown(), 'echo mismatch replay stays unknown');
+}
+assertOrder(count($echoCp->calls) === 1, 'echo mismatch replay createOrder count must remain 1');
 
 $badOrder = new CreatedOrder(56, 'BADTOTAL', 1049, 'BGN', 1, $created->customer, $created->addresses, $created->lines);
 $badOrders = new FakeOrders($badOrder);

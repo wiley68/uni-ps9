@@ -28,13 +28,15 @@ $controllers = [
 $base = (string) file_get_contents($root . '/src/Controller/ModuleApiController.php');
 assertCtrl(strpos($base, 'extends \\ModuleFrontController') !== false, 'base is ModuleFrontController');
 assertCtrl(strpos($base, "!== 'POST'") !== false, 'POST-only');
-assertCtrl(strpos($base, 'php://input') !== false, 'raw body from php://input');
+assertCtrl(strpos($base, 'BoundedRawBodyReader::read') !== false, 'bounded raw body reader');
+assertCtrl(strpos($base, "file_get_contents('php://input')") === false, 'must not unbounded-read php://input');
 assertCtrl(strpos($base, 'ModuleRequestAuthenticator') !== false, 'authenticator used');
-assertCtrl(strpos($base, 'json_decode($rawBody') !== false, 'JSON parsed after raw capture');
-assertCtrl(
-    strpos($base, 'authenticate($payload, $rawBody, $headers)') !== false,
-    'authenticate receives raw body'
-);
+assertCtrl(strpos($base, 'authenticate($rawBody, $headers)') !== false, 'authenticate receives raw body then headers');
+assertCtrl(strpos($base, 'expectedOperation()') !== false, 'expected operation is code-defined');
+assertCtrl(strpos($base, 'assertExpectedOperation') !== false, 'operation binding enforced');
+assertCtrl(strpos($base, 'ModuleApiResponse::failure') !== false, 'canonical failure envelope');
+assertCtrl(strpos($base, 'normalizeSuccessEnvelope') !== false, 'canonical success envelope');
+assertCtrl(strpos($base, 'PAYLOAD_TOO_LARGE') !== false, 'oversized body mapped');
 
 foreach ($controllers as $file => $class) {
     $path = $root . '/controllers/front/' . $file;
@@ -42,6 +44,7 @@ foreach ($controllers as $file => $class) {
     $src = (string) file_get_contents($path);
     assertCtrl(strpos($src, "final class {$class} extends ModuleApiController") !== false, "{$file} class");
     assertCtrl(strpos($src, 'handleAuthenticatedRequest') !== false, "{$file} authenticated handler");
+    assertCtrl(strpos($src, 'expectedOperation()') !== false, "{$file} expectedOperation");
 }
 
 $shopcache = (string) file_get_contents($root . '/controllers/front/shopcache.php');
@@ -49,11 +52,18 @@ assertCtrl(strpos($shopcache, 'replaceSnapshot') !== false, 'shopcache uses repl
 assertCtrl(strpos($shopcache, 'ShopConfigurationSnapshotValidationException') !== false, 'invalid snapshot mapping');
 assertCtrl(strpos($shopcache, 'hash_equals($unicid, $data[\'unicid\'])') !== false, 'unicid identity check');
 
+$bank = (string) file_get_contents($root . '/controllers/front/orderbankstatus.php');
+assertCtrl(strpos($bank, 'ORDER_ID_MAX') !== false, 'bank status uses ORDER_ID_MAX');
+assertCtrl(strpos($bank, 'is_string($value)') !== false, 'bank status rejects non-string order_id');
+assertCtrl(strpos($bank, 'ORDER_AMBIGUOUS') !== false, 'bank status maps ambiguous matches');
+
 $smart = (string) file_get_contents($root . '/controllers/front/smartucfdebuglog.php');
 assertCtrl(strpos($smart, 'SmartUcfDiagnosticJournal') !== false, 'smartucf uses journal');
-assertCtrl(strpos($smart, 'findLatestByOrderIdAndShop') !== false, 'smartucf is shop-scoped read endpoint');
+assertCtrl(strpos($smart, 'resolveAuthorizedFinancingOrder') !== false, 'smartucf authorizes via financing order');
+assertCtrl(strpos($smart, 'findLatestForAuthorizedOrder') !== false, 'smartucf binds authorized ps_order_id');
 assertCtrl(strpos($smart, 'context->shop->id') !== false, 'smartucf resolves authenticated shop from context');
 assertCtrl(!preg_match('/findLatestByOrderId\s*\(/', $smart), 'smartucf must not use global order_id lookup');
+assertCtrl(strpos($smart, 'ORDER_ID_MAX') !== false, 'smartucf uses ORDER_ID_MAX');
 
 $module = (string) file_get_contents($root . '/unipayment.php');
 assertCtrl(strpos($module, 'ApiNonceRepository') !== false, 'install wires nonce');

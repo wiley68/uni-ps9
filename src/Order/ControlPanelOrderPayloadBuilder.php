@@ -22,13 +22,14 @@ final class ControlPanelOrderPayloadBuilder
             $quantities[] = max(1, (int) ($line['quantity'] ?? 1));
         }
         $name = trim((string) ($customer['first_name'] ?? '') . ' ' . (string) ($customer['last_name'] ?? ''));
-        $process2 = (int) ($shop['uni_proces'] ?? 0) === 1;
         $address = $this->address($invoice);
         $address2 = $this->address($delivery);
         if ($address2 === '') $address2 = $address;
         if ($address2 === '') $address2 = '-';
 
-        $payload = [
+        // P1 and P2 share the same create schema. CP owns initial status (cp_sent).
+        // Lifecycle progression uses PATCH /orders/status after successful handoff.
+        return [
             'order_id' => substr((string) $snapshot['order_reference'], 0, 13),
             'name' => substr($name, 0, 65),
             'phone' => substr((string) ($customer['phone'] ?? ''), 0, 45),
@@ -47,13 +48,6 @@ final class ControlPanelOrderPayloadBuilder
             'currency' => (string) $snapshot['currency_iso'],
             'version' => (string) $snapshot['module_version'],
         ];
-
-        if ($process2) {
-            $payload['status'] = 'Изпратен Банка - Процес 2';
-            $payload['status_id'] = 'bank_sent_process2';
-        }
-
-        return $payload;
     }
 
     /** @param array<string, mixed> $address */

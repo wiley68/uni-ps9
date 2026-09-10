@@ -231,7 +231,7 @@ final class Aud019Cp implements ControlPanelOrderClientInterface
         return $next;
     }
 
-    public function updateOrderStatus(string $orderId, string $status, ?string $statusId = null): array
+    public function updateOrderStatus(string $orderId, string $status, string $statusId): array
     {
         return ['ok' => true];
     }

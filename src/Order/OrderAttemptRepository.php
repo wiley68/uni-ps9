@@ -80,6 +80,9 @@ final class OrderAttemptRepository implements OrderAttemptStoreInterface
             }
         }
         $data['updated_at'] = gmdate('Y-m-d H:i:s');
+        // PrestaShop Db::update does not quote-escape string values. Free-text JSON in
+        // cp_payload (products_name / name / address) breaks UPDATE without pSQL().
+        $data = $this->prepareUpdateValues($data);
         if (!$this->database->update(self::TABLE, $data, '`id_attempt`=' . $attemptId)) {
             throw new \RuntimeException('The financing attempt could not be updated.');
         }
@@ -149,5 +152,44 @@ final class OrderAttemptRepository implements OrderAttemptStoreInterface
         }
 
         return $row;
+    }
+
+    /**
+     * Escape string literals for {@see \Db::update()} and map PHP nulls to SQL NULL.
+     * Does not enable blanket Db null conversion — only explicit null keys become SQL NULL.
+     *
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function prepareUpdateValues(array $values): array
+    {
+        foreach ($values as $key => $value) {
+            if (is_array($value) && isset($value['type']) && $value['type'] === 'sql') {
+                continue;
+            }
+            if ($value === null) {
+                $values[$key] = ['type' => 'sql', 'value' => 'NULL'];
+                continue;
+            }
+            if (is_bool($value)) {
+                $values[$key] = $value ? 1 : 0;
+                continue;
+            }
+            if (is_int($value) || is_float($value)) {
+                continue;
+            }
+            $values[$key] = $this->escapeUpdateString((string) $value);
+        }
+
+        return $values;
+    }
+
+    private function escapeUpdateString(string $value): string
+    {
+        if (function_exists('pSQL')) {
+            return pSQL($value, true);
+        }
+
+        return addslashes($value);
     }
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PrestaShop\Module\Unipayment\Order;
 
-final class FinancingSnapshotRepository implements FinancingSnapshotStoreInterface, FinancingSnapshotByOrderReaderPort
+final class FinancingSnapshotRepository implements FinancingSnapshotStoreInterface, FinancingSnapshotByOrderReaderPort, ControlPanelStatusSyncStoreInterface
 {
     public const TABLE = 'unipayment_financing_snapshot';
     /** Matches PrestaShop {@see \Db}::INSERT_IGNORE for idempotent snapshot persistence. */
@@ -40,9 +40,15 @@ final class FinancingSnapshotRepository implements FinancingSnapshotStoreInterfa
             `smartucf_retryable` TINYINT(1) UNSIGNED NOT NULL DEFAULT 0,
             `smartucf_claimed_at` DATETIME NULL,
             `smartucf_completed_at` DATETIME NULL,
+            `cp_status_sync_state` VARCHAR(32) NOT NULL DEFAULT \'not_needed\',
+            `cp_status_sync_status_id` VARCHAR(255) NULL,
+            `cp_status_sync_status` VARCHAR(255) NULL,
+            `cp_status_sync_error_class` VARCHAR(64) NULL,
+            `cp_status_sync_updated_at` DATETIME NULL,
             `created_at` DATETIME NOT NULL, `updated_at` DATETIME NOT NULL, PRIMARY KEY (`id_snapshot`),
             UNIQUE KEY `uniq_unipayment_snapshot_attempt` (`id_attempt`), UNIQUE KEY `uniq_unipayment_snapshot_order` (`id_order`),
-            KEY `idx_unipayment_snapshot_smartucf_state` (`smartucf_state`, `smartucf_claimed_at`)
+            KEY `idx_unipayment_snapshot_smartucf_state` (`smartucf_state`, `smartucf_claimed_at`),
+            KEY `idx_unipayment_snapshot_cp_status_sync` (`cp_status_sync_state`)
         ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
     }
 
@@ -55,10 +61,18 @@ final class FinancingSnapshotRepository implements FinancingSnapshotStoreInterfa
     {
         $values = $snapshot;
         $values['id_attempt'] = $attemptId;
-        foreach (['customer_json', 'address_json', 'lines_json', 'consents_json'] as $key) $values[$key] = json_encode($values[$key] ?? [], JSON_THROW_ON_ERROR);
+        foreach (['customer_json', 'address_json', 'lines_json', 'consents_json'] as $key) {
+            $values[$key] = json_encode($values[$key] ?? [], JSON_THROW_ON_ERROR);
+        }
         $values['created_at'] = $values['created_at'] ?? gmdate('Y-m-d H:i:s');
         $values['updated_at'] = gmdate('Y-m-d H:i:s');
-        if (!$this->database->insert(self::TABLE, $values, false, true, self::INSERT_IGNORE) && $this->findByAttempt($attemptId) === null) throw new \RuntimeException('The financing snapshot could not be stored.');
+        $values = $this->normalizeCpSyncNullableFieldsForInsert($values);
+        // PrestaShop Db::insert does not quote-escape string values. Apostrophes in
+        // product names / addresses / consent text break INSERT without pSQL().
+        $values = $this->prepareInsertValues($values);
+        if (!$this->database->insert(self::TABLE, $values, false, true, self::INSERT_IGNORE) && $this->findByAttempt($attemptId) === null) {
+            throw new \RuntimeException('The financing snapshot could not be stored.');
+        }
     }
 
     public function findByAttempt(int $attemptId): ?array
@@ -90,11 +104,28 @@ final class FinancingSnapshotRepository implements FinancingSnapshotStoreInterfa
 
     public function update(int $attemptId, array $changes): void
     {
-        $allowed = ['control_panel_order_id', 'lifecycle_status', 'leasing_email_sent'];
+        $allowed = [
+            'control_panel_order_id',
+            'lifecycle_status',
+            'leasing_email_sent',
+            'cp_status_sync_state',
+            'cp_status_sync_status_id',
+            'cp_status_sync_status',
+            'cp_status_sync_error_class',
+            'cp_status_sync_updated_at',
+        ];
         $data = [];
-        foreach ($changes as $key => $value) if (in_array($key, $allowed, true)) $data[$key] = $value;
+        foreach ($changes as $key => $value) {
+            if (in_array($key, $allowed, true)) {
+                $data[$key] = $value;
+            }
+        }
         $data['updated_at'] = gmdate('Y-m-d H:i:s');
-        if (!$this->database->update(self::TABLE, $data, '`id_attempt`=' . $attemptId)) throw new \RuntimeException('The financing snapshot could not be updated.');
+        // Same Db::update quoting gap as insert — escape free-text status fields at the SQL boundary.
+        $data = $this->prepareInsertValues($data);
+        if (!$this->database->update(self::TABLE, $data, '`id_attempt`=' . $attemptId, 0, false)) {
+            throw new \RuntimeException('The financing snapshot could not be updated.');
+        }
     }
 
     public function redactExpiredPii(string $cutoffDatetime, int $limit): int
@@ -120,5 +151,213 @@ final class FinancingSnapshotRepository implements FinancingSnapshotStoreInterfa
         );
 
         return (int) $this->database->Affected_Rows();
+    }
+
+    public function compareAndSetPendingTarget(
+        int $attemptId,
+        string $expectedState,
+        ?string $expectedStatusId,
+        ?string $expectedStatus,
+        string $newStatusId,
+        string $newStatus
+    ): bool {
+        $now = gmdate('Y-m-d H:i:s');
+        $sql = sprintf(
+            "UPDATE `%s%s` SET
+                `cp_status_sync_state` = '%s',
+                `cp_status_sync_status_id` = '%s',
+                `cp_status_sync_status` = '%s',
+                `cp_status_sync_error_class` = NULL,
+                `cp_status_sync_updated_at` = '%s',
+                `updated_at` = '%s'
+             WHERE `id_attempt` = %d
+               AND `cp_status_sync_state` = '%s'
+               AND %s
+               AND %s",
+            _DB_PREFIX_,
+            self::TABLE,
+            pSQL(ControlPanelStatusSyncStates::PENDING),
+            pSQL($newStatusId),
+            pSQL($newStatus, true),
+            pSQL($now),
+            pSQL($now),
+            $attemptId,
+            pSQL($expectedState),
+            $this->nullSafeEqualsSql('cp_status_sync_status_id', $expectedStatusId),
+            $this->nullSafeEqualsSql('cp_status_sync_status', $expectedStatus, true)
+        );
+
+        if (!$this->database->execute($sql)) {
+            return false;
+        }
+
+        return (int) $this->database->Affected_Rows() > 0;
+    }
+
+    public function compareAndSetConfirmed(
+        int $attemptId,
+        string $expectedStatusId,
+        string $expectedStatus
+    ): bool {
+        $now = gmdate('Y-m-d H:i:s');
+        $sql = sprintf(
+            "UPDATE `%s%s` SET
+                `cp_status_sync_state` = '%s',
+                `cp_status_sync_status_id` = '%s',
+                `cp_status_sync_status` = '%s',
+                `cp_status_sync_error_class` = NULL,
+                `cp_status_sync_updated_at` = '%s',
+                `updated_at` = '%s'
+             WHERE `id_attempt` = %d
+               AND `cp_status_sync_state` = '%s'
+               AND `cp_status_sync_status_id` = '%s'
+               AND `cp_status_sync_status` = '%s'",
+            _DB_PREFIX_,
+            self::TABLE,
+            pSQL(ControlPanelStatusSyncStates::CONFIRMED),
+            pSQL($expectedStatusId),
+            pSQL($expectedStatus, true),
+            pSQL($now),
+            pSQL($now),
+            $attemptId,
+            pSQL(ControlPanelStatusSyncStates::PENDING),
+            pSQL($expectedStatusId),
+            pSQL($expectedStatus, true)
+        );
+
+        if (!$this->database->execute($sql)) {
+            return false;
+        }
+
+        return (int) $this->database->Affected_Rows() > 0;
+    }
+
+    public function compareAndSetFailure(
+        int $attemptId,
+        string $expectedStatusId,
+        string $expectedStatus,
+        string $newState,
+        string $errorClass
+    ): bool {
+        if (!in_array($newState, [ControlPanelStatusSyncStates::PENDING, ControlPanelStatusSyncStates::TERMINAL_FAILED], true)) {
+            return false;
+        }
+
+        $now = gmdate('Y-m-d H:i:s');
+        $sql = sprintf(
+            "UPDATE `%s%s` SET
+                `cp_status_sync_state` = '%s',
+                `cp_status_sync_error_class` = '%s',
+                `cp_status_sync_updated_at` = '%s',
+                `updated_at` = '%s'
+             WHERE `id_attempt` = %d
+               AND `cp_status_sync_state` = '%s'
+               AND `cp_status_sync_status_id` = '%s'
+               AND `cp_status_sync_status` = '%s'",
+            _DB_PREFIX_,
+            self::TABLE,
+            pSQL($newState),
+            pSQL($errorClass),
+            pSQL($now),
+            pSQL($now),
+            $attemptId,
+            pSQL(ControlPanelStatusSyncStates::PENDING),
+            pSQL($expectedStatusId),
+            pSQL($expectedStatus, true)
+        );
+
+        if (!$this->database->execute($sql)) {
+            return false;
+        }
+
+        return (int) $this->database->Affected_Rows() > 0;
+    }
+
+    /**
+     * Nullable CP sync string columns where PrestaShop insert historically persisted '' instead of SQL NULL.
+     * Semantic "no value" must match both representations in CAS predicates.
+     */
+    private const CP_SYNC_SEMANTIC_NULL_STRING_COLUMNS = [
+        'cp_status_sync_status_id',
+        'cp_status_sync_status',
+        'cp_status_sync_error_class',
+    ];
+
+    /**
+     * Persist semantic-null CP sync string fields as SQL NULL on insert (type=sql),
+     * without enabling blanket Db::$null_values for the whole row.
+     *
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function normalizeCpSyncNullableFieldsForInsert(array $values): array
+    {
+        foreach (self::CP_SYNC_SEMANTIC_NULL_STRING_COLUMNS as $column) {
+            if (!array_key_exists($column, $values)) {
+                continue;
+            }
+            $value = $values[$column];
+            if ($value === null || $value === '') {
+                $values[$column] = ['type' => 'sql', 'value' => 'NULL'];
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * Escape string literals for {@see \Db::insert()} / {@see \Db::update()} and map remaining PHP nulls to SQL NULL.
+     * Does not enable blanket Db null conversion — only explicit null keys become SQL NULL.
+     *
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function prepareInsertValues(array $values): array
+    {
+        foreach ($values as $key => $value) {
+            if (is_array($value) && isset($value['type']) && $value['type'] === 'sql') {
+                continue;
+            }
+            if ($value === null) {
+                $values[$key] = ['type' => 'sql', 'value' => 'NULL'];
+                continue;
+            }
+            if (is_bool($value)) {
+                $values[$key] = $value ? 1 : 0;
+                continue;
+            }
+            if (is_int($value) || is_float($value)) {
+                continue;
+            }
+            $values[$key] = $this->escapeInsertString((string) $value);
+        }
+
+        return $values;
+    }
+
+    private function escapeInsertString(string $value): string
+    {
+        if (function_exists('pSQL')) {
+            return pSQL($value, true);
+        }
+
+        return addslashes($value);
+    }
+
+    /**
+     * Exact equality for non-null expected values; NULL/'' equivalence for semantic null.
+     */
+    private function nullSafeEqualsSql(string $column, ?string $value, bool $htmlOk = false): string
+    {
+        if ($value === null || $value === '') {
+            return $this->semanticNullEqualsSql($column);
+        }
+
+        return '`' . $column . '` <=> \'' . pSQL($value, $htmlOk) . '\'';
+    }
+
+    private function semanticNullEqualsSql(string $column): string
+    {
+        return '(`' . $column . '` IS NULL OR `' . $column . '` = \'\')';
     }
 }

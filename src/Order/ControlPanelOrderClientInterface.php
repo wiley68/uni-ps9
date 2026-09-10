@@ -10,5 +10,5 @@ interface ControlPanelOrderClientInterface
     public function createOrder(array $payload): array;
 
     /** @return array<string, mixed> */
-    public function updateOrderStatus(string $orderId, string $status, ?string $statusId = null): array;
+    public function updateOrderStatus(string $orderId, string $status, string $statusId): array;
 }

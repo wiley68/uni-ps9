@@ -68,12 +68,7 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
             'name' => $this->shopName,
             'secret' => $secret,
         ]);
-        $this->storeTokenResponse($response);
-
-        if (!isset($response['shop']) || !is_array($response['shop'])) {
-            $this->tokens->invalidate();
-            throw new InvalidPayloadException('The Control Panel login response has no valid shop data.');
-        }
+        $this->storeTokenResponse($response, true);
 
         return $response;
     }
@@ -88,7 +83,7 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
 
         try {
             $response = $this->send('POST', '/auth/refresh', null, $token);
-            $this->storeTokenResponse($response);
+            $this->storeTokenResponse($response, false);
 
             return $response;
         } catch (AuthenticationException $exception) {
@@ -102,7 +97,7 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
     {
         $token = $this->tokens->getAccessToken();
         if ($token === null) {
-            return ['success' => true];
+            return ModuleApiResponse::success('Logged out locally.');
         }
 
         try {
@@ -116,7 +111,8 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
     public function getShop(): array
     {
         $response = $this->authenticatedRequest('GET', '/shop');
-        if (!isset($response['data']) || !is_array($response['data'])) {
+        $data = $response['data'] ?? null;
+        if (!is_array($data) || !$this->isAssociativeObject($data)) {
             throw new InvalidPayloadException('The Control Panel shop response has no valid data object.');
         }
 
@@ -130,28 +126,22 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
     public function createOrder(array $order): array
     {
         $response = $this->authenticatedRequest('POST', '/orders', $order);
-        if (!isset($response['data']['id'])) {
-            throw new InvalidPayloadException('The Control Panel create-order response has no order id.');
-        }
+        $this->assertCreateOrderIdentity($response, $order);
 
         return $response;
     }
 
     /** @return array<string, mixed> */
-    public function updateOrderStatus(string $orderId, string $status, ?string $statusId = null): array
+    public function updateOrderStatus(string $orderId, string $status, string $statusId): array
     {
         $payload = [
             'order_id' => $orderId,
+            'status_id' => $statusId,
             'status' => $status,
         ];
-        if ($statusId !== null) {
-            $payload['status_id'] = $statusId;
-        }
 
         $response = $this->authenticatedRequest('PATCH', '/orders/status', $payload);
-        if (!isset($response['data']['order_id'])) {
-            throw new InvalidPayloadException('The Control Panel status response has no order id.');
-        }
+        $this->assertPatchStatusEcho($response, $payload);
 
         return $response;
     }
@@ -333,29 +323,45 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
             );
         }
 
-        $decoded = $this->decode($response->getBody());
-
-        if (($decoded['success'] ?? null) !== true) {
-            throw new InvalidPayloadException('The Control Panel response does not confirm success.');
-        }
-
-        return $decoded;
+        return $this->decodeSuccessEnvelope($response->getBody());
     }
 
     /** @return array<string, mixed> */
-    private function decode(string $body): array
+    private function decodeSuccessEnvelope(string $body): array
     {
-        try {
-            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $exception) {
-            throw new MalformedJsonException('The Control Panel returned malformed JSON.', 0, $exception);
+        $decodedObject = $this->decodeJsonAsObject($body);
+        if ($decodedObject === null) {
+            throw new MalformedJsonException('The Control Panel JSON response is not an object.');
         }
 
+        if (!property_exists($decodedObject, 'success')
+            || $decodedObject->success !== true
+            || !property_exists($decodedObject, 'error')
+            || $decodedObject->error !== null
+            || !property_exists($decodedObject, 'data')
+            || !($decodedObject->data instanceof \stdClass)
+        ) {
+            throw new InvalidPayloadException('The Control Panel response does not confirm success.');
+        }
+
+        /** @var array<string, mixed> $decoded */
+        $decoded = json_decode(json_encode($decodedObject, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
         if (!is_array($decoded)) {
             throw new MalformedJsonException('The Control Panel JSON response is not an object.');
         }
 
         return $decoded;
+    }
+
+    private function decodeJsonAsObject(string $body): ?\stdClass
+    {
+        try {
+            $decoded = json_decode($body, false, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            throw new MalformedJsonException('The Control Panel returned malformed JSON.', 0, $exception);
+        }
+
+        return $decoded instanceof \stdClass ? $decoded : null;
     }
 
     /** @return array<string, mixed> */
@@ -371,11 +377,17 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
     }
 
     /** @param array<string, mixed> $response */
-    private function storeTokenResponse(array $response): void
+    private function storeTokenResponse(array $response, bool $requireShop): void
     {
-        $accessToken = $response['access_token'] ?? null;
-        $tokenType = $response['token_type'] ?? null;
-        $expiresIn = $response['expires_in'] ?? null;
+        $data = $response['data'] ?? null;
+        if (!is_array($data)) {
+            $this->tokens->invalidate();
+            throw new InvalidPayloadException('The Control Panel token response has no valid data object.');
+        }
+
+        $accessToken = $data['access_token'] ?? null;
+        $tokenType = $data['token_type'] ?? null;
+        $expiresIn = $data['expires_in'] ?? null;
 
         if (
             !is_string($accessToken) || $accessToken === ''
@@ -386,10 +398,93 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
             throw new InvalidPayloadException('The Control Panel token response is invalid.');
         }
 
+        if ($requireShop) {
+            $shop = $data['shop'] ?? null;
+            if (!is_array($shop)) {
+                $this->tokens->invalidate();
+                throw new InvalidPayloadException('The Control Panel login response has no valid shop data.');
+            }
+
+            $responseUnicid = $shop['unicid'] ?? null;
+            $configuredUnicid = $this->configuration->getUnicid();
+            if (!is_string($responseUnicid) || $responseUnicid === '' || !hash_equals($configuredUnicid, $responseUnicid)) {
+                $this->tokens->invalidate();
+                throw new InvalidPayloadException('The Control Panel login shop UNICID does not match configuration.');
+            }
+        }
+
         if (!$this->tokens->save($accessToken, $tokenType, $this->now() + (int) $expiresIn)) {
             $this->tokens->invalidate();
             throw new InvalidPayloadException('The Control Panel token could not be stored.');
         }
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     * @param array<string, mixed> $order
+     */
+    private function assertCreateOrderIdentity(array $response, array $order): void
+    {
+        $data = $response['data'] ?? null;
+        if (!is_array($data)) {
+            throw new InvalidPayloadException('The Control Panel create-order response has no valid data object.');
+        }
+
+        $id = $data['id'] ?? null;
+        if (!is_numeric($id) || (int) $id <= 0) {
+            throw new InvalidPayloadException('The Control Panel create-order response has no order id.');
+        }
+
+        $sentOrderId = (string) ($order['order_id'] ?? '');
+        $echoOrderId = isset($data['order_id']) ? (string) $data['order_id'] : '';
+        if ($sentOrderId === '' || $echoOrderId !== $sentOrderId) {
+            throw new InvalidPayloadException('The Control Panel create-order response order_id does not match the request.');
+        }
+
+        $configuredUnicid = $this->configuration->getUnicid();
+        $echoUnicid = isset($data['unicid']) ? (string) $data['unicid'] : '';
+        if ($configuredUnicid === '' || $echoUnicid === '' || !hash_equals($configuredUnicid, $echoUnicid)) {
+            throw new InvalidPayloadException('The Control Panel create-order response unicid does not match configuration.');
+        }
+
+        $shopId = $data['shop_id'] ?? null;
+        if (!is_numeric($shopId) || (int) $shopId <= 0) {
+            throw new InvalidPayloadException('The Control Panel create-order response has no valid shop_id.');
+        }
+
+        $createdAt = $data['created_at'] ?? null;
+        if (!is_string($createdAt) || trim($createdAt) === '') {
+            throw new InvalidPayloadException('The Control Panel create-order response has no valid created_at.');
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     * @param array{order_id: string, status_id: string, status: string} $payload
+     */
+    private function assertPatchStatusEcho(array $response, array $payload): void
+    {
+        $data = $response['data'] ?? null;
+        if (!is_array($data)) {
+            throw new InvalidPayloadException('The Control Panel status response has no valid data object.');
+        }
+
+        if ((string) ($data['order_id'] ?? '') !== $payload['order_id']
+            || (string) ($data['status_id'] ?? '') !== $payload['status_id']
+            || (string) ($data['status'] ?? '') !== $payload['status']
+        ) {
+            throw new InvalidPayloadException('The Control Panel status response does not echo the request identity.');
+        }
+    }
+
+    /** @param array<mixed> $value */
+    private function isAssociativeObject(array $value): bool
+    {
+        if ($value === []) {
+            return true;
+        }
+
+        return array_keys($value) !== range(0, count($value) - 1);
     }
 
     private function now(): int

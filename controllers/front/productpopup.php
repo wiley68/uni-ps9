@@ -331,13 +331,23 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
 
             return ['success' => false, 'message' => 'The financing selection is unavailable.'];
         } catch (OrderOrchestrationException $exception) {
+            $previous = $exception->getPrevious();
             PrestaShopLogger::addLog(
                 'UniPayment popup apply orchestration failed: ' . get_class($exception)
                     . ' post_order=' . ($exception->isPostOrder() ? '1' : '0')
                     . ' id_order=' . $exception->idOrder()
                     . ' id_attempt=' . $exception->attemptId()
-                    . ' state=' . $exception->state(),
-                2
+                    . ' state=' . $exception->state()
+                    . ' order_reference=' . $exception->orderReference()
+                    . ($previous instanceof Throwable
+                        ? (' previous=' . get_class($previous)
+                            . ' previous_msg=' . $this->sanitizeExceptionMessage($previous))
+                        : ''),
+                2,
+                null,
+                null,
+                null,
+                true
             );
             if ($exception->isPostOrder()) {
                 PopupSubmissionPostOrderBinder::bind(
@@ -638,7 +648,8 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
         ControlPanelOrderClientAdapter $cpClient,
         bool $replayExistingOrder
     ): \PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleResult {
-        return (new PostControlPanelLifecycleService())->handle(
+        // CP client is required so P2 durable status sync can PATCH /orders/status.
+        return (new PostControlPanelLifecycleService(null, null, null, null, $cpClient))->handle(
             $result,
             $shop,
             new PostControlPanelLifecycleContext(
@@ -740,12 +751,14 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
     private function sanitizeExceptionMessage(\Throwable $exception): string
     {
         $message = trim(strip_tags($exception->getMessage()));
+        $message = preg_replace('/\b(INSERT|UPDATE|DELETE|SELECT)\b.*/is', '[sql-redacted]', $message) ?? $message;
         $message = preg_replace('/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i', '[redacted-email]', $message) ?? $message;
         $message = preg_replace(
             '/\b(popup_submission_token|token|secret|passwd|password)=[^\s&]+/i',
             '$1=[redacted]',
             $message
         ) ?? $message;
+        $message = preg_replace('/\d{10}/', '[redacted-digits]', $message) ?? $message;
 
         return mb_substr($message, 0, 500);
     }

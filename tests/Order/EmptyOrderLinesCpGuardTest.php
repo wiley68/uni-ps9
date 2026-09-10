@@ -165,7 +165,7 @@ final class EmptyLinesCp implements ControlPanelOrderClientInterface
         return ['data' => ['id' => 1]];
     }
 
-    public function updateOrderStatus(string $orderId, string $status, ?string $statusId = null): array
+    public function updateOrderStatus(string $orderId, string $status, string $statusId): array
     {
         return ['ok' => true];
     }

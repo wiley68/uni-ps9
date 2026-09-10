@@ -66,6 +66,11 @@ final class FinancingSnapshotFactory
             'lifecycle_status' => OrderOrchestrator::PS_ORDER_CREATED,
             'smartucf_state' => 'not_started',
             'smartucf_retryable' => 0,
+            'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
+            'cp_status_sync_status_id' => null,
+            'cp_status_sync_status' => null,
+            'cp_status_sync_error_class' => null,
+            'cp_status_sync_updated_at' => null,
         ];
     }
 }

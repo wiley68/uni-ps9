@@ -18,7 +18,17 @@ final class ModuleRequestSignatureProtocol
 
     public const NONCE_RETENTION_SECONDS = 900;
 
-    public const AUTH_FAILURE_MESSAGE = 'Невалидна или изтекла заявка към модула.';
+    /** Soft upper bound for CP→module inbound JSON bodies (bytes). */
+    public const MAX_REQUEST_BODY_BYTES = 1048576;
+
+    /** Canonical wire maximum for shop-side financing order_id. */
+    public const ORDER_ID_MAX = 13;
+
+    public const STATUS_ID_MAX = 255;
+
+    public const STATUS_MAX = 255;
+
+    public const AUTH_FAILURE_MESSAGE = 'Invalid or expired module request.';
 
     public const CONTRACT_SECRET = 'test_shared_secret_123';
 
@@ -26,9 +36,9 @@ final class ModuleRequestSignatureProtocol
 
     public const CONTRACT_NONCE = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
-    public const CONTRACT_RAW_BODY = '{"unicid":"TEST-UNICID","order_id":"ABC123","status":"approved","status_id":"10"}';
+    public const CONTRACT_RAW_BODY = '{"operation":"order-bank-status","unicid":"TEST-UNICID","order_id":"ABC123","status":"approved","status_id":"10"}';
 
-    public const CONTRACT_SIGNATURE = '2f4a55c19a2dd0f2f7f2390a6d720e95dbdff577c096d7ff291ef8f84a53e94f';
+    public const CONTRACT_SIGNATURE = '012e8545e84e43b45ae05a828bb487932454313ace1729d846cc3bd05a41c6a0';
 
     public static function buildCanonicalString(string $timestamp, string $nonce, string $rawBody): string
     {

@@ -106,7 +106,8 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
             (new CheckoutPreferenceStore())->clear($this->context->cookie);
 
             // Phase 11: post-CP lifecycle only after durable CP order exists (cp_created).
-            $lifecycle = (new PostControlPanelLifecycleService())->handle(
+            // CP client is required so P2 durable status sync can PATCH /orders/status.
+            $lifecycle = (new PostControlPanelLifecycleService(null, null, null, null, $cpClient))->handle(
                 $result,
                 $shop,
                 new PostControlPanelLifecycleContext(

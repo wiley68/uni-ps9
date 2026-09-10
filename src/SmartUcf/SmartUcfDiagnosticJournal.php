@@ -83,6 +83,28 @@ final class SmartUcfDiagnosticJournal
         return $entry === null ? null : $this->sanitizeEntry($entry);
     }
 
+    /**
+     * Shop-scoped diagnostic lookup bound to authorized financing order identity.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findLatestForAuthorizedOrder(string $orderReference, int $psOrderId, int $idShop): ?array
+    {
+        if ($psOrderId <= 0 || $idShop <= 0) {
+            return null;
+        }
+
+        $entry = $this->store->findLatestByOrderIdAndShop($orderReference, $idShop);
+        if ($entry === null) {
+            return null;
+        }
+        if ((int) ($entry['ps_order_id'] ?? 0) !== $psOrderId) {
+            return null;
+        }
+
+        return $this->sanitizeEntry($entry);
+    }
+
     /** @return array<string, mixed> */
     public function buildExport(): array
     {

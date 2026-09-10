@@ -92,8 +92,12 @@ assertCpFailureThankYou(
 // Test B — HTTP 5xx retryable is same-attempt, not customer Try again
 assertCpFailureThankYou(
     strpos($orchestrator, 'CP_FAILED_RETRYABLE') !== false
-        && strpos($orchestrator, 'getStatusCode() >= 500') !== false,
+        && (strpos($orchestrator, '$status >= 500') !== false || strpos($orchestrator, 'getStatusCode() >= 500') !== false),
     'B: HTTP 5xx stays CP_FAILED_RETRYABLE on the same attempt'
+);
+assertCpFailureThankYou(
+    strpos($orchestrator, 'cp_create_server_ambiguous') !== false,
+    'B: 5xx create failures stay non-definitive / ambiguous'
 );
 assertCpFailureThankYou(
     strpos($cpTemplate, 'Опитайте отново') === false && strpos($cpTemplate, 'Try again') === false,

@@ -54,16 +54,21 @@ final class SmartUcfDebugLogRepository implements SmartUcfDebugLogStoreInterface
         $this->ensureTable();
         $this->prune();
 
-        return (bool) $this->database->insert(self::TABLE, [
-            'id_shop' => $idShop,
-            'id_order' => max(0, (int) ($entry['ps_order_id'] ?? 0)),
-            'order_id' => trim((string) ($entry['order_id'] ?? '')),
-            'http_status' => max(0, (int) ($entry['http_code'] ?? 0)),
-            'request_json' => $this->encodeBody($entry['request'] ?? null),
-            'response_json' => $this->encodeBody($entry['response'] ?? null),
-            'transport_error' => isset($entry['transport_error']) ? (string) $entry['transport_error'] : null,
-            'created_at' => (string) ($entry['created_at_gmt'] ?? gmdate('Y-m-d H:i:s')),
-        ]);
+        // PrestaShop Db::insert does not quote-escape string values. Apostrophes in
+        // diagnostic JSON / transport errors break INSERT without pSQL().
+        return (bool) $this->database->insert(
+            self::TABLE,
+            $this->prepareInsertValues([
+                'id_shop' => $idShop,
+                'id_order' => max(0, (int) ($entry['ps_order_id'] ?? 0)),
+                'order_id' => trim((string) ($entry['order_id'] ?? '')),
+                'http_status' => max(0, (int) ($entry['http_code'] ?? 0)),
+                'request_json' => $this->encodeBody($entry['request'] ?? null),
+                'response_json' => $this->encodeBody($entry['response'] ?? null),
+                'transport_error' => isset($entry['transport_error']) ? (string) $entry['transport_error'] : null,
+                'created_at' => (string) ($entry['created_at_gmt'] ?? gmdate('Y-m-d H:i:s')),
+            ])
+        );
     }
 
     /** @return array<string, mixed>|null */
@@ -144,6 +149,45 @@ final class SmartUcfDebugLogRepository implements SmartUcfDebugLogStoreInterface
         } catch (\JsonException $exception) {
             return 'null';
         }
+    }
+
+    /**
+     * Escape string literals for {@see \Db::insert()} and map PHP nulls to SQL NULL.
+     * JSON bodies are already encoded before this step.
+     *
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function prepareInsertValues(array $values): array
+    {
+        foreach ($values as $key => $value) {
+            if (is_array($value) && isset($value['type']) && $value['type'] === 'sql') {
+                continue;
+            }
+            if ($value === null) {
+                $values[$key] = ['type' => 'sql', 'value' => 'NULL'];
+                continue;
+            }
+            if (is_bool($value)) {
+                $values[$key] = $value ? 1 : 0;
+                continue;
+            }
+            if (is_int($value) || is_float($value)) {
+                continue;
+            }
+            $values[$key] = $this->escapeInsertString((string) $value);
+        }
+
+        return $values;
+    }
+
+    private function escapeInsertString(string $value): string
+    {
+        if (function_exists('pSQL')) {
+            return pSQL($value, true);
+        }
+
+        return addslashes($value);
     }
 
     /** @return mixed */

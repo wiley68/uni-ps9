@@ -21,7 +21,7 @@ final class ControlPanelOrderClientAdapter implements ControlPanelOrderClientInt
         return $this->client->createOrder($payload);
     }
 
-    public function updateOrderStatus(string $orderId, string $status, ?string $statusId = null): array
+    public function updateOrderStatus(string $orderId, string $status, string $statusId): array
     {
         return $this->client->updateOrderStatus($orderId, $status, $statusId);
     }
