@@ -14,8 +14,9 @@ final class Configuration
     /** @var array<string, mixed> */
     public static $values = [];
 
-    public static function updateValue(string $key, mixed $value): bool
+    public static function updateValue(string $key, mixed $value, bool $html = false, $idShopGroup = null, $idShop = null): bool
     {
+        unset($html, $idShopGroup, $idShop);
         self::$values[$key] = $value;
 
         return true;
@@ -81,6 +82,7 @@ use PrestaShop\Module\Unipayment\Configuration\Exception\ShopConfigurationSnapsh
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCacheInterface;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationService;
 use PrestaShop\Module\Unipayment\Security\TokenRepository;
+use PrestaShop\Module\Unipayment\Tests\Support\ShopConfigurationCredentialWiring;
 
 final class MemoryShopConfigurationCache implements ShopConfigurationCacheInterface
 {
@@ -166,17 +168,21 @@ $tokens = new TokenRepository();
 $tokens->save('test-token', 'Bearer', 2000000000);
 $cache = new MemoryShopConfigurationCache();
 $provider = new FakeShopConfigurationProvider();
-$service = new ShopConfigurationService($configuration, $cache, $provider, $tokens);
+[$service] = ShopConfigurationCredentialWiring::service($configuration, $cache, $provider, $tokens);
 $unicid = $configuration->getUnicid();
 $unicidB = '223e4567-e89b-12d3-a456-426614174000';
 
 $provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_snapshot(['id' => 10])];
 $initial = $service->get();
 assertPhase3($provider->calls === 1, 'missing cache did not call Control Panel');
-assertPhase3($initial['id'] === 10 && $cache->rows[$unicid] === $initial, 'initial snapshot was not cached');
+assertPhase3($initial['id'] === 10, 'initial snapshot id');
+assertPhase3(!isset($cache->rows[$unicid]['uni_user']), 'GET /shop cache strips uni_user');
+assertPhase3(!isset($cache->rows[$unicid]['uni_password']), 'GET /shop cache strips uni_password');
+assertPhase3(($initial['uni_user'] ?? '') === 'demo-user', 'runtime hydrate restores uni_user');
+assertPhase3(($initial['uni_password'] ?? '') === 'demo-secret-password', 'runtime hydrate restores uni_password');
 
 $hit = $service->get();
-assertPhase3($provider->calls === 1 && $hit === $initial, 'fresh cache did not avoid a Control Panel request');
+assertPhase3($provider->calls === 1 && ($hit['uni_zaglavie'] ?? '') === ($initial['uni_zaglavie'] ?? ''), 'fresh cache did not avoid a Control Panel request');
 
 $cache->fresh = false;
 $provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_snapshot(['id' => 10, 'uni_zaglavie' => 'v2'])];
@@ -241,8 +247,11 @@ try {
 $callsBeforePush = $provider->calls;
 $pushed = unipayment_valid_shop_snapshot(['id' => 10, 'consents' => [['id' => 5, 'name' => 'C', 'mandatory' => 1]]]);
 assertPhase3($service->replaceSnapshot($unicid, $pushed), 'push snapshot replacement failed');
-assertPhase3($cache->rows[$unicid] === $pushed, 'push snapshot was merged instead of replaced');
+assertPhase3(!isset($cache->rows[$unicid]['uni_user']), 'push cache strips credentials');
+assertPhase3(($cache->rows[$unicid]['consents'][0]['name'] ?? '') === 'C', 'push snapshot was merged instead of replaced');
 assertPhase3($provider->calls === $callsBeforePush, 'push replacement made an outbound request');
+$hydratedPush = $service->get();
+assertPhase3(($hydratedPush['uni_user'] ?? '') === 'demo-user', 'push path hydrates credentials');
 
 $snapshotA = unipayment_valid_shop_snapshot(['unicid' => $unicid, 'uni_zaglavie' => 'shop-a']);
 $snapshotB = unipayment_valid_shop_snapshot(['unicid' => $unicidB, 'uni_zaglavie' => 'shop-b']);

@@ -24,6 +24,8 @@ final class SmartUcfDiagnosticJournal
         'certificate_pem',
         'certificate_password',
         'user',
+        'uni_user',
+        'uni_password',
         'clientfirstname',
         'clientlastname',
         'clientphone',

@@ -32,6 +32,8 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
     public const CUSTOMER_FAILED =
     'Възникна грешка при обработката на заявката.';
 
+    public const ERROR_CREDENTIALS_UNAVAILABLE = 'smartucf_credentials_unavailable';
+
     /** @var SmartUcfLifecycleRepository */
     private $lifecycle;
     /** @var SmartUcfSessionGatewayInterface */
@@ -119,6 +121,15 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
         $replay = $this->resultFromState($row);
         if ($replay !== null) {
             return $replay;
+        }
+
+        // Fail-before-network: require hydrated SmartUCF credentials before claim or cURL.
+        if (!$this->hasRuntimeSmartUcfCredentials($shop)) {
+            return SmartUcfCoordinationResult::failed(
+                self::CUSTOMER_FAILED,
+                true,
+                self::ERROR_CREDENTIALS_UNAVAILABLE
+            );
         }
 
         $certificateLease = null;
@@ -455,6 +466,17 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
         return $this->context instanceof \Context && isset($this->context->shop)
             ? (int) $this->context->shop->id
             : 0;
+    }
+
+    /**
+     * @param array<string, mixed> $shop
+     */
+    private function hasRuntimeSmartUcfCredentials(array $shop): bool
+    {
+        $user = trim((string) ($shop['uni_user'] ?? ''));
+        $password = trim((string) ($shop['uni_password'] ?? ''));
+
+        return $user !== '' && $password !== '';
     }
 
     /** @param mixed $request */

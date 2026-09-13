@@ -17,8 +17,9 @@ final class Configuration
     /** @var array<string, mixed> */
     public static $values = [];
 
-    public static function updateValue(string $key, mixed $value): bool
+    public static function updateValue(string $key, mixed $value, bool $html = false, $idShopGroup = null, $idShop = null): bool
     {
+        unset($html, $idShopGroup, $idShop);
         self::$values[$key] = $value;
 
         return true;
@@ -70,6 +71,7 @@ use PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCacheInterface;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationService;
 use PrestaShop\Module\Unipayment\Security\TokenRepository;
+use PrestaShop\Module\Unipayment\Tests\Support\ShopConfigurationCredentialWiring;
 
 function assertAud022(bool $ok, string $message): void
 {
@@ -145,7 +147,7 @@ assertAud022($configuration->save(true, $unicid, 'secret'), 'stage credentials')
 
 $provider = new Aud022FailIfCalledProvider();
 $cache = new Aud022MemoryCache();
-$service = new ShopConfigurationService($configuration, $cache, $provider, new TokenRepository());
+[$service] = ShopConfigurationCredentialWiring::service($configuration, $cache, $provider, new TokenRepository());
 
 $shop = unipayment_valid_shop_snapshot(['uni_status' => 1, 'uni_container_status' => 1, 'uni_zaglavie' => 'cached-ad']);
 
@@ -153,6 +155,7 @@ $shop = unipayment_valid_shop_snapshot(['uni_status' => 1, 'uni_container_status
 $cache->fresh[$unicid] = $shop;
 $cached = $service->getCachedOnly();
 assertAud022(is_array($cached) && ($cached['uni_zaglavie'] ?? '') === 'cached-ad', 'A: fresh cache returned');
+assertAud022(!array_key_exists('uni_user', $cached), 'A: cached-only strips credentials');
 assertAud022($provider->calls === 0, 'A: provider not called');
 
 // B: cache miss → null, provider not called
@@ -176,7 +179,7 @@ assertAud022($provider->calls === 0, 'D: provider not called');
 // empty UNICID → null without provider
 Configuration::$values = [];
 $emptyConfig = new ConfigurationRepository();
-$emptyService = new ShopConfigurationService($emptyConfig, $cache, $provider, new TokenRepository());
+[$emptyService] = ShopConfigurationCredentialWiring::service($emptyConfig, $cache, $provider, new TokenRepository());
 assertAud022($emptyService->getCachedOnly() === null, 'empty UNICID → null');
 assertAud022($provider->calls === 0, 'empty UNICID does not call provider');
 
@@ -195,7 +198,12 @@ $liveProvider = new class implements ShopConfigurationProviderInterface {
     }
 };
 $liveCache = new Aud022MemoryCache();
-$liveService = new ShopConfigurationService($configuration, $liveCache, $liveProvider, new TokenRepository());
+[$liveService] = ShopConfigurationCredentialWiring::service(
+    $configuration,
+    $liveCache,
+    $liveProvider,
+    new TokenRepository()
+);
 $forced = $liveService->get(true);
 assertAud022(($forced['uni_zaglavie'] ?? '') === 'from-cp', 'G: explicit refresh still works');
 assertAud022($liveProvider->calls === 1, 'G: provider called on force refresh');
@@ -212,7 +220,12 @@ $liveProvider2 = new class implements ShopConfigurationProviderInterface {
         return ['data' => unipayment_valid_shop_snapshot(['uni_zaglavie' => 'auto-refresh'])];
     }
 };
-$liveService2 = new ShopConfigurationService($configuration, $liveCache2, $liveProvider2, new TokenRepository());
+[$liveService2] = ShopConfigurationCredentialWiring::service(
+    $configuration,
+    $liveCache2,
+    $liveProvider2,
+    new TokenRepository()
+);
 $auto = $liveService2->get(false);
 assertAud022(($auto['uni_zaglavie'] ?? '') === 'auto-refresh', 'G: get(false) still refreshes on miss');
 assertAud022($liveProvider2->calls === 1, 'G: provider called on get miss');

@@ -19,6 +19,8 @@ final class PostControlPanelLifecycleResult
 
     public const OUTCOME_SMARTUCF_FAILED = 'smartucf_failed';
 
+    public const OUTCOME_SMARTUCF_PRE_SEND = 'smartucf_pre_send';
+
     public const OUTCOME_SNAPSHOT_MISSING = 'snapshot_missing';
 
     public const OUTCOME_POST_ORDER_FAILURE = 'post_order_failure';
@@ -50,6 +52,9 @@ final class PostControlPanelLifecycleResult
     /** @var string|null */
     private $postOrderError;
 
+    /** @var string */
+    private $smartUcfErrorClass;
+
     /**
      * @param array{status_id: string, status_label: string}|null $finalBankStatus
      */
@@ -62,7 +67,8 @@ final class PostControlPanelLifecycleResult
         bool $snapshotAvailable = true,
         bool $emailSent = false,
         ?string $emailError = null,
-        ?string $postOrderError = null
+        ?string $postOrderError = null,
+        string $smartUcfErrorClass = ''
     ) {
         $this->outcome = $outcome;
         $this->process2 = $process2;
@@ -73,6 +79,7 @@ final class PostControlPanelLifecycleResult
         $this->emailSent = $emailSent;
         $this->emailError = $emailError;
         $this->postOrderError = $postOrderError;
+        $this->smartUcfErrorClass = $smartUcfErrorClass;
     }
 
     public static function process2(?array $finalBankStatus = null): self
@@ -100,6 +107,22 @@ final class PostControlPanelLifecycleResult
         return new self(self::OUTCOME_SMARTUCF_FAILED, false, '', $customerMessage, $finalBankStatus, true, $emailSent);
     }
 
+    public static function smartUcfPreSendFailed(string $customerMessage, string $errorClass = ''): self
+    {
+        return new self(
+            self::OUTCOME_SMARTUCF_PRE_SEND,
+            false,
+            '',
+            $customerMessage,
+            null,
+            true,
+            false,
+            null,
+            null,
+            $errorClass
+        );
+    }
+
     public static function snapshotMissing(): self
     {
         return new self(self::OUTCOME_SNAPSHOT_MISSING, false, '', '', null, false);
@@ -121,7 +144,8 @@ final class PostControlPanelLifecycleResult
             $this->snapshotAvailable,
             $emailSent,
             $emailError,
-            $this->postOrderError
+            $this->postOrderError,
+            $this->smartUcfErrorClass
         );
     }
 
@@ -184,6 +208,16 @@ final class PostControlPanelLifecycleResult
     public function isFailed(): bool
     {
         return $this->outcome === self::OUTCOME_SMARTUCF_FAILED;
+    }
+
+    public function isPreSendFailure(): bool
+    {
+        return $this->outcome === self::OUTCOME_SMARTUCF_PRE_SEND;
+    }
+
+    public function smartUcfErrorClass(): string
+    {
+        return $this->smartUcfErrorClass;
     }
 
     public function isCreated(): bool

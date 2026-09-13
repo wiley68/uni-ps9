@@ -39,6 +39,14 @@ final class PostControlPanelLifecyclePopupMapper
             case PostControlPanelLifecycleResult::OUTCOME_SMARTUCF_FAILED:
                 $response['smartucf_error'] = $result->customerMessage();
                 break;
+            case PostControlPanelLifecycleResult::OUTCOME_SMARTUCF_PRE_SEND:
+                $response['step'] = 'pre_send_failed';
+                $response['smartucf_error'] = $result->customerMessage();
+                $response['retryable'] = true;
+                if ($result->smartUcfErrorClass() !== '') {
+                    $response['smartucf_error_class'] = $result->smartUcfErrorClass();
+                }
+                break;
             case PostControlPanelLifecycleResult::OUTCOME_PROCESS2:
                 // redirect_url is assigned by the controller (confirmation URL builder).
                 break;

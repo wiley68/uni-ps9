@@ -407,7 +407,9 @@ final class ShopConfigurationSnapshotValidator
         $serviceKey = $isTest ? 'uni_test_service' : 'uni_production_service';
         $applicationKey = $isTest ? 'uni_test_application' : 'uni_production_application';
 
-        foreach ([$serviceKey, $applicationKey, 'uni_user', 'uni_password'] as $key) {
+        // SmartUCF credentials (uni_user/uni_password) are partitioned into dedicated encrypted
+        // storage by SmartUcfCredentialPersistence — not validated as general cache fields here.
+        foreach ([$serviceKey, $applicationKey] as $key) {
             if (!array_key_exists($key, $shopData) || !is_string($shopData[$key]) || trim($shopData[$key]) === '') {
                 $this->add($key, 'required');
             }

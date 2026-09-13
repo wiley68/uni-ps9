@@ -23,6 +23,7 @@ use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleService;
 use PrestaShop\Module\Unipayment\Order\PostControlPanelSmartUcfPort;
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfCoordinationResult;
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfEndpointPolicy;
+use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfFailureClassification;
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfSessionCoordinator;
 
 if (!class_exists('PrestaShopLogger', false)) {
@@ -328,7 +329,11 @@ assertAud018($resultE->emailSent() === true, 'E: email sent for outcome_unknown'
 // Test F — failed
 $storeF = new Aud018MemorySnapshotStore();
 $storeF->seed(10, $snapshot);
-$smartFailed = new Aud018FakeSmartUcfPort(SmartUcfCoordinationResult::failed('failed msg'));
+$smartFailed = new Aud018FakeSmartUcfPort(SmartUcfCoordinationResult::failed(
+    'failed msg',
+    false,
+    SmartUcfFailureClassification::CLASS_REMOTE_REJECT
+));
 $failedBankSpy = new Aud018BankStatusSpy();
 $resultF = (new PostControlPanelLifecycleService($storeF, new Aud018NoopMailDispatcher(), $failedBankSpy))->handle(
     $order,

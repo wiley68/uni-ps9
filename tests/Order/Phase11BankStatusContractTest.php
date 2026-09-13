@@ -23,6 +23,7 @@ use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleService;
 use PrestaShop\Module\Unipayment\Order\PostControlPanelSmartUcfPort;
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfCoordinationResult;
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfEndpointPolicy;
+use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfFailureClassification;
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfSessionCoordinator;
 
 if (!class_exists('PrestaShopLogger', false)) {
@@ -162,7 +163,11 @@ $storeFail = new Phase11SnapStore();
 $storeFail->rows[1] = $snapshot;
 $bankFail = new Phase11BankSpy();
 $smartFail = new Phase11SmartPort();
-$smartFail->queue[] = SmartUcfCoordinationResult::failed(SmartUcfSessionCoordinator::CUSTOMER_FAILED, false);
+$smartFail->queue[] = SmartUcfCoordinationResult::failed(
+    SmartUcfSessionCoordinator::CUSTOMER_FAILED,
+    false,
+    SmartUcfFailureClassification::CLASS_REMOTE_REJECT
+);
 $rFail = (new PostControlPanelLifecycleService($storeFail, new Phase11MailNoop(), $bankFail))->handle(
     $order,
     ['uni_proces' => 0],

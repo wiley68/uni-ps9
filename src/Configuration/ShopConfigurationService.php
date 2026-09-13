@@ -9,7 +9,12 @@ use PrestaShop\Module\Unipayment\Api\Exception\HttpException;
 use PrestaShop\Module\Unipayment\Api\Exception\InvalidPayloadException;
 use PrestaShop\Module\Unipayment\Api\ShopConfigurationProviderInterface;
 use PrestaShop\Module\Unipayment\Configuration\Exception\ShopConfigurationSnapshotValidationException;
+use PrestaShop\Module\Unipayment\Infrastructure\DbMutationBoundary;
+use PrestaShop\Module\Unipayment\Infrastructure\MutationBoundaryInterface;
 use PrestaShop\Module\Unipayment\Security\TokenRepository;
+use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfCredentialPairClassifier;
+use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfCredentialPersistence;
+use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfCredentialRepository;
 
 final class ShopConfigurationService
 {
@@ -28,18 +33,37 @@ final class ShopConfigurationService
     /** @var ShopConfigurationSnapshotValidator */
     private $snapshotValidator;
 
+    /** @var SmartUcfCredentialRepository */
+    private $smartUcfCredentials;
+
+    /** @var SmartUcfCredentialPersistence */
+    private $credentialPersistence;
+
+    /** @var MutationBoundaryInterface */
+    private $mutationBoundary;
+
     public function __construct(
         ConfigurationRepository $configuration,
         ShopConfigurationCacheInterface $cache,
         ShopConfigurationProviderInterface $provider,
         TokenRepository $tokens,
-        ?ShopConfigurationSnapshotValidator $snapshotValidator = null
+        ?ShopConfigurationSnapshotValidator $snapshotValidator = null,
+        ?SmartUcfCredentialRepository $smartUcfCredentials = null,
+        ?SmartUcfCredentialPersistence $credentialPersistence = null,
+        ?MutationBoundaryInterface $mutationBoundary = null
     ) {
         $this->configuration = $configuration;
         $this->cache = $cache;
         $this->provider = $provider;
         $this->tokens = $tokens;
         $this->snapshotValidator = $snapshotValidator ?? new ShopConfigurationSnapshotValidator();
+        $this->smartUcfCredentials = $smartUcfCredentials ?? new SmartUcfCredentialRepository();
+        $this->mutationBoundary = $mutationBoundary ?? new DbMutationBoundary();
+        $this->credentialPersistence = $credentialPersistence ?? new SmartUcfCredentialPersistence(
+            $this->smartUcfCredentials,
+            $cache,
+            $this->mutationBoundary
+        );
     }
 
     /** @return array<string, mixed> */
@@ -51,20 +75,31 @@ final class ShopConfigurationService
             throw new AuthenticationException('UNICID is required to load the shop configuration.');
         }
 
+        if ($forceRefresh) {
+            $this->refresh($unicid);
+        }
+
+        $hydrated = $this->loadCoherentRuntimeSnapshot($unicid);
+        if ($hydrated !== null) {
+            return $hydrated;
+        }
+
         if (!$forceRefresh) {
-            $cached = $this->cache->getFresh($unicid);
-            if ($cached !== null) {
-                return $cached;
+            $this->refresh($unicid);
+            $hydrated = $this->loadCoherentRuntimeSnapshot($unicid);
+            if ($hydrated !== null) {
+                return $hydrated;
             }
         }
 
-        return $this->refresh($unicid);
+        throw new InvalidPayloadException('The shop configuration cache could not be loaded.');
     }
 
     /**
-     * Cache-only shop snapshot for FO advertising render paths.
+     * Cache-only shop snapshot for FO advertising render paths (AUD-022).
      *
      * Never calls refresh(), the remote provider, login, or token refresh.
+     * Never hydrates SmartUCF credentials (FO advertising must stay credential-free).
      * Missing/stale/malformed cache → null (fail closed).
      *
      * @return array<string, mixed>|null
@@ -77,7 +112,13 @@ final class ShopConfigurationService
         }
 
         try {
-            return $this->cache->getFresh($unicid);
+            $cached = $this->cache->getFresh($unicid);
+            if ($cached === null) {
+                return null;
+            }
+
+            // FO advertising must never see runtime credentials.
+            return SmartUcfCredentialPairClassifier::stripFromSnapshot($cached);
         } catch (\Throwable $exception) {
             return null;
         }
@@ -94,15 +135,49 @@ final class ShopConfigurationService
             throw new InvalidPayloadException('The pushed shop configuration snapshot is invalid.');
         }
 
+        $shopData = ShopSnapshotSanitizer::sanitize($shopData);
         $this->snapshotValidator->validate($shopData, trim($unicid));
+        $this->credentialPersistence->persistValidatedSnapshot(trim($unicid), $shopData);
 
-        return $this->cache->replace(trim($unicid), $shopData);
+        return true;
+    }
+
+    public function smartUcfCredentials(): SmartUcfCredentialRepository
+    {
+        return $this->smartUcfCredentials;
     }
 
     /** @return array<string, mixed>|null */
     public function getMetadata(): ?array
     {
         return $this->cache->getMetadata($this->configuration->getUnicid());
+    }
+
+    /**
+     * Cache + exact credential pair under the same writer lock scope (no version skew).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function loadCoherentRuntimeSnapshot(string $unicid): ?array
+    {
+        $unicid = trim($unicid);
+        if ($unicid === '') {
+            return null;
+        }
+
+        $lockName = DbMutationBoundary::smartUcfCredentialLockName(
+            $this->smartUcfCredentials->shopId(),
+            $unicid
+        );
+
+        return $this->mutationBoundary->runExclusive($lockName, function () use ($unicid) {
+            $cached = $this->cache->getFresh($unicid);
+            if ($cached === null) {
+                return null;
+            }
+
+            return $this->smartUcfCredentials->hydrateShopSnapshot($cached);
+        });
     }
 
     /** @return array<string, mixed> */
@@ -115,6 +190,8 @@ final class ShopConfigurationService
                 throw new InvalidPayloadException('The Control Panel returned no usable shop configuration.');
             }
 
+            $shopData = ShopSnapshotSanitizer::sanitize($shopData);
+
             try {
                 $this->snapshotValidator->validate($shopData, $unicid);
             } catch (ShopConfigurationSnapshotValidationException $exception) {
@@ -126,11 +203,7 @@ final class ShopConfigurationService
                 throw $exception;
             }
 
-            if (!$this->cache->replace($unicid, $shopData)) {
-                throw new InvalidPayloadException('The shop configuration cache could not be stored.');
-            }
-
-            return $shopData;
+            return $this->credentialPersistence->persistValidatedSnapshot($unicid, $shopData);
         } catch (ShopConfigurationSnapshotValidationException $exception) {
             // Keep known-good cache. Do not purge tokens.
             throw $exception;

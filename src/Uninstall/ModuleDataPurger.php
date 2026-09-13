@@ -16,6 +16,7 @@ use PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository;
 use PrestaShop\Module\Unipayment\Security\ApiNonceRepository;
 use PrestaShop\Module\Unipayment\Security\TokenRepository;
 use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateLocalStore;
+use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfCredentialRepository;
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository;
 
 /**
@@ -59,6 +60,10 @@ final class ModuleDataPurger
 
         $this->runComponent('tokens', function () {
             return (new TokenRepository())->invalidate();
+        }, $completed, $errors);
+
+        $this->runComponent('smartucf_credentials', function () {
+            return (new SmartUcfCredentialRepository())->uninstallAllShops();
         }, $completed, $errors);
 
         $this->runComponent('configuration', function () {

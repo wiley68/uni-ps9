@@ -133,7 +133,7 @@ final class PostControlPanelLifecycleService
             }
         }
 
-        if ($result->isProcessing() || !$context->sendLeasingEmail) {
+        if ($result->isProcessing() || $result->isPreSendFailure() || !$context->sendLeasingEmail) {
             return $result;
         }
 
@@ -189,6 +189,13 @@ final class PostControlPanelLifecycleService
             $message = $smart->customerMessage() !== ''
                 ? $smart->customerMessage()
                 : SmartUcfSessionCoordinator::CUSTOMER_FAILED;
+
+            if ($smart->isPreSendFailure()) {
+                return PostControlPanelLifecycleResult::smartUcfPreSendFailed(
+                    $message,
+                    $smart->errorClass()
+                );
+            }
 
             return PostControlPanelLifecycleResult::smartUcfFailed(
                 $message,

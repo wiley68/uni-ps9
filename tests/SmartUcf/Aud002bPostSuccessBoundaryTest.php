@@ -184,8 +184,11 @@ function aud002bCoordinatorWith(Aud002bMemoryLifecycle $lifecycle, Aud002bFakeSe
         'classifier' => new SmartUcfFailureClassifier(),
         'snapshots' => null,
         'cpClient' => null,
+        'controlPanelApi' => null,
+        'certificateSynchronizer' => null,
         'module' => null,
         'context' => null,
+        'statusSync' => null,
     ];
     foreach ($props as $name => $value) {
         $prop = $ref->getProperty($name);
@@ -206,8 +209,16 @@ $snapshot = [
     'first_installment' => 0,
     'months' => 12,
     'monthly_installment' => 10,
+    'customer_json' => ['first_name' => 'A', 'last_name' => 'B', 'phone' => '1', 'email' => 'a@b.c'],
+    'lines_json' => [['name' => 'Item', 'id_product' => 1, 'quantity' => 1, 'total' => 100]],
+    'address_json' => ['address1' => 'Addr', 'city' => 'Sofia', 'postcode' => '1000'],
 ];
-$shop = ['_currency_iso' => 'EUR'];
+$shop = [
+    '_currency_iso' => 'EUR',
+    'uni_user' => 'demo-user',
+    'uni_password' => 'demo-secret-password',
+    'uni_sertificat' => 0,
+];
 
 $baseRow = [
     'id_attempt' => 42,

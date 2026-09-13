@@ -17,8 +17,9 @@ final class Configuration
     /** @var array<string, mixed> */
     public static $values = [];
 
-    public static function updateValue(string $key, mixed $value): bool
+    public static function updateValue(string $key, mixed $value, bool $html = false, $idShopGroup = null, $idShop = null): bool
     {
+        unset($html, $idShopGroup, $idShop);
         self::$values[$key] = $value;
 
         return true;
@@ -70,6 +71,7 @@ use PrestaShop\Module\Unipayment\Configuration\Exception\ShopConfigurationSnapsh
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCacheInterface;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationService;
 use PrestaShop\Module\Unipayment\Security\TokenRepository;
+use PrestaShop\Module\Unipayment\Tests\Support\ShopConfigurationCredentialWiring;
 
 function assertPush(bool $ok, string $message): void
 {
@@ -137,7 +139,12 @@ $unicid = '123e4567-e89b-12d3-a456-426614174000';
 $configuration = new ConfigurationRepository();
 $configuration->save(true, $unicid, 'secret');
 $cache = new MemoryShopCache();
-$service = new ShopConfigurationService($configuration, $cache, new NullProvider(), new TokenRepository());
+[$service] = ShopConfigurationCredentialWiring::service(
+    $configuration,
+    $cache,
+    new NullProvider(),
+    new TokenRepository()
+);
 
 $good = unipayment_valid_shop_snapshot();
 $cache->replace($unicid, $good);
@@ -146,6 +153,7 @@ assertPush(isset($cache->rows[$unicid]['uni_status']), 'seed cache');
 $replaced = unipayment_valid_shop_snapshot(['uni_minstojnost' => 250]);
 assertPush($service->replaceSnapshot($unicid, $replaced), 'valid push replaces');
 assertPush((int) $cache->rows[$unicid]['uni_minstojnost'] === 250, 'full replacement applied');
+assertPush(!array_key_exists('uni_user', $cache->rows[$unicid]), 'push strips uni_user');
 assertPush(!array_key_exists('extra_old_field', $cache->rows[$unicid]), 'no merge of old keys');
 
 $beforeInvalid = $cache->rows[$unicid];

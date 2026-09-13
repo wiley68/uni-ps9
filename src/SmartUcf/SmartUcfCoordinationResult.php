@@ -128,6 +128,19 @@ final class SmartUcfCoordinationResult
         return $this->errorClass;
     }
 
+    /**
+     * Local failure before SmartUCF submission (credentials, certificate sync, payload guard).
+     */
+    public function isPreSendFailure(): bool
+    {
+        if (!$this->isFailed()) {
+            return false;
+        }
+
+        return $this->errorClass === SmartUcfFailureClassification::CLASS_PRE_SEND
+            || $this->errorClass === SmartUcfSessionCoordinator::ERROR_CREDENTIALS_UNAVAILABLE;
+    }
+
     /** @return array<string, mixed>|null */
     public function sessionPayload(): ?array
     {

@@ -11,6 +11,11 @@
       "PrestaShop\\Module\\Unipayment\\": "src/"
     }
   },
+  "autoload-dev": {
+    "psr-4": {
+      "PrestaShop\\Module\\Unipayment\\Tests\\Support\\": "tests/Support/"
+    }
+  },
   "scripts": {
     "test": "php tests/run.php"
   },

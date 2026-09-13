@@ -69,6 +69,8 @@ final class ConfigurationRepository
                 self::CP_TOKEN_TYPE,
                 self::CP_TOKEN_EXPIRES_AT,
                 self::LAST_PRIVACY_CLEANUP,
+                \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfCredentialRepository::USER_KEY,
+                \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfCredentialRepository::PASSWORD_KEY,
             ] as $key
         ) {
             $result = \Configuration::deleteByName($key) && $result;

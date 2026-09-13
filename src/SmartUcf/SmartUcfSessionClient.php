@@ -78,6 +78,15 @@ final class SmartUcfSessionClient implements SmartUcfSessionGatewayInterface
         }
 
         $payload = $this->payloadBuilder->build($shop, $snapshot);
+        if (trim((string) ($payload['user'] ?? '')) === '' || trim((string) ($payload['pass'] ?? '')) === '') {
+            throw new SmartUcfSessionException(
+                'SmartUCF credentials are unavailable.',
+                true,
+                '',
+                0,
+                SmartUcfSessionException::KIND_PRE_SEND
+            );
+        }
         $useCert = ShopConfigurationFlags::usesSmartUcfCertificate($shop);
 
         $keyPath = null;

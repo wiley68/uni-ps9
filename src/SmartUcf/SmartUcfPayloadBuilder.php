@@ -31,9 +31,9 @@ final class SmartUcfPayloadBuilder
             $deliveryAddress = trim((string) ($customer['address'] ?? '-'));
         }
 
-        return [
-            'user' => (string) ($shop['uni_user'] ?? ''),
-            'pass' => (string) ($shop['uni_password'] ?? ''),
+        $payload = [
+            'user' => trim((string) ($shop['uni_user'] ?? '')),
+            'pass' => trim((string) ($shop['uni_password'] ?? '')),
             'orderNo' => (string) $snapshot['order_reference'],
             'clientFirstName' => $this->clean((string) ($customer['first_name'] ?? '')),
             'clientLastName' => $this->clean((string) ($customer['last_name'] ?? '')),
@@ -47,6 +47,12 @@ final class SmartUcfPayloadBuilder
             'monthlyPayment' => $this->formatAmount((float) $snapshot['monthly_installment'], $shop),
             'items' => $this->buildItems($lines, $shop),
         ];
+
+        if ($payload['user'] === '' || $payload['pass'] === '') {
+            throw new \InvalidArgumentException('SmartUCF credentials are required before payload build.');
+        }
+
+        return $payload;
     }
 
     /**

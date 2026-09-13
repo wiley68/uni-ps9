@@ -17,8 +17,9 @@ final class Configuration
     /** @var bool */
     public static $failTokenDeletes = false;
 
-    public static function updateValue(string $key, mixed $value): bool
+    public static function updateValue(string $key, mixed $value, bool $html = false, $idShopGroup = null, $idShop = null): bool
     {
+        unset($html, $idShopGroup, $idShop);
         self::$values[$key] = $value;
 
         return true;
@@ -82,6 +83,7 @@ use PrestaShop\Module\Unipayment\Configuration\CredentialChangeSideEffectHandler
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCacheInterface;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationService;
 use PrestaShop\Module\Unipayment\Security\TokenRepository;
+use PrestaShop\Module\Unipayment\Tests\Support\ShopConfigurationCredentialWiring;
 
 final class MemoryShopConfigurationCache implements ShopConfigurationCacheInterface
 {
@@ -172,7 +174,7 @@ $unicidB = '223e4567-e89b-12d3-a456-426614174000';
 $tokens = new TokenRepository();
 $cache = new MemoryShopConfigurationCache();
 $provider = new CountingShopProvider();
-$service = new ShopConfigurationService($configuration, $cache, $provider, $tokens);
+[$service] = ShopConfigurationCredentialWiring::service($configuration, $cache, $provider, $tokens);
 
 $snapshot = unipayment_valid_shop_snapshot(['unicid' => $unicid]);
 $cache->replace($unicid, $snapshot);
