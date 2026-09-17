@@ -39,15 +39,18 @@ final class BankStatus
     }
 
     /**
-     * Woo parity: Process 1 CP create failure uses bank_send_failed_cp;
-     * Process 2 uses the generic bank_send_failed label.
+     * Definitive CP create failure — Process 1 and Process 2 share the same
+     * public bank status. Generic bank_send_failed is not a permitted public label.
      *
      * @return array{status_id: string, status_label: string}
      */
     public static function controlPanelFailure(bool $process2 = false): array
     {
-        return $process2
-            ? ['status_id' => self::SEND_FAILED, 'status_label' => self::LABEL_SEND_FAILED]
-            : ['status_id' => self::SEND_FAILED_CP, 'status_label' => self::LABEL_SEND_FAILED_CP];
+        unset($process2);
+
+        return [
+            'status_id' => self::SEND_FAILED_CP,
+            'status_label' => self::LABEL_SEND_FAILED_CP,
+        ];
     }
 }

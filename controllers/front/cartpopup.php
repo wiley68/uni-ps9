@@ -334,7 +334,11 @@ final class UnipaymentCartPopupModuleFrontController extends ModuleFrontControll
                     0
                 );
 
-                return PostOrderPopupFailureResponse::fromException($exception);
+                $thankYouUrl = $exception->idOrder() > 0
+                    ? (new OrderConfirmationUrlBuilder())->build($this->context, $module, $exception->idOrder())
+                    : '';
+
+                return PostOrderPopupFailureResponse::fromException($exception, $thankYouUrl);
             }
             if ($exception->isRetryable()) {
                 $submissions->revertProcessingWithoutCart($submissionId);
@@ -362,7 +366,14 @@ final class UnipaymentCartPopupModuleFrontController extends ModuleFrontControll
                     0
                 );
 
-                return PostOrderPopupFailureResponse::fromPersistedOrder($recoveredOrderId, $reference);
+                return PostOrderPopupFailureResponse::fromPersistedOrder(
+                    $recoveredOrderId,
+                    $reference,
+                    null,
+                    $recoveredOrderId > 0
+                        ? (new OrderConfirmationUrlBuilder())->build($this->context, $module, $recoveredOrderId)
+                        : ''
+                );
             }
             $rowAfter = $submissions->findByToken($token);
             if (is_array($rowAfter) && (int) ($rowAfter['id_cart'] ?? 0) <= 0) {
@@ -525,9 +536,13 @@ final class UnipaymentCartPopupModuleFrontController extends ModuleFrontControll
         ];
 
         if ((int) ($row['control_panel_order_id'] ?? 0) <= 0 && (int) ($row['id_order'] ?? 0) > 0) {
+            $idOrder = (int) $row['id_order'];
+
             return PostOrderPopupFailureResponse::fromPersistedOrder(
-                (int) $row['id_order'],
-                (string) $row['order_reference']
+                $idOrder,
+                (string) $row['order_reference'],
+                null,
+                (new OrderConfirmationUrlBuilder())->build($this->context, $module, $idOrder)
             );
         }
 

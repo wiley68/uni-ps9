@@ -36,6 +36,9 @@ final class OrderOrchestrator
     /** @var BankStatusPersistencePort|null */
     private $bankStatus;
 
+    /** @var LeasingMailDispatchPort|null */
+    private $mailDispatcher;
+
     public function __construct(
         OrderAttemptStoreInterface $attempts,
         FinancingSnapshotStoreInterface $snapshots,
@@ -43,7 +46,8 @@ final class OrderOrchestrator
         ControlPanelOrderClientInterface $cp,
         FinancingSnapshotFactory $snapshotFactory,
         ControlPanelOrderPayloadBuilder $payloads,
-        ?BankStatusPersistencePort $bankStatus = null
+        ?BankStatusPersistencePort $bankStatus = null,
+        ?LeasingMailDispatchPort $mailDispatcher = null
     ) {
         $this->attempts = $attempts;
         $this->snapshots = $snapshots;
@@ -52,6 +56,7 @@ final class OrderOrchestrator
         $this->snapshotFactory = $snapshotFactory;
         $this->payloads = $payloads;
         $this->bankStatus = $bankStatus;
+        $this->mailDispatcher = $mailDispatcher;
     }
 
     /** @param array<string, mixed> $shop */
@@ -357,6 +362,10 @@ final class OrderOrchestrator
      * Ambiguous transport/application outcomes must remain distinguishable from definitive
      * rejection and must not be reported as bank_send_failed_cp.
      *
+     * Explicit HTTP-layer endpoint/access rejection (403/404/405/410) proves the create
+     * was not accepted — including Cloudflare/edge HTML challenges on a wrong API path
+     * such as /api/v11 — even without an application machine-code error body.
+     *
      * @return array{state: string, error_class: string, retryable: bool, definitive_local_failure: bool}
      */
     private function classifyControlPanelCreateFailure(HttpException $exception): array
@@ -381,7 +390,17 @@ final class OrderOrchestrator
             ];
         }
 
-        // Auth, rate limit, server errors, unknown 4xx, and missing machine codes stay non-definitive.
+        // Explicit endpoint / access rejection: create was not accepted; no CP order exists.
+        if (in_array($status, [403, 404, 405, 410], true)) {
+            return [
+                'state' => self::TERMINAL_FAILED,
+                'error_class' => 'cp_create_http_' . $status,
+                'retryable' => false,
+                'definitive_local_failure' => true,
+            ];
+        }
+
+        // Auth, rate limit, server errors, and other unknown 4xx stay non-definitive.
         if ($status === 401 || $error === 'authentication_failed' || $error === 'token_expired') {
             return [
                 'state' => self::CP_OUTCOME_UNKNOWN,
@@ -548,6 +567,9 @@ final class OrderOrchestrator
      * Local bank_send_failed_cp is only written for definitive CP rejection — never for
      * ambiguous outcomes (timeout / malformed / echo mismatch / auth / rate limit / unknown 4xx).
      *
+     * Definitive failure finalizes standard order emails once with the canonical bank status.
+     * Ambiguous outcomes discard deferred order_conf and do not claim definitive absence.
+     *
      * @param array<string, mixed> $shop
      */
     private function recordControlPanelFailure(
@@ -561,24 +583,62 @@ final class OrderOrchestrator
     ): void {
         $this->attempts->update($attemptId, ['state' => $state, 'last_error_class' => $errorClass]);
         $this->snapshots->update($attemptId, ['lifecycle_status' => $state]);
-        DeferredOrderMailQueue::discard();
-        if (!$definitiveLocalFailure || $this->bankStatus === null || $order->reference === '') {
+
+        if (!$definitiveLocalFailure) {
+            DeferredOrderMailQueue::discard();
+
             return;
         }
 
         $status = BankStatus::controlPanelFailure(ShopConfigurationFlags::isProcess2($shop));
+        if ($this->bankStatus !== null && $order->reference !== '') {
+            try {
+                $this->bankStatus->updateByOrderIdentifier(
+                    $idShop,
+                    $order->reference,
+                    $status['status_id'],
+                    $status['status_label']
+                );
+            } catch (\Throwable $exception) {
+                \PrestaShopLogger::addLog(
+                    'UniPayment local CP-failure status update failed: ' . get_class($exception),
+                    2
+                );
+            }
+        }
+
+        $this->finalizeDefinitiveControlPanelFailureEmails($attemptId, $shop, $status);
+    }
+
+    /**
+     * Shop order exists + definitive CP create failure → send deferred order_conf + leasing once.
+     *
+     * @param array<string, mixed> $shop
+     * @param array{status_id: string, status_label: string} $status
+     */
+    private function finalizeDefinitiveControlPanelFailureEmails(
+        int $attemptId,
+        array $shop,
+        array $status
+    ): void {
+        $snapshot = $this->snapshots->findByAttempt($attemptId);
+        if ($snapshot === null) {
+            DeferredOrderMailQueue::discard();
+
+            return;
+        }
+
         try {
-            $this->bankStatus->updateByOrderIdentifier(
-                $idShop,
-                $order->reference,
-                $status['status_id'],
-                $status['status_label']
-            );
+            $dispatcher = $this->mailDispatcher ?? new FinancingOrderMailDispatcher();
+            $dispatcher->send($snapshot, $attemptId, $shop, $status);
         } catch (\Throwable $exception) {
-            \PrestaShopLogger::addLog(
-                'UniPayment local CP-failure status update failed: ' . get_class($exception),
-                2
-            );
+            DeferredOrderMailQueue::discard();
+            if (class_exists('\\PrestaShopLogger', false)) {
+                \PrestaShopLogger::addLog(
+                    'UniPayment CP-failure order email finalization failed: ' . get_class($exception),
+                    2
+                );
+            }
         }
     }
 

@@ -409,12 +409,13 @@ assertOrder(is_array($ambiguousAttemptAfter), 'ambiguous replay attempt row miss
 assertOrder((string) ($ambiguousAttemptAfter['state'] ?? '') === OrderOrchestrator::CP_OUTCOME_UNKNOWN, 'ambiguous replay must preserve attempt state');
 assertOrder(json_encode(json_decode((string) $ambiguousAttemptAfter['cp_payload'], true)) === json_encode($c2->calls[0]), 'frozen payload must remain authoritative');
 
-foreach ([
-    [404, true, OrderOrchestrator::CP_OUTCOME_UNKNOWN, true],
-    [409, true, OrderOrchestrator::CP_OUTCOME_UNKNOWN, true],
-    [422, true, OrderOrchestrator::CP_OUTCOME_UNKNOWN, true],
-    [500, true, OrderOrchestrator::CP_FAILED_RETRYABLE, true],
-] as [$status, $retryable, $state, $outcomeUnknown]) {
+foreach (
+    [
+        [409, true, OrderOrchestrator::CP_OUTCOME_UNKNOWN, true],
+        [422, true, OrderOrchestrator::CP_OUTCOME_UNKNOWN, true],
+        [500, true, OrderOrchestrator::CP_FAILED_RETRYABLE, true],
+    ] as [$status, $retryable, $state, $outcomeUnknown]
+) {
     $a = new MemoryAttempts();
     $s = new MemorySnapshots();
     $o = new FakeOrders($created);
@@ -438,12 +439,37 @@ foreach ([
     assertOrder((int) ($s->rows[1]['control_panel_order_id'] ?? 0) === 0, "HTTP $status must not fabricate a CP id");
 }
 
-foreach ([
-    ['invalid_payload', 422],
-    ['semantic_conflict', 409],
-    ['unsupported_status', 422],
-    ['shop_not_found', 404],
-] as [$code, $status]) {
+foreach ([403, 404, 405, 410] as $status) {
+    $a = new MemoryAttempts();
+    $s = new MemorySnapshots();
+    $o = new FakeOrders($created);
+    $c = new FakeCp();
+    $bank = new MemoryBankStatus();
+    $c->queue[] = new HttpException($status, []);
+    $flow = new OrderOrchestrator($a, $s, $o, $c, new FinancingSnapshotFactory(new SensitiveDataCipher()), new ControlPanelOrderPayloadBuilder(), $bank);
+    try {
+        $flow->orchestrate(2, $status + 1000, $request, $shop);
+        assertOrder(false, "HTTP $status endpoint rejection accepted");
+    } catch (OrderOrchestrationException $e) {
+        assertOrder(!$e->isRetryable() && $e->state() === OrderOrchestrator::TERMINAL_FAILED, "HTTP $status must be terminal");
+        assertOrder(!$e->isOutcomeUnknown(), "HTTP $status must not be outcome unknown");
+        assertOrder($e->isPostOrder(), "HTTP $status is post-order");
+    }
+    assertOrder(
+        $bank->updates !== [] && $bank->updates[0]['statusId'] === BankStatus::SEND_FAILED_CP,
+        "HTTP $status must persist bank_send_failed_cp"
+    );
+    assertOrder((int) ($s->rows[1]['control_panel_order_id'] ?? 0) === 0, "HTTP $status must not fabricate a CP id");
+}
+
+foreach (
+    [
+        ['invalid_payload', 422],
+        ['semantic_conflict', 409],
+        ['unsupported_status', 422],
+        ['shop_not_found', 404],
+    ] as [$code, $status]
+) {
     $a = new MemoryAttempts();
     $s = new MemorySnapshots();
     $o = new FakeOrders($created);

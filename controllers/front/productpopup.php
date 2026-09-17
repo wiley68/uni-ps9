@@ -360,7 +360,10 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                     0
                 );
 
-                return PostOrderPopupFailureResponse::fromException($exception);
+                return PostOrderPopupFailureResponse::fromException(
+                    $exception,
+                    $this->buildThankYouUrl($module, $exception->idOrder())
+                );
             }
             if ($exception->isRetryable()) {
                 return $this->processingResponse($token);
@@ -388,7 +391,12 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                     0
                 );
 
-                return PostOrderPopupFailureResponse::fromPersistedOrder($recoveredOrderId, $reference);
+                return PostOrderPopupFailureResponse::fromPersistedOrder(
+                    $recoveredOrderId,
+                    $reference,
+                    null,
+                    $this->buildThankYouUrl($module, $recoveredOrderId)
+                );
             }
             $rowAfter = $submissions->findByToken($token);
             if (is_array($rowAfter) && (int) ($rowAfter['id_cart'] ?? 0) <= 0) {
@@ -547,7 +555,9 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
         if ((int) ($row['control_panel_order_id'] ?? 0) <= 0 && (int) ($row['id_order'] ?? 0) > 0) {
             return PostOrderPopupFailureResponse::fromPersistedOrder(
                 (int) $row['id_order'],
-                (string) $row['order_reference']
+                (string) $row['order_reference'],
+                null,
+                $this->buildThankYouUrl($module, (int) $row['id_order'])
             );
         }
 

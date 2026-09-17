@@ -39,7 +39,7 @@ $smartucfTemplate = (string) file_get_contents($root . '/views/templates/hook/or
 $errorTemplate = (string) file_get_contents($root . '/views/templates/front/checkout_validation_error.tpl');
 $urlBuilder = (string) file_get_contents($root . '/src/Order/OrderConfirmationUrlBuilder.php');
 
-$bankStub = new class () implements BankStatusReaderPort {
+$bankStub = new class() implements BankStatusReaderPort {
     /** @var array<int, array<string, mixed>|null> */
     public $rows = [];
 
@@ -48,7 +48,7 @@ $bankStub = new class () implements BankStatusReaderPort {
         return $this->rows[$idOrder] ?? null;
     }
 };
-$snapshotStub = new class () implements FinancingSnapshotByOrderReaderPort {
+$snapshotStub = new class() implements FinancingSnapshotByOrderReaderPort {
     /** @var array<int, array<string, mixed>|null> */
     public $rows = [];
 
@@ -78,6 +78,11 @@ assertCpFailureThankYou(
 assertCpFailureThankYou(
     BankStatus::controlPanelFailure(false)['status_id'] === BankStatus::SEND_FAILED_CP,
     'A: Process 1 CP failure id'
+);
+assertCpFailureThankYou(
+    BankStatus::controlPanelFailure(true)['status_id'] === BankStatus::SEND_FAILED_CP
+        && BankStatus::controlPanelFailure(true)['status_label'] === BankStatus::LABEL_SEND_FAILED_CP,
+    'A: Process 2 CP failure uses bank_send_failed_cp (not generic bank_send_failed)'
 );
 $bankStub->rows[40] = [
     'status_id' => BankStatus::SEND_FAILED_CP,
@@ -246,8 +251,18 @@ assertCpFailureThankYou(
     'L: CP failure notice must not use bank-sent or SmartUCF wording'
 );
 assertCpFailureThankYou(
-    strpos($orchestrator, 'DeferredOrderMailQueue::discard()') !== false,
-    'L: Process 1 deferred order_conf must be discarded on CP create failure'
+    strpos($orchestrator, 'finalizeDefinitiveControlPanelFailureEmails') !== false,
+    'L: Process 1 deferred order_conf must be finalized on definitive CP create failure'
+);
+assertCpFailureThankYou(
+    (bool) preg_match(
+        '/CP_OUTCOME_UNKNOWN[\s\S]*?DeferredOrderMailQueue::discard\(\)/s',
+        $orchestrator
+    ) || (bool) preg_match(
+        '/if\s*\(\s*!\$definitiveLocalFailure\s*\)\s*\{[\s\S]*?DeferredOrderMailQueue::discard\(\)/s',
+        $orchestrator
+    ),
+    'L: ambiguous CP create must still discard deferred order_conf'
 );
 assertCpFailureThankYou(
     BankStatus::SEND_FAILED_CP !== BankStatus::SEND_FAILED_SMARTUCF,

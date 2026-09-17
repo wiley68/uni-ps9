@@ -116,10 +116,10 @@ assertProcess2OrderConf(
     'Process 2 success leasing email remains after CP create'
 );
 assertProcess2OrderConf(
-    strpos($orchestrator, 'LeasingEmailNotifier') === false
+    strpos($orchestrator, 'finalizeDefinitiveControlPanelFailureEmails') !== false
         && strpos($orchestrator, 'mailExtraVarsFromRequest') === false
         && strpos($orchestrator, 'dispatchLeasingEmail') === false,
-    'CP create failure path must not send leasing emails'
+    'CP create failure finalizes emails via shared status, not premature Process 2 success vars'
 );
 
 assertProcess2OrderConf(
