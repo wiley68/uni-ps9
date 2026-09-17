@@ -301,6 +301,7 @@ Deleted files трябва да бъдат изрично обяснени.
 - `CheckoutSchemeIdentity` / `preference_unresolved` остават authoritative за Product→Checkout handoff;
 - Cart intersection identity остава `type|KOP|months` (`filterId` = metadata);
 - rejection sync остава dormant без proven CP codes;
+- **standard bank status** е само един от четирите публични етикета (или later raw SmartUCF текст) — виж `docs/ARCHITECTURE.md` § bank status; internal lifecycle states не са банков статус;
 - не създавай release tag/package без изрично указание.
 
 Primary financing entries: checkout `validatecheckout`, product popup apply, cart popup apply.

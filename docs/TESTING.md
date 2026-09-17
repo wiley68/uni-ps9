@@ -56,16 +56,24 @@ Do not hard-code a permanent test file count here — it changes with each remed
 
 ## Manual smoke (final regression)
 
-| Area        | Checks                                                                                 |
-| ----------- | -------------------------------------------------------------------------------------- |
-| Product     | Calculator + financing popup (Hummingbird + Classic)                                   |
-| Cart        | Calculator + financing popup; **guest cart** → exactly one authoritative PS order      |
-| Checkout    | PaymentOption; Process 1 / Process 2; double-click stays post-order (AUD-019)          |
-| Advertising | Fresh cache shows float; missing/stale cache → homepage OK, no advertising, no CP wait |
-| Packaging   | ZIP with `config/environment.php` + `secrets/smartucf-key.php` only (no SSH/env)       |
-| Privacy     | Process 1/2 mail audiences; no customer EGN                                            |
+| Area        | Checks                                                                                                                           |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Product     | Calculator + financing popup (Hummingbird + Classic)                                                                             |
+| Cart        | Calculator + financing popup; **guest cart** → exactly one authoritative PS order                                                |
+| Checkout    | PaymentOption; Process 1 / Process 2; double-click stays post-order (AUD-019)                                                    |
+| Advertising | Fresh cache shows float; missing/stale cache → homepage OK, no advertising, no CP wait                                           |
+| Packaging   | ZIP with `config/environment.php` + `secrets/smartucf-key.php` only (no SSH/env)                                                 |
+| Privacy     | Process 1/2 mail audiences; no customer EGN; public bank status only on emails/Thank You (see ARCHITECTURE bank-status contract) |
 
 Historical phase STOP gates (7–13) are **completed** delivery milestones; they are not the current release gate.
+
+## Authoritative manual-test contract
+
+For bank status, leasing panel fields, Thank You / email content, and diagnostic visibility, use:
+
+[`ARCHITECTURE.md`](ARCHITECTURE.md) § _Authoritative bank status and leasing information_
+
+Do not treat internal lifecycle/machine ids as public bank-status copy during manual verification.
 
 ## Deferred product behavior
 

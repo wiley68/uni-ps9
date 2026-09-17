@@ -41,6 +41,8 @@ No PrestaShop 10 support claim. No production jQuery dependency.
 - Homepage advertising float from **local fresh shop cache only** (no synchronous CP on FO render)
 - Signed inbound CP API (`shopcache`, `orderbankstatus`, `smartucfdebuglog`)
 
+**Public bank status / leasing information contract:** see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) § _Authoritative bank status and leasing information_ (four initial standard bank statuses; internal lifecycle states are not public bank status).
+
 ## Control Panel dependency
 
 Shop must be registered in UniPayment Control Panel with matching **UNICID** and shared secret.

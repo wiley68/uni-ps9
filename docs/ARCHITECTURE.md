@@ -243,16 +243,206 @@ PostControlPanelLifecycleService
                 → flush deferred order_conf + audience leasing mails
 ```
 
-**Bank status meanings:**
+---
 
-| Status                      | Trigger                                                       |
-| --------------------------- | ------------------------------------------------------------- |
-| `bank_send_failed_cp`       | Definitive CP create rejection only (not transport ambiguity) |
-| `bank_sent_process1`        | CP created **and** SmartUCF Process 1 succeeded               |
-| `bank_send_failed_smartucf` | CP created **and** SmartUCF Process 1 failed                  |
-| `bank_sent_process2`        | CP created **and** Process 2 handoff (no SmartUCF)            |
+## Authoritative bank status and leasing information (business contract)
 
-**SmartUCF snapshot states:** `not_started` → `submitting` → `created` \| `failed` \| `outcome_unknown`.
+This section is the **AUTHORITATIVE** business contract for public bank status, customer/business-facing leasing information, and diagnostic visibility on PS9.
+
+It governs upcoming manual business tests and subsequent runtime remediation. Implementation machine codes / lifecycle states are **not** substitutes for these public labels.
+
+Strings below are identical across PS9, PS8, Woo, Control Panel, and other shop modules. Do **not** rename them.
+
+### Two classes of status
+
+| Class                                | Role                                                                          |
+| ------------------------------------ | ----------------------------------------------------------------------------- |
+| **Standard bank status**             | Public / business-facing bank status shown on officially agreed UI and emails |
+| **Internal/service lifecycle state** | Technical progression, retry, transport, sync, diagnostic, or recovery state  |
+
+Never present an internal/service lifecycle state as a standard bank status on customer, normal admin, email, or CP order-list surfaces.
+
+### Four initial standard bank statuses
+
+Until a later SmartUCF status arrives via CP, exactly **four** initial standard bank statuses are allowed:
+
+#### A. `Неуспешно изпратен Банка - КП`
+
+Use when:
+
+- Shop order exists;
+- CP order was **not** successfully created / is not visible in Control Panel;
+- SmartUCF was **not** successfully created/sent.
+
+This is the public bank status for **definitive failure before successful CP create**.
+
+Same rule for **Process 1** and **Process 2**.
+
+#### B. `Неуспешно изпратен Банка - SmartUCF`
+
+Use when:
+
+- Shop order exists;
+- CP order exists and is visible in Control Panel;
+- SmartUCF create/send **definitively** fails/rejects.
+
+#### C. `Изпратен Банка - Процес 1`
+
+Use when:
+
+- Shop order exists;
+- CP order exists;
+- SmartUCF create/send succeeded;
+- financing used **Process 1**.
+
+#### D. `Изпратен Банка - Процес 2`
+
+Use when:
+
+- Shop order exists;
+- CP order exists;
+- financing used **Process 2**.
+
+Process 2 does **not** require proof that the order was already created/sent to SmartUCF for this public status.
+
+### Forbidden generic public status
+
+```text
+Неуспешно изпратен Банка
+```
+
+is **not** an allowed public bank status. Definitive CP failure must use `Неуспешно изпратен Банка - КП` for both Process 1 and Process 2.
+
+### Later statuses from SmartUCF
+
+After the initial bank status, Control Panel may request an updated status from SmartUCF (manual CP action or CP periodic/daily check).
+
+Authoritative rule:
+
+```text
+Persist and display the status exactly as returned by SmartUCF.
+```
+
+Do **not**:
+
+- rename it;
+- normalize it into a predefined list;
+- invent a mapping of all possible SmartUCF values.
+
+The same raw-display rule applies to PS9 and Control Panel.
+
+### Internal/service lifecycle states
+
+Internal examples (non-exhaustive): pending, created, submitting, retryable, timeout, outcome unknown, definitive*failed, sent_unknown, sync pending/failed, transport failure, and PS9 equivalents such as attempt states, `smartucf_state`, `cp_status_sync*\*`, machine status ids (`bank_sent_process1`, …).
+
+These may appear **only** on explicitly diagnostic surfaces, for example:
+
+- SmartUCF debug information in Control Panel;
+- debug information retrieved from the PS9 shop (`smartucfdebuglog`);
+- specialized developer/support diagnostic panels;
+- module/application logs;
+- other explicitly designated service locations.
+
+They must **not** appear as bank status on:
+
+- customer UI;
+- standard PrestaShop admin order UI bank-status columns/panels;
+- standard emails;
+- Control Panel order list / order table;
+- normal customer/business-facing screens.
+
+### Allowed locations for standard bank status
+
+A field labeled as bank status may show only:
+
+- one of the four initial standard bank statuses; **or**
+- a later raw SmartUCF status.
+
+Allowed PS9 / product surfaces:
+
+1. PrestaShop admin order list UniCredit bank-status column (when present).
+2. PrestaShop admin order view UniCredit / leasing panel.
+3. Customer order/confirmation UI when such display is explicitly provided.
+4. Thank You / order confirmation when bank status is part of the agreed customer content.
+5. Standard financing / order emails when they include bank status.
+6. Control Panel order list / order table.
+7. Other pre-agreed, explicitly designated bank-status surfaces.
+
+### Failure status semantics
+
+| Situation                                                                                           | Public standard bank status                                                              |
+| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Shop order exists; CP order definitively does **not** exist; SmartUCF not successfully created/sent | `Неуспешно изпратен Банка - КП`                                                          |
+| Shop order exists; CP order exists; SmartUCF definitively rejects/fails                             | `Неуспешно изпратен Банка - SmartUCF`                                                    |
+| Ambiguous technical outcome (timeout / interrupted transport / cannot prove remote create)          | Keep **internal** lifecycle/recovery state; do **not** invent a fifth public bank status |
+
+Process consistency:
+
+```text
+Process 1 + definitive CP failure → Неуспешно изпратен Банка - КП
+Process 2 + definitive CP failure → Неуспешно изпратен Банка - КП
+```
+
+### Terminal order UX rule
+
+When a Shop order exists **and** a terminal public bank status exists, the business flow is a **terminal business result**.
+
+Customer UX must use the existing Thank You / order confirmation page when that is the agreed PS9 flow.
+
+Terminal business failures such as:
+
+```text
+Неуспешно изпратен Банка - КП
+Неуспешно изпратен Банка - SmartUCF
+```
+
+must not be treated as a generic technical popup/request failure after the Shop order already exists. Customer-facing failure content belongs on the agreed confirmation surface, without internal diagnostics.
+
+### Standard email rule
+
+When a Shop order exists and the flow ends with a terminal public bank status, standard order/financing emails must use the **same canonical bank status** (one of the four initial labels, or a later raw SmartUCF status when that is what was persisted).
+
+Do not invent separate technical email statuses. Internal lifecycle/debug information must not appear in standard emails.
+
+### Customer/business-facing leasing information
+
+Standardized leasing information may appear on agreed surfaces (admin UniCredit panel, Thank You when provided, standard emails, designated reports). Adaptations are allowed only for pre-agreed business cases (for example Process 2 second phone / EGN only where privacy rules permit).
+
+**Base field set** (structure is authoritative; values are examples):
+
+```text
+Статус към банката    Изтекло време за регистрация
+КП поръчка (ID)       329
+КП shop order_id      920
+Срок (месеци)         12
+КОП                    POS COM 50
+Първоначална вноска   0.00
+Сума на заема         1000.00
+Месечна вноска        97.49
+Обща дължима сума     1169.88
+ГЛП / ГПР             30.00% / 34.50%
+```
+
+If a field has no value at a given lifecycle moment, follow the existing agreed presentation behavior (omit or leave empty). Do not invent a new placeholder convention in documentation alone.
+
+**Forbidden** in the standard leasing block (except explicit diagnostic surfaces): CP create result, SmartUCF result/lifecycle/session, automatic resend, recommended action, last error category, subsystem, error time, correlation, CP synchronization state, lifecycle/retry state, HTTP/transport classification, timeout/network details, internal error class, internal CP/SmartUCF stage, or other architecture/retry/recovery details.
+
+### Privacy / business-model rule
+
+```text
+Customer-facing and normal business-facing UI must contain only information
+needed for the order, the financing, and the agreed bank status.
+```
+
+Do not expose Shop → CP → SmartUCF internals, retry/recovery/timeout/outcome-unknown mechanisms, internal state machines, correlation/error classification, transport implementation, or architectural details on those surfaces.
+
+### Internal machine keys (implementation detail only)
+
+PS9 may persist machine ids such as `bank_send_failed_cp`, `bank_send_failed_smartucf`, `bank_sent_process1`, `bank_sent_process2` separately from public labels. Those ids are **not** public bank-status copy. Public UI and emails must show the Bulgarian standard labels (or later raw SmartUCF text).
+
+**SmartUCF snapshot states** (internal): `not_started` → `submitting` → `created` \| `failed` \| `outcome_unknown`.
+
+---
 
 **Module-owned tables: 8** — `shop_cache`, `api_nonce`, `order_bank_status`, `smartucf_log`, `popup_submission`, `checkout_lock`, `order_attempt`, `financing_snapshot`.
 
@@ -269,15 +459,15 @@ Accepted residual risk: retry after partial success may duplicate the already-de
 
 **Confirmation UX:**
 
-| Outcome                       | Customer landing                                             |
-| ----------------------------- | ------------------------------------------------------------ |
-| Process 2 success             | Native order-confirmation + leasing table                    |
-| Process 1 SmartUCF created    | Trusted SmartUCF redirect (then shop confirmation on return) |
-| Process 1 SmartUCF failed     | Native confirmation + safe failure notice                    |
-| CP failed / outcome unknown   | Native confirmation + safe degraded notice                   |
-| SmartUCF processing / unknown | `checkout_validated.tpl` (order-aware; do not resubmit)      |
+| Outcome                       | Customer landing                                                                                                                                                           |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Process 2 success             | Native order-confirmation + leasing table                                                                                                                                  |
+| Process 1 SmartUCF created    | Trusted SmartUCF redirect (then shop confirmation on return)                                                                                                               |
+| Process 1 SmartUCF failed     | Native confirmation + safe failure notice (terminal bank status on confirmation surface)                                                                                   |
+| CP failed / outcome unknown   | Native confirmation + safe degraded notice (definitive CP failure uses public CP-failure bank status; ambiguity stays order-aware without inventing a fifth public status) |
+| SmartUCF processing / unknown | `checkout_validated.tpl` (order-aware; do not resubmit)                                                                                                                    |
 
-**BO diagnostics:** `displayAdminOrderMainBottom` → leasing rows + process label + CP id + safe SmartUCF fields. Absent snapshot → empty (non-financing orders).
+**BO UniCredit / leasing panel:** `displayAdminOrderMainBottom` → customer/business-facing leasing rows + public bank status only. Absent snapshot → empty (non-financing orders). Operational CP/SmartUCF diagnostics belong in the SmartUCF journal / designated debug surfaces — not in the standard leasing table.
 
 **Homepage advertising:**
 

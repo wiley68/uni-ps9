@@ -138,9 +138,11 @@ Failures set `success` to `false` and `error` to a stable snake_case machine cod
 
 ### Local bank status vs durable CP status sync
 
-Local `bank_sent_process1` / `bank_sent_process2` mean **business handoff proven**.
+Public **standard bank status** labels and visibility rules are authoritative in [`ARCHITECTURE.md`](ARCHITECTURE.md) § _Authoritative bank status and leasing information_.
 
-Outbound CP `PATCH /orders/status` confirmation is tracked on `unipayment_financing_snapshot` (`cp_status_sync_*`):
+Local machine ids `bank_sent_process1` / `bank_sent_process2` mean **business handoff proven** for internal persistence/sync only — they are not customer-facing copy.
+
+Outbound CP `PATCH /orders/status` confirmation is tracked on `unipayment_financing_snapshot` (`cp_status_sync_*`) as an **internal/service** synchronization state:
 
 | State             | Meaning                                                                                                  |
 | ----------------- | -------------------------------------------------------------------------------------------------------- |
@@ -149,7 +151,7 @@ Outbound CP `PATCH /orders/status` confirmation is tracked on `unipayment_financ
 | `confirmed`       | Canonical CP success + echo validated                                                                    |
 | `terminal_failed` | Positive allowlist only: `invalid_payload`, `semantic_conflict`, `unsupported_status`, `order_not_found` |
 
-`bank_sent_process1` and `bank_sent_process2` are mutually incompatible terminal outcomes (not sequential stages). Conflicting admission does not PATCH.
+`bank_sent_process1` and `bank_sent_process2` are mutually incompatible terminal outcomes (not sequential stages). Conflicting admission does not PATCH. These sync states must not be shown as public bank status.
 
 ### Auth failure
 
@@ -281,8 +283,9 @@ Phase 13 homepage advertising: FO render uses `getCachedOnly()` only (AUD-022). 
 - `Mail::Send` false or throw → marker unchanged; `LeasingEmailDeliveryException` → lifecycle `withEmailSent(false)`
 - Retry after failure may duplicate a previously successful audience (accepted residual risk; no schema change)
 - Mail logs: order reference + audience class + exception class only — never body/EGN/SMTP credentials
-- Thank-you page uses **customer** audience rows (no EGN); BO may show Process 2 EGN via admin rows (audited)
-- BO may also show CP id + safe SmartUCF diagnostics; never raw request/response or secrets
+- Standard emails must use the **canonical public bank status** (four initial labels, or later raw SmartUCF text). No separate technical email statuses. See [`ARCHITECTURE.md`](ARCHITECTURE.md) bank-status contract.
+- Thank-you page uses **customer** audience leasing rows (no EGN); bank status on confirmation is public-facing only
+- BO UniCredit / leasing panel shows the same customer/business-facing leasing field set + public bank status; SmartUCF journal / `smartucfdebuglog` remain the diagnostic channel (never raw request/response or secrets in the leasing table)
 
 ### Data retention (module-owned)
 
