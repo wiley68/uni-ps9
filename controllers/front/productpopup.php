@@ -5,6 +5,7 @@ declare(strict_types=1);
 use PrestaShop\Module\Unipayment\Calculator\Calculator;
 use PrestaShop\Module\Unipayment\Calculator\UnavailableSchemeException;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
+use PrestaShop\Module\Unipayment\Order\BankStatus;
 use PrestaShop\Module\Unipayment\Order\ControlPanelOrderClientAdapter;
 use PrestaShop\Module\Unipayment\Order\ControlPanelOrderPayloadBuilder;
 use PrestaShop\Module\Unipayment\Order\FinancingSnapshotFactory;
@@ -576,6 +577,12 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             );
         }
         PostControlPanelLifecyclePopupMapper::apply($response, $lifecycle);
+        $this->applyTerminalSmartUcfFailureThankYouRedirect(
+            $response,
+            $lifecycle,
+            $module,
+            (int) $row['id_order']
+        );
 
         return $response;
     }
@@ -625,6 +632,12 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             );
         }
         PostControlPanelLifecyclePopupMapper::apply($response, $lifecycle);
+        $this->applyTerminalSmartUcfFailureThankYouRedirect(
+            $response,
+            $lifecycle,
+            $module,
+            $result->idOrder
+        );
 
         if ($this->isDebugResponseEnabled()) {
             if (!empty($response['smartucf_error'])) {
@@ -636,6 +649,43 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
         }
 
         return $response;
+    }
+
+    /**
+     * Terminal SmartUCF rejection with a persisted public bank status is a completed
+     * financing order outcome — redirect to native Thank You (checkout parity), not a
+     * generic popup AJAX error. Pre-send failures (no final bank status) stay as errors.
+     *
+     * @param array<string, mixed> $response
+     */
+    private function applyTerminalSmartUcfFailureThankYouRedirect(
+        array &$response,
+        \PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleResult $lifecycle,
+        Unipayment $module,
+        int $idOrder
+    ): void {
+        if (!$lifecycle->isFailed() || $idOrder <= 0) {
+            return;
+        }
+
+        $status = $lifecycle->finalBankStatus();
+        if ($status === null || ($status['status_id'] ?? '') !== BankStatus::SEND_FAILED_SMARTUCF) {
+            return;
+        }
+
+        // Prefer Thank You over any mapper smartucf_error (JS follows redirect_url first).
+        $response['redirect_url'] = $this->buildThankYouUrl($module, $idOrder);
+        unset($response['smartucf_error'], $response['debug_smartucf_error']);
+        $response['step'] = 'order_created';
+    }
+
+    private function buildThankYouUrl(Unipayment $module, int $idOrder): string
+    {
+        if ($idOrder <= 0) {
+            return '';
+        }
+
+        return (new OrderConfirmationUrlBuilder())->build($this->context, $module, $idOrder);
     }
 
     /**
