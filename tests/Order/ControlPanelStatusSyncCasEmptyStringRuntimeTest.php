@@ -62,7 +62,7 @@ $db->execute(
      ) VALUES (
         ' . (int) $attemptId . ', ' . (int) $attemptId . ', \'CASRT' . (int) $attemptId . '\', \'' . str_repeat('c', 64) . '\',
         \'standard\', \'standard|X|12|0\', \'X\', 12, 0, 0, 100, 10, 120, 0, 0, 1, 100, \'EUR\', 1,
-        \'2.0.2\', \'checkout\', \'{}\', \'{}\', \'[]\', \'{}\',
+        \'2.0.3\', \'checkout\', \'{}\', \'{}\', \'[]\', \'{}\',
         \'cp_created\', \'not_started\', 0,
         \'not_needed\', \'\', \'\', \'\',
         \'' . pSQL($now) . '\', \'' . pSQL($now) . '\'
@@ -129,7 +129,7 @@ $db->execute(
      ) VALUES (
         ' . (int) $attemptNull . ', ' . (int) $attemptNull . ', \'CASRN' . (int) $attemptNull . '\', \'' . str_repeat('d', 64) . '\',
         \'standard\', \'standard|X|12|0\', \'X\', 12, 0, 0, 100, 10, 120, 0, 0, 1, 100, \'EUR\', 1,
-        \'2.0.2\', \'checkout\', \'{}\', \'{}\', \'[]\', \'{}\',
+        \'2.0.3\', \'checkout\', \'{}\', \'{}\', \'[]\', \'{}\',
         \'cp_created\', \'not_started\', 0,
         \'not_needed\', NULL, NULL, NULL,
         \'' . pSQL($now) . '\', \'' . pSQL($now) . '\'

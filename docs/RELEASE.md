@@ -8,11 +8,11 @@ Release and packaging checklist for UniPayment PrestaShop **9**.
 
 | Item           | Value                                      |
 | -------------- | ------------------------------------------ |
-| Module version | **2.0.2** (`unipayment.php`, `config.xml`) |
-| Project status | **Scheme presentation / checkout parity**  |
+| Module version | **2.0.3** (`unipayment.php`, `config.xml`) |
+| Project status | **Failure UX + Satrudnik mail**            |
 | Release notes  | [`../CHANGELOG.md`](../CHANGELOG.md)       |
 
-`2.0.1` remains the final-audit remediation line. `2.0.2` is the scheme presentation, Cart representative, and Checkout parity release (Woo / PS8 / PS9 coordinated behavior).
+`2.0.2` remains the scheme presentation / Cart / Checkout parity line. `2.0.3` adds definitive CP-failure classification/Thank You/emails and Satrudnik operational notification mail.
 
 Do **not** create or push a Git tag automatically from agent workflows — tagging is an explicit operator step.
 
@@ -20,7 +20,7 @@ Do **not** create or push a Git tag automatically from agent workflows — taggi
 
 ## 2. Version policy
 
-- Module version is **`2.0.2`** for this release
+- Module version is **`2.0.3`** for this release
 - Version metadata must stay consistent in `unipayment.php` and `config.xml`
 - **No** historical upgrade scripts for development-only iterations
 - After first production package, future schema changes use `upgrade/upgrade-x.y.z.php`
@@ -31,12 +31,12 @@ Do **not** create or push a Git tag automatically from agent workflows — taggi
 
 ### Quality
 
-- [x] Scheme parity version is **2.0.2**
+- [x] Module version is **2.0.3**
 - [x] Version in `unipayment.php` and `config.xml`
 - [ ] `composer validate --no-check-publish`
 - [ ] `composer test` green on PHP 8.1–8.5
 - [ ] `git diff --check` clean
-- [ ] Manual browser smoke (product/cart/checkout scheme ordering, Cart representative, Checkout priority/transitions)
+- [ ] Manual browser smoke (product/cart/checkout; CP failure Thank You; SmartUCF failure; Satrudnik mail when configured)
 - [ ] Confirm `secrets/smartucf-key.php` and PEMs are present in the **package** only (not committed)
 
 ### Packaging (future / operator)
@@ -62,5 +62,5 @@ Uninstall removes module-owned data only. Historical PS orders remain. Reinstall
 
 1. Confirm this commit is the intended release HEAD
 2. Confirm safe suite + manual smoke
-3. Create annotated local tag only when explicitly approved: `git tag -a v2.0.2 -m "UniPayment 2.0.2"`
-4. Push tag / attach `unipayment-2.0.2.zip` only when distribution is approved
+3. Create annotated local tag only when explicitly approved: `git tag -a v2.0.3 -m "UniPayment 2.0.3"`
+4. Push tag / attach `unipayment-2.0.3.zip` only when distribution is approved

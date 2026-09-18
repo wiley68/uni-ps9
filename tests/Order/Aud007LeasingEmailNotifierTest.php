@@ -211,6 +211,6 @@ assertAud007(
     'no upgrade scripts created'
 );
 $moduleSrc = (string) file_get_contents($root . '/unipayment.php');
-assertAud007(strpos($moduleSrc, "version = '2.0.2'") !== false, 'version is 2.0.2');
+assertAud007(strpos($moduleSrc, "version = '2.0.3'") !== false, 'version is 2.0.3');
 
 fwrite(STDOUT, "OK (AUD-007 LeasingEmailNotifier no runtime schema mutation)\n");

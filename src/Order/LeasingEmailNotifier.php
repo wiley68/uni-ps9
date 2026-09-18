@@ -12,9 +12,12 @@ namespace PrestaShop\Module\Unipayment\Order;
  * Partial failure leaves the marker unset so safe replay can retry.
  *
  * Residual risk (accepted): after partial success, retry may resend the audience
- * that already received mail (single combined marker; no new columns).
+ * that already received mail (single combined marker; no new columns). The same
+ * once-guard covers best-effort Satrudnik failure mail — if Satrudnik succeeds and
+ * leasing later fails, replay may resend Satrudnik.
  *
- * No recipient / empty rows: notification not required; marker stays unset.
+ * No recipient / empty rows: leasing notification not required; marker stays unset.
+ * Satrudnik may still have run inside the once-guard before that early return.
  */
 final class LeasingEmailNotifier
 {
@@ -31,28 +34,37 @@ final class LeasingEmailNotifier
      */
     private $mailSender;
 
+    /** @var SatrudnikFailureMailNotifier */
+    private $satrudnikNotifier;
+
     public function __construct(
         ?FinancingSnapshotStoreInterface $snapshots = null,
         ?LeasingOrderEmailPresenter $presenter = null,
-        ?callable $mailSender = null
+        ?callable $mailSender = null,
+        ?SatrudnikFailureMailNotifier $satrudnikNotifier = null
     ) {
         $this->snapshots = $snapshots ?? new FinancingSnapshotRepository();
         $this->presenter = $presenter ?? new LeasingOrderEmailPresenter();
         $this->mailSender = $mailSender;
+        $this->satrudnikNotifier = $satrudnikNotifier ?? new SatrudnikFailureMailNotifier();
     }
 
     /**
      * @param array<string, mixed> $snapshot
      * @param array<string, mixed> $shop
+     * @param array{status_id?: string, status_label?: string} $status
      *
      * @throws LeasingEmailDeliveryException When a required Mail::Send fails or throws
      */
-    public function notify(array $snapshot, int $attemptId, array $shop = []): void
+    public function notify(array $snapshot, int $attemptId, array $shop = [], array $status = []): void
     {
         $current = $this->snapshots->findByAttempt($attemptId);
         if ($current !== null && !empty($current['leasing_email_sent'])) {
             return;
         }
+
+        // Inside once-guard, before leasing_email_sent is finalized. Best-effort only.
+        $this->satrudnikNotifier->notify($snapshot, $shop, $status);
 
         $customer = is_array($snapshot['customer_json'] ?? null) ? $snapshot['customer_json'] : [];
         $customerEmail = trim((string) ($customer['email'] ?? ''));

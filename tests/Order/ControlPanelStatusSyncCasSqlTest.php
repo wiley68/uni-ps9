@@ -247,7 +247,7 @@ $repo->save(91002, [
     'order_total' => 100,
     'currency_iso' => 'EUR',
     'id_currency' => 1,
-    'module_version' => '2.0.2',
+    'module_version' => '2.0.3',
     'submission_source' => 'checkout',
     'customer_json' => [],
     'address_json' => [],

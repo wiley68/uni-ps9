@@ -89,7 +89,7 @@ $snapshot = [
     'months' => 10,
     'first_installment' => 10.0,
     'currency_iso' => 'BGN',
-    'module_version' => '2.0.2',
+    'module_version' => '2.0.3',
     'customer_json' => [
         'first_name' => 'Ivan',
         'last_name' => 'Petrov',
@@ -160,6 +160,6 @@ assertCanon(strpos($snapshotRepo, 'cp_status_sync_updated_at') !== false, 'snaps
 
 // --- Version unchanged ---
 $module = (string) file_get_contents($root . '/unipayment.php');
-assertCanon(strpos($module, "version = '2.0.2'") !== false, 'module version remains 2.0.2');
+assertCanon(strpos($module, "version = '2.0.3'") !== false, 'module version remains 2.0.3');
 
 fwrite(STDOUT, "OK (Canonical CP↔module protocol adaptation contracts)\n");

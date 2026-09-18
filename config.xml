@@ -2,7 +2,7 @@
 <module>
     <name>unipayment</name>
     <displayName><![CDATA[УниКредит покупки на Кредит]]></displayName>
-    <version><![CDATA[2.0.2]]></version>
+    <version><![CDATA[2.0.3]]></version>
     <description><![CDATA[Дава възможност на Вашите клиенти да закупуват стока на изплащане с УниКредит.]]></description>
     <author><![CDATA[Avalon Ltd]]></author>
     <tab><![CDATA[payments_gateways]]></tab>

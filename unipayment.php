@@ -18,7 +18,7 @@ class Unipayment extends PaymentModule
     {
         $this->name = 'unipayment';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.2';
+        $this->version = '2.0.3';
         $this->author = 'Avalon Ltd';
         $this->need_instance = 0;
         $this->bootstrap = true;

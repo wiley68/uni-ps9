@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes high-level boundaries and the **current accepted implementation** for module **2.0.2** (scheme presentation / Cart representative / Checkout parity). Phase numbers below are historical delivery milestones; they are all implemented unless marked deferred.
+This document describes high-level boundaries and the **current accepted implementation** for module **2.0.3**. Phase numbers below are historical delivery milestones; they are all implemented unless marked deferred.
 
 ---
 

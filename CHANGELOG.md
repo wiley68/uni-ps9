@@ -2,6 +2,13 @@
 
 Notable notes for the UniPayment PrestaShop **9** development line.
 
+## 2.0.3 — 2026-09-18
+
+- Definitive CP create failure: persist `bank_send_failed_cp` / `Неуспешно изпратен Банка - КП` for Process 1 and Process 2; finalize standard emails once; Thank You redirect (not ambiguous popup-only UX).
+- Explicit HTTP endpoint rejection (`403` / `404` / `405` / `410`) classified as definitive CP create failure (covers Cloudflare/edge rejection of wrong API path such as `/api/v11`); true transport ambiguity (`timeout`, `5xx`, connection errors) remains `CP_OUTCOME_UNKNOWN`.
+- Satrudnik operational notification mail on `bank_send_failed_cp` and `bank_send_failed_smartucf` via shared leasing mail once-guard (`leasing_email_sent`); recipient from cached `satrudnik_email` only (no fallback).
+- No database schema change and no upgrade script.
+
 ## 2.0.2 — 2026-08-27
 
 - Canonical financing scheme ordering for equal month counts: standard → non-zero promo → 0%.

@@ -32,6 +32,6 @@ final class FinancingOrderMailDispatcher implements LeasingMailDispatchPort
     {
         $snapshot['status_label'] = $status['status_label'];
         DeferredOrderMailQueue::flush($this->presenter->mailExtraVarsFromSnapshot($snapshot, $shop));
-        $this->notifier->notify($snapshot, $attemptId, $shop);
+        $this->notifier->notify($snapshot, $attemptId, $shop, $status);
     }
 }
