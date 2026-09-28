@@ -49,7 +49,7 @@ Shop must be registered in UniPayment Control Panel with matching **UNICID** and
 
 Default CP host: `config/environment.php` (`control_panel_url`); outbound API base = host + `/api/v1`.
 
-Shop schemes and promotional fields come from cached `GET /api/v1/shop` snapshots. Homepage advertising reads **`ShopConfigurationService::getCachedOnly()`** only — missing/stale/malformed cache means no advertising block (no FO CP HTTP).
+Shop schemes and promotional fields come from cached `GET /api/v1/shop` snapshots. Homepage advertising uses the shared PRESENTATION resolver: fresh data stays local, stale data triggers coordinated revalidation, and only a structurally valid snapshot no more than 6 hours stale may be used after a transient refresh failure.
 
 ## Configuration (BO)
 

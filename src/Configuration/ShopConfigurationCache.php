@@ -6,10 +6,11 @@ namespace PrestaShop\Module\Unipayment\Configuration;
 
 use PrestaShop\Module\Unipayment\Api\Exception\InvalidPayloadException;
 
-final class ShopConfigurationCache implements ShopConfigurationCacheInterface
+final class ShopConfigurationCache implements ShopConfigurationCacheInterface, StaleShopConfigurationCacheInterface
 {
     public const TABLE = 'unipayment_shop_cache';
     public const TTL_SECONDS = 86400;
+    public const LKG_SECONDS = 21600;
 
     /** @var \Db */
     private $database;
@@ -80,6 +81,40 @@ final class ShopConfigurationCache implements ShopConfigurationCacheInterface
         }
 
         return $decoded;
+    }
+
+    public function getRetained(string $unicid): ?array
+    {
+        $unicid = trim($unicid);
+        if ($unicid === '') {
+            return null;
+        }
+
+        $row = $this->database->getRow(sprintf(
+            "SELECT `shop_data`, `fetched_at`, `expires_at` FROM `%s` WHERE `unicid` = '%s'",
+            $this->tableName(),
+            pSQL($unicid)
+        ));
+        if (!is_array($row) || !isset($row['shop_data'], $row['fetched_at'], $row['expires_at'])) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode((string) $row['shop_data'], true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            return null;
+        }
+        $expiresAt = strtotime((string) $row['expires_at'] . ' UTC');
+        if (!is_array($decoded) || $decoded === [] || $expiresAt === false) {
+            return null;
+        }
+
+        return [
+            'data' => $decoded,
+            'fetched_at' => (string) $row['fetched_at'],
+            'expires_at' => (string) $row['expires_at'],
+            'expires_at_timestamp' => $expiresAt,
+        ];
     }
 
     public function replace(string $unicid, array $shopData): bool

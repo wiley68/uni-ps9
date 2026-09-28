@@ -80,7 +80,11 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             }
             /** @var Unipayment $module */
             $module = $this->module;
-            $shop = $module->getShopConfigurationService()->get();
+            $action = (string) Tools::getValue('popup_action', 'calculate');
+            $configurationService = $module->getShopConfigurationService();
+            $shop = $action === 'apply'
+                ? $configurationService->getForSubmission()
+                : $configurationService->get();
             $product = (new ProductContextFactory())->create((int) $productId, (int) $attributeId, (int) $quantity);
             $calculation = (new ProductPopupCalculator(new Calculator()))->calculate(
                 $shop,
@@ -95,7 +99,6 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
                 (float) $firstRaw
             );
 
-            $action = (string) Tools::getValue('popup_action', 'calculate');
             if ($action === 'issue_submission_token') {
                 return $this->handleIssueSubmissionToken(
                     $calculation,

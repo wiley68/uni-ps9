@@ -268,7 +268,7 @@ Phase 10 financing snapshot stores EGN/phone2 only in encrypted `sensitive_paylo
 
 Phase 11 SmartUCF: do not log EGN, full SmartUCF customer payload, certificate/key material, or Bearer tokens. Safe: order reference, attempt id, SmartUCF state/error class.
 
-Phase 13 homepage advertising: FO render uses `getCachedOnly()` only (AUD-022). CP text fields are plain text after `strip_tags` (not trusted HTML). Promo/image/CTA URLs must pass `FILTER_VALIDATE_URL` with scheme `http` or `https` only.
+REM-PS9-CACHE-001 homepage advertising: FO render uses the credential-free view of the shared PRESENTATION resolver. CP text fields are plain text after `strip_tags` (not trusted HTML). Promo/image/CTA URLs must pass `FILTER_VALIDATE_URL` with scheme `http` or `https` only.
 
 ### Phase 12 financing email audiences
 

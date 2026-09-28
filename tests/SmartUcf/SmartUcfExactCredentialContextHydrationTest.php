@@ -668,8 +668,8 @@ $provider = new class implements ShopConfigurationProviderInterface {
     ]));
 $fresh = $cache->getFresh($unicid);
 assertScope($fresh !== null && !isset($fresh['uni_user']) && !isset($fresh['uni_password']), '17/18: cache credential-free after exact persist');
-$cachedOnly = $service->getCachedOnly();
-assertScope($cachedOnly !== null && !isset($cachedOnly['uni_user']) && !isset($cachedOnly['uni_password']), '19: getCachedOnly credential-free');
+$presentation = $service->getForPresentationWithoutCredentials();
+assertScope(!isset($presentation['uni_user']) && !isset($presentation['uni_password']), '19: presentation view credential-free');
 $runtime = $service->get();
 assertScope(
     trim((string) ($runtime['uni_user'] ?? '')) !== '' && trim((string) ($runtime['uni_password'] ?? '')) !== '',

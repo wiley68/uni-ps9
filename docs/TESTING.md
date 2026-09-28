@@ -40,7 +40,7 @@ Destructive Aud006 DB purge test **SKIPs** in the safe suite.
 | Area                                            | Location                                        |
 | ----------------------------------------------- | ----------------------------------------------- |
 | Calculator / parity                             | `tests/Calculator/*`                            |
-| Configuration / shop cache / AUD-022 cache-only | `tests/Configuration/*`                         |
+| Configuration / shared cache lifecycle / LKG     | `tests/Configuration/*`                         |
 | Inbound API / CP client                         | `tests/Api/*`                                   |
 | Security / tokens / AUD-021 secrets             | `tests/Security/*`                              |
 | Product FO / popup                              | `tests/Product/*`, `tests/Frontend/Product*`    |
@@ -48,7 +48,7 @@ Destructive Aud006 DB purge test **SKIPs** in the safe suite.
 | Checkout / lock / AUD-019                       | `tests/Checkout/*`, `tests/Frontend/Checkout*`  |
 | Order / mail / bank status                      | `tests/Order/*`                                 |
 | SmartUCF / AUD-020 journal scope                | `tests/SmartUcf/*`                              |
-| Advertising / AUD-022 FO isolation              | `tests/Advertising/*`                           |
+| Advertising / shared presentation resolver      | `tests/Advertising/*`                           |
 | Uninstall                                       | `tests/Uninstall/*`                             |
 | Remediation / infrastructure                    | `tests/Remediation/*`, `tests/Infrastructure/*` |
 
@@ -61,7 +61,7 @@ Do not hard-code a permanent test file count here — it changes with each remed
 | Product     | Calculator + financing popup (Hummingbird + Classic)                                                                             |
 | Cart        | Calculator + financing popup; **guest cart** → exactly one authoritative PS order                                                |
 | Checkout    | PaymentOption; Process 1 / Process 2; double-click stays post-order (AUD-019)                                                    |
-| Advertising | Fresh cache shows float; missing/stale cache → homepage OK, no advertising, no CP wait                                           |
+| Advertising | Fresh cache is local; stale refreshes; transient <=6h may show valid LKG; Class B/C and too-old hide safely                       |
 | Packaging   | ZIP with `config/environment.php` + `secrets/smartucf-key.php` only (no SSH/env)                                                 |
 | Privacy     | Process 1/2 mail audiences; no customer EGN; public bank status only on emails/Thank You (see ARCHITECTURE bank-status contract) |
 

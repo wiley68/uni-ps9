@@ -75,16 +75,20 @@ require dirname(__DIR__) . '/fixtures/shop_snapshot.php';
 use PrestaShop\Module\Unipayment\Api\Exception\AuthenticationException;
 use PrestaShop\Module\Unipayment\Api\Exception\ConnectionException;
 use PrestaShop\Module\Unipayment\Api\Exception\HttpException;
+use PrestaShop\Module\Unipayment\Api\Exception\InvalidPayloadException;
+use PrestaShop\Module\Unipayment\Api\Exception\MalformedJsonException;
 use PrestaShop\Module\Unipayment\Api\ShopConfigurationProviderInterface;
 use PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository;
 use PrestaShop\Module\Unipayment\Configuration\CredentialChangeSideEffectHandler;
 use PrestaShop\Module\Unipayment\Configuration\Exception\ShopConfigurationSnapshotValidationException;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCacheInterface;
+use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFailureClassifier;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationService;
+use PrestaShop\Module\Unipayment\Configuration\StaleShopConfigurationCacheInterface;
 use PrestaShop\Module\Unipayment\Security\TokenRepository;
 use PrestaShop\Module\Unipayment\Tests\Support\ShopConfigurationCredentialWiring;
 
-final class MemoryShopConfigurationCache implements ShopConfigurationCacheInterface
+final class MemoryShopConfigurationCache implements ShopConfigurationCacheInterface, StaleShopConfigurationCacheInterface
 {
     /** @var array<string, array<string, mixed>> */
     public $rows = [];
@@ -95,9 +99,26 @@ final class MemoryShopConfigurationCache implements ShopConfigurationCacheInterf
     /** @var int */
     public $replaceCount = 0;
 
+    /** @var int */
+    public $expiresAt = 1999990000;
+
     public function getFresh(string $unicid): ?array
     {
         return $this->fresh ? ($this->rows[$unicid] ?? null) : null;
+    }
+
+    public function getRetained(string $unicid): ?array
+    {
+        if (!isset($this->rows[$unicid])) {
+            return null;
+        }
+
+        return [
+            'data' => $this->rows[$unicid],
+            'fetched_at' => '2026-08-17 10:00:00',
+            'expires_at' => gmdate('Y-m-d H:i:s', $this->expiresAt),
+            'expires_at_timestamp' => $this->expiresAt,
+        ];
     }
 
     public function replace(string $unicid, array $shopData): bool
@@ -193,6 +214,54 @@ $provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_sna
 $manualRefresh = $service->get(true);
 assertPhase3($provider->calls === 3 && $manualRefresh['uni_zaglavie'] === 'v3', 'forced refresh used cached data');
 
+// Presentation may use a structurally valid <=6h LKG only after a transient current failure.
+$cache->fresh = false;
+$cache->expiresAt = time() - 3600;
+$provider->responses[] = new ConnectionException('temporary transport failure');
+$lkg = $service->get();
+assertPhase3(($lkg['uni_zaglavie'] ?? '') === 'v3', 'eligible transient presentation did not use LKG');
+
+// Submission must revalidate and must never inherit presentation LKG.
+$provider->responses[] = new ConnectionException('temporary transport failure');
+try {
+    $service->getForSubmission();
+    assertPhase3(false, 'submission accepted LKG');
+} catch (ConnectionException $exception) {
+    assertPhase3(isset($cache->rows[$unicid]), 'submission transient deleted retained row');
+}
+
+// Successful current-request revalidation permits submission.
+$provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_snapshot(['uni_zaglavie' => 'submission-fresh'])];
+$submission = $service->getForSubmission();
+assertPhase3(($submission['uni_zaglavie'] ?? '') === 'submission-fresh', 'submission did not use revalidated snapshot');
+
+// Invalid empty response is Class C: no same-attempt LKG and byte-identical row/token preservation.
+$cache->fresh = false;
+$cache->expiresAt = time() - 3600;
+$beforeEmpty = $cache->rows[$unicid];
+$provider->responses[] = ['success' => true, 'data' => []];
+try {
+    $service->get();
+    assertPhase3(false, 'invalid empty response used same-attempt LKG');
+} catch (InvalidPayloadException $exception) {
+    assertPhase3($cache->rows[$unicid] === $beforeEmpty, 'invalid empty response changed known-good row');
+    assertPhase3($tokens->hasToken(), 'invalid empty response cleared token');
+}
+
+// A later independent transient may reconsider that preserved LKG.
+$provider->responses[] = new ConnectionException('later temporary failure');
+assertPhase3($service->get()['uni_zaglavie'] === 'submission-fresh', 'later transient did not reconsider LKG');
+
+// Anything beyond the exact 6h window fails closed and remains physically retained.
+$cache->expiresAt = time() - 21601;
+$provider->responses[] = new HttpException(500, ['message' => 'upstream']);
+try {
+    $service->get();
+    assertPhase3(false, 'too-old LKG was served');
+} catch (HttpException $exception) {
+    assertPhase3(isset($cache->rows[$unicid]), 'too-old transient deleted retained row');
+}
+
 $beforeInvalid = $cache->rows[$unicid];
 $replaceBefore = $cache->replaceCount;
 $provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_snapshot(['uni_typekop' => 'x'])];
@@ -206,6 +275,7 @@ try {
 }
 
 $cache->fresh = false;
+$cache->expiresAt = time() - 21601;
 $provider->responses[] = new ConnectionException('temporary transport failure');
 try {
     $service->get();
@@ -223,6 +293,47 @@ try {
     assertPhase3(isset($cache->rows[$unicid]), 'HTTP 500 must not purge valid cache');
     assertPhase3($tokens->hasToken(), 'HTTP 500 must not invalidate tokens');
 }
+
+$classifier = new ShopConfigurationFailureClassifier();
+assertPhase3($classifier->classify(new HttpException(422, ['error' => 'invalid'])) === ShopConfigurationFailureClassifier::CONTRACT_INVALID, '422 taxonomy');
+assertPhase3($classifier->classify(new MalformedJsonException('malformed')) === ShopConfigurationFailureClassifier::CONTRACT_INVALID, 'malformed taxonomy');
+assertPhase3($classifier->classify(new HttpException(410, [])) === ShopConfigurationFailureClassifier::CONTRACT_INVALID, 'ambiguous 410 must not purge');
+assertPhase3($classifier->classify(new HttpException(410, ['error' => 'shop gone'])) === ShopConfigurationFailureClassifier::AUTHORITATIVE_NEGATIVE, 'semantic gone 410 must purge');
+
+// Ambiguous 410 is Class C and preserves both the known-good row and token.
+$cache->fresh = false;
+$cache->expiresAt = time() - 3600;
+$beforeAmbiguous410 = $cache->rows[$unicid];
+$provider->responses[] = new HttpException(410, []);
+try {
+    $service->get();
+    assertPhase3(false, 'ambiguous 410 used same-attempt LKG');
+} catch (HttpException $exception) {
+    assertPhase3($cache->rows[$unicid] === $beforeAmbiguous410, 'ambiguous 410 changed known-good row');
+    assertPhase3($tokens->hasToken(), 'ambiguous 410 cleared token');
+}
+
+// Semantic gone/revoked 410 is Class B and purges scoped state.
+$provider->responses[] = new HttpException(410, ['error' => 'shop gone']);
+try {
+    $service->get();
+    assertPhase3(false, 'authoritative 410 was hidden');
+} catch (HttpException $exception) {
+    assertPhase3(!isset($cache->rows[$unicid]), 'authoritative 410 retained cache');
+    assertPhase3(!$tokens->hasToken(), 'authoritative 410 retained token');
+}
+
+// A later transient must not resurrect state after Class B purge.
+$provider->responses[] = new ConnectionException('later temporary failure');
+try {
+    $service->get();
+    assertPhase3(false, 'transient resurrected purged Class-B snapshot');
+} catch (ConnectionException $exception) {
+    assertPhase3(!isset($cache->rows[$unicid]), 'post-Class-B transient recreated cache');
+}
+
+$cache->replace($unicid, unipayment_valid_shop_snapshot(['id' => 10]));
+$tokens->save('replacement-token-before-auth', 'Bearer', 2000000000);
 
 $provider->responses[] = new AuthenticationException('invalid credentials');
 try {

@@ -36,8 +36,8 @@ Infrastructure
 | CP client                   | `ControlPanelClient` — API base from `config/environment.php` (`control_panel_url` + `/api/v1`) |
 | Shop snapshot cache         | `ShopConfigurationCache` table `unipayment_shop_cache`, TTL **86400** seconds                   |
 | Snapshot validation         | `ShopConfigurationSnapshotValidator` + `ShopConfigurationSnapshotValidationException`           |
-| Pull / forced refresh       | `ShopConfigurationService::get(false\|true)` (explicit/non-render paths)                        |
-| FO advertising cache read   | `ShopConfigurationService::getCachedOnly()` — **never** refreshes / calls CP (AUD-022)          |
+| Pull / forced refresh       | purpose-aware `ShopConfigurationService` resolver + `get(true)` manual refresh                  |
+| FO advertising resolution   | shared PRESENTATION resolver, credential-free view, lazy refresh + bounded transient LKG         |
 | Flag helpers                | `ShopConfigurationFlags`                                                                        |
 | BO bank-data refresh        | enabled — `get(true)` with PS8 error mapping                                                    |
 | Inbound signed API          | `shopcache`, `orderbankstatus`, `smartucfdebuglog` + HMAC/nonce                                 |
@@ -58,24 +58,22 @@ Infrastructure
 ### Shop configuration cache flow
 
 ```text
-get(false) / get(true)   ← BO refresh, product/cart calculators, explicit sync
+get(false)   ← homepage/product/cart/checkout presentation
     ↓
 fresh local cache for current UNICID?
     ├─ yes → return cached snapshot
-    └─ no / force → GET /shop → validate → replace → return
+    └─ no → per-UNICID refresh lease → GET /shop → validate → replace → return
 
-getCachedOnly()   ← FO homepage advertising only (AUD-022)
-    ↓
-fresh local cache?
-    ├─ yes → return snapshot
-    └─ no / stale / malformed → null (no refresh, no CP HTTP)
+transient refresh failure + structurally valid stale snapshot <= 6h
+    ├─ PRESENTATION → LKG
+    └─ SUBMISSION → fail closed (never LKG)
 ```
 
-Invalid remote snapshot: **do not overwrite** a known-good cache; do not purge tokens.
+Invalid/malformed/empty remote snapshot (Class C): fail the current attempt, **do not overwrite** a known-good cache, do not purge tokens, and do not use same-attempt LKG.
 
-Permanent auth/shop failures (401 / 400 / 403 / 404 / empty InvalidPayload): purge that UNICID cache entry + invalidate tokens.
+Authoritative/security failures (authentication, or semantic proof of forbidden/deleted/revoked shop including a proven 403/404/410): purge that UNICID cache entry + invalidate tokens. Status numbers without authoritative semantics are not sufficient for 403/404/410.
 
-Transient failures (timeout / connection / 5xx): keep cache; rethrow.
+Transient failures (timeout / connection / 408 / 429 / 5xx): preserve cache; presentation may use an eligible <=6h LKG, submission fails closed.
 
 Cache scope key is **`unicid`** (UNIQUE), not PrestaShop `id_shop` — same as audited PS8.
 
@@ -474,7 +472,8 @@ Accepted residual risk: retry after partial success may duplicate the already-de
 ```text
 UNIPAYMENT_ADVERTISING_ENABLED + module enabled + UNICID
 → HomepageAdvertisingGate (php_self=index + uni_status + uni_container_status)
-→ ShopConfigurationService::getCachedOnly() (local fresh cache only; never refresh/CP on render)
+→ ShopConfigurationService::getForPresentationWithoutCredentials()
+→ shared per-UNICID lazy resolver (fresh local, coordinated refresh, bounded transient LKG)
 → HomepageAdvertisingPresenter (strip_tags + http/https URL filter)
 → displayFooter + homepage_advertising.tpl + scoped CSS/JS
 ```
@@ -482,10 +481,11 @@ UNIPAYMENT_ADVERTISING_ENABLED + module enabled + UNICID
 | Cache state                         | FO advertising       |
 | ----------------------------------- | -------------------- |
 | Fresh valid snapshot                | May render           |
-| Missing / stale / malformed         | No advertising block |
-| Explicit BO / inbound cache refresh | Allowed (non-render) |
+| Stale + refresh success             | Current promo may render |
+| Stale <=6h + transient failure      | Valid LKG promo may render |
+| Missing / too old / Class B or C    | No advertising block |
 
-Empty/invalid promo → render nothing. Failures fail closed (no FO 500). No browser/AJAX CP fallback.
+Empty/invalid promo → render nothing. Failures fail closed (no FO 500). The homepage has no separate refresh policy or browser/AJAX CP fallback.
 
 **Order-state sync (AUD-009):** inbound `orderbankstatus` does **not** map bank status to native PS order state (`ps_order_state_changed: false`). `BankStatusOrderStateMapper` / `SYNC_BANK_REJECTION_STATE` remain **dormant**; rejection whitelist empty until proven CP codes.
 

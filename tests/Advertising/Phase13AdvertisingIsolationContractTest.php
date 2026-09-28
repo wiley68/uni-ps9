@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Phase 13 — advertising isolation from transactional surfaces + cache-only data source.
+ * Phase 13 + REM-PS9-CACHE-001 — advertising isolation with shared presentation resolution.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -28,10 +28,10 @@ $lifecycle = (string) file_get_contents($root . '/src/Order/PostControlPanelLife
 $mail = (string) file_get_contents($root . '/src/Order/LeasingEmailNotifier.php');
 
 assertPhase13Adv(strpos($module, 'HomepageAdvertisingPresenter') !== false, 'module wires advertising presenter');
-assertPhase13Adv(strpos($module, 'createShopConfigurationService()->getCachedOnly()') !== false, 'advertising uses cache-only shop config');
+assertPhase13Adv(strpos($module, 'createShopConfigurationService()->getForPresentationWithoutCredentials()') !== false, 'advertising uses shared presentation resolver');
 assertPhase13Adv(
-    !preg_match('/homepageAdvertisingContext[\s\S]{0,1200}->get\s*\(/', $module),
-    'advertising context must not call ShopConfigurationService::get()'
+    !preg_match('/homepageAdvertisingContext[\s\S]{0,1200}->getForSubmission\s*\(/', $module),
+    'advertising context must not call submission resolution'
 );
 assertPhase13Adv(
     !preg_match('/homepageAdvertisingContext[\s\S]{0,800}getShop\(/', $module),

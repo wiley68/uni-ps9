@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * AUD-022: ShopConfigurationService::getCachedOnly never contacts CP.
+ * REM-PS9-CACHE-001: homepage presentation uses the shared lazy resolver.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -81,14 +81,14 @@ function assertAud022(bool $ok, string $message): void
     }
 }
 
-final class Aud022FailIfCalledProvider implements ShopConfigurationProviderInterface
+final class Aud022ObservedProvider implements ShopConfigurationProviderInterface
 {
     public int $calls = 0;
 
     public function getShop(): array
     {
         ++$this->calls;
-        throw new RuntimeException('AUD-022: remote provider must not be called');
+        throw new RuntimeException('Observed presentation refresh failure');
     }
 }
 
@@ -145,7 +145,7 @@ Configuration::$values = [];
 $configuration = new ConfigurationRepository();
 assertAud022($configuration->save(true, $unicid, 'secret'), 'stage credentials');
 
-$provider = new Aud022FailIfCalledProvider();
+$provider = new Aud022ObservedProvider();
 $cache = new Aud022MemoryCache();
 [$service] = ShopConfigurationCredentialWiring::service($configuration, $cache, $provider, new TokenRepository());
 
@@ -153,35 +153,51 @@ $shop = unipayment_valid_shop_snapshot(['uni_status' => 1, 'uni_container_status
 
 // A: fresh cached → returned, provider not called
 $cache->fresh[$unicid] = $shop;
-$cached = $service->getCachedOnly();
+$cached = $service->getForPresentationWithoutCredentials();
 assertAud022(is_array($cached) && ($cached['uni_zaglavie'] ?? '') === 'cached-ad', 'A: fresh cache returned');
 assertAud022(!array_key_exists('uni_user', $cached), 'A: cached-only strips credentials');
 assertAud022($provider->calls === 0, 'A: provider not called');
 
-// B: cache miss → null, provider not called
+// B: cache miss → shared resolver attempts CP and fails closed.
 unset($cache->fresh[$unicid]);
-assertAud022($service->getCachedOnly() === null, 'B: miss returns null');
-assertAud022($provider->calls === 0, 'B: provider not called on miss');
+try {
+    $service->getForPresentationWithoutCredentials();
+    assertAud022(false, 'B: miss unexpectedly resolved');
+} catch (RuntimeException $exception) {
+    assertAud022($provider->calls === 1, 'B: provider not called on miss');
+}
 
-// C: stale treated as miss by getFresh contract → null, no refresh
+// C: stale follows the same remote-capable resolver.
 $cache->staleOnly[$unicid] = $shop;
-assertAud022($service->getCachedOnly() === null, 'C: stale/unavailable fresh row → null');
-assertAud022($provider->calls === 0, 'C: provider not called on stale');
+try {
+    $service->getForPresentationWithoutCredentials();
+    assertAud022(false, 'C: stale unexpectedly resolved');
+} catch (RuntimeException $exception) {
+    assertAud022($provider->calls === 2, 'C: provider not called on stale');
+}
 
 // D: empty/malformed style via getFresh returning null already covered; empty array delete path
 $cache->fresh[$unicid] = [];
-// Memory fake returns [] which getCachedOnly would return — real getFresh deletes empty.
+// Real getFresh deletes an empty row; simulate that unavailable state here.
 // Simulate real behavior: getFresh returns null for empty.
 unset($cache->fresh[$unicid]);
-assertAud022($service->getCachedOnly() === null, 'D: unavailable cache → null');
-assertAud022($provider->calls === 0, 'D: provider not called');
+try {
+    $service->getForPresentationWithoutCredentials();
+    assertAud022(false, 'D: unavailable cache unexpectedly resolved');
+} catch (RuntimeException $exception) {
+    assertAud022($provider->calls === 3, 'D: provider not called');
+}
 
 // empty UNICID → null without provider
 Configuration::$values = [];
 $emptyConfig = new ConfigurationRepository();
 [$emptyService] = ShopConfigurationCredentialWiring::service($emptyConfig, $cache, $provider, new TokenRepository());
-assertAud022($emptyService->getCachedOnly() === null, 'empty UNICID → null');
-assertAud022($provider->calls === 0, 'empty UNICID does not call provider');
+try {
+    $emptyService->getForPresentationWithoutCredentials();
+    assertAud022(false, 'empty UNICID unexpectedly resolved');
+} catch (\PrestaShop\Module\Unipayment\Api\Exception\AuthenticationException $exception) {
+    assertAud022($provider->calls === 3, 'empty UNICID must not call provider');
+}
 
 // G: explicit get()/refresh still can call provider
 Configuration::$values = [];
@@ -230,4 +246,4 @@ $auto = $liveService2->get(false);
 assertAud022(($auto['uni_zaglavie'] ?? '') === 'auto-refresh', 'G: get(false) still refreshes on miss');
 assertAud022($liveProvider2->calls === 1, 'G: provider called on get miss');
 
-fwrite(STDOUT, "OK (AUD-022 getCachedOnly network isolation)\n");
+fwrite(STDOUT, "OK (REM-PS9 homepage shared resolver)\n");

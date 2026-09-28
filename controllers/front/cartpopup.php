@@ -85,7 +85,11 @@ final class UnipaymentCartPopupModuleFrontController extends ModuleFrontControll
             }
             /** @var Unipayment $module */
             $module = $this->module;
-            $shop = $module->getShopConfigurationService()->get();
+            $action = (string) Tools::getValue('popup_action', 'calculate');
+            $configurationService = $module->getShopConfigurationService();
+            $shop = $action === 'apply'
+                ? $configurationService->getForSubmission()
+                : $configurationService->get();
             $calculator = new Calculator();
             $resolver = new CartSchemeResolver($calculator);
             $cartContext = (new CartContextFactory())->create($cart);
@@ -106,7 +110,6 @@ final class UnipaymentCartPopupModuleFrontController extends ModuleFrontControll
                 (float) $firstRaw
             );
 
-            $action = (string) Tools::getValue('popup_action', 'calculate');
             if ($action === 'issue_submission_token') {
                 return $this->handleIssueSubmissionToken($calculation, $cart, $cartContext);
             }
