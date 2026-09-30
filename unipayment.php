@@ -120,28 +120,6 @@ class Unipayment extends PaymentModule
         return true;
     }
 
-    /**
-     * Display-only currency suffix for UI amounts (Woo: евро / лв. / лева).
-     */
-    public function getDisplayCurrencyLabel(string $iso): string
-    {
-        $iso = strtoupper(trim($iso));
-        if ($iso === 'EUR') {
-            return $this->trans('евро', [], 'Modules.Unipayment.Shop');
-        }
-        if ($iso === 'BGN') {
-            return $this->trans('лв.', [], 'Modules.Unipayment.Shop');
-        }
-
-        return $iso;
-    }
-
-    /** Dual-button BGN suffix used by installment labels (Woo: лева). */
-    public function getDisplayCurrencyLabelDualBgn(): string
-    {
-        return $this->trans('лева', [], 'Modules.Unipayment.Shop');
-    }
-
     public function getContent(): string
     {
         // Idempotent: already-installed shops gain Phase 6–13 hooks/tables without reinstall.

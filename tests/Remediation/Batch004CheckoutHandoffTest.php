@@ -87,7 +87,7 @@ $presenter = new CheckoutPaymentPresenter(
     new CartSnapshotSigner('batch004-key'),
     new ConsentResolver()
 );
-$shop = calculatorFixture(['uni_eur' => 0, 'uni_first_vnoska' => 1]);
+$shop = calculatorFixture(['uni_first_vnoska' => 1]);
 
 $productCart = new CartContext(
     [new CartLine(new ProductContext(42, [7], 1000.0), 7, 2, 2000.0)],
@@ -104,13 +104,13 @@ $checkoutCart = new CartContext(
         'cart_rules' => [],
     ]
 );
-$linesFp = $snapshot->linesFingerprint($productCart, 'BGN');
+$linesFp = $snapshot->linesFingerprint($productCart, 'EUR');
 assertBatch004(
-    $linesFp === $snapshot->linesFingerprint($checkoutCart, 'BGN'),
+    $linesFp === $snapshot->linesFingerprint($checkoutCart, 'EUR'),
     'lines fingerprint stable across shipping evolution'
 );
 
-$checkoutView = $presenter->present(true, $shop, $checkoutCart, 'BGN');
+$checkoutView = $presenter->present(true, $shop, $checkoutCart, 'EUR');
 assertBatch004(is_array($checkoutView) && $checkoutView['schemes'] !== [], 'checkout exposes schemes');
 
 $target = null;
@@ -152,7 +152,7 @@ assertBatch004((int) ($decoded['months'] ?? 0) === 12, 'months survive cookie');
 assertBatch004((int) ($decoded['filter_id'] ?? -1) === ((int) $target['filter_id']) + 99, 'product filter_id survives');
 
 // 1. Shipping evolution + one-time/full fingerprint refresh
-$fp1 = $snapshot->fingerprint($checkoutCart, 'BGN');
+$fp1 = $snapshot->fingerprint($checkoutCart, 'EUR');
 $loaded = $store->load($cookie, 88001, 0, $fp1, $linesFp);
 assertBatch004(is_array($loaded), '1: preference loads after shipping evolution');
 assertBatch004(!empty($loaded['checkout_fingerprint_bound']), '1: full fingerprint bound');
@@ -168,9 +168,9 @@ $afterShip = new CartContext(
         'cart_rules' => [],
     ]
 );
-$fp2 = $snapshot->fingerprint($afterShip, 'BGN');
+$fp2 = $snapshot->fingerprint($afterShip, 'EUR');
 assertBatch004($fp1 !== $fp2, '1: shipping change alters full fingerprint');
-$loaded2 = $store->load($cookie, 88001, 0, $fp2, $snapshot->linesFingerprint($afterShip, 'BGN'));
+$loaded2 = $store->load($cookie, 88001, 0, $fp2, $snapshot->linesFingerprint($afterShip, 'EUR'));
 assertBatch004(is_array($loaded2), '1: preference survives further shipping evolution after bind');
 assertBatch004(($loaded2['cart_fingerprint'] ?? '') === $fp2, '1: fingerprint refreshed');
 
@@ -182,7 +182,7 @@ assertBatch004(is_array($guest), '2: guest customer evolution survives');
 assertBatch004((int) ($guest['customer_id'] ?? 0) === 77, '2: customer identity bound');
 
 // 3. Same Product scheme available → matches (even with filter_id mismatch)
-$view = $presenter->present(true, $shop, $afterShip, 'BGN', $loaded2);
+$view = $presenter->present(true, $shop, $afterShip, 'EUR', $loaded2);
 assertBatch004(is_array($view), '3: presenter returns view');
 assertBatch004($view['preselect_payment'] === true, '3: preselect_payment true');
 assertBatch004($view['default_scheme_key'] === $target['key'], '3: default_scheme_key is exact checkout scheme');
@@ -199,14 +199,14 @@ assertBatch004(
 // 4. Same months but DIFFERENT KOP must not match
 $wrongKop = $loaded2;
 $wrongKop['kop_code'] = 'OTHER-KOP';
-$wrongView = $presenter->present(true, $shop, $afterShip, 'BGN', $wrongKop);
+$wrongView = $presenter->present(true, $shop, $afterShip, 'EUR', $wrongKop);
 assertBatch004($wrongView['preselect_payment'] === false, '4: different KOP must not preselect');
 assertBatch004(!empty($wrongView['preference_unresolved']), '4: different KOP marked unresolved');
 
 // 5. Genuine removed scheme → unresolved (hook clears only then)
 $missing = $loaded2;
 $missing['months'] = 99;
-$missingView = $presenter->present(true, $shop, $afterShip, 'BGN', $missing);
+$missingView = $presenter->present(true, $shop, $afterShip, 'EUR', $missing);
 assertBatch004($missingView['preselect_payment'] === false, '5: removed scheme no preselection');
 assertBatch004(!empty($missingView['preference_unresolved']), '5: removed scheme unresolved for safe clear');
 
@@ -217,7 +217,7 @@ $drift = new CartContext(
     $afterShip->checkoutState
 );
 assertBatch004(
-    $store->load($cookie, 88001, 0, $snapshot->fingerprint($drift, 'BGN'), $snapshot->linesFingerprint($drift, 'BGN')) === null,
+    $store->load($cookie, 88001, 0, $snapshot->fingerprint($drift, 'EUR'), $snapshot->linesFingerprint($drift, 'EUR')) === null,
     '6: material qty drift rejects preference'
 );
 

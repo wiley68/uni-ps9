@@ -275,7 +275,7 @@ $created = new CreatedOrder(
     91,
     'APIV11REF01',
     1000.0,
-    'BGN',
+    'EUR',
     1,
     ['email' => 'c@example.com'],
     [],

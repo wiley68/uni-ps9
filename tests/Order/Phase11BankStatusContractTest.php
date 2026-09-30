@@ -11,6 +11,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
+require dirname(__DIR__) . '/Support/EurOrderCurrencyGuardFixture.php';
 
 use PrestaShop\Module\Unipayment\Order\BankStatus;
 use PrestaShop\Module\Unipayment\Order\BankStatusPersistencePort;
@@ -115,10 +116,12 @@ final class Phase11SmartPort implements PostControlPanelSmartUcfPort
 }
 
 $order = new OrderOrchestrationResult(1, 'cp_created', 55, 'ABCD12345', 901);
-$ctx = new PostControlPanelLifecycleContext(1, 'BGN');
+$ctx = new PostControlPanelLifecycleContext(1, 'EUR');
 $snapshot = [
     'id_attempt' => 1,
     'id_order' => 55,
+    'id_currency' => 1,
+    'currency_iso' => 'EUR',
     'order_reference' => 'ABCD12345',
     'customer_json' => ['email' => 'a@b.c'],
 ];
@@ -129,7 +132,7 @@ $store2 = new Phase11SnapStore();
 $store2->rows[1] = $snapshot;
 $bank2 = new Phase11BankSpy();
 $smart2 = new Phase11SmartPort();
-$r2 = (new PostControlPanelLifecycleService($store2, new Phase11MailNoop(), $bank2))->handle(
+$r2 = (eurTestPostService($store2, new Phase11MailNoop(), $bank2))->handle(
     $order,
     ['uni_proces' => 1],
     $ctx,
@@ -149,7 +152,7 @@ $storeCpOnly->rows[1] = $snapshot;
 $bankCpOnly = new Phase11BankSpy();
 $smartIdle = new Phase11SmartPort();
 $smartIdle->queue[] = SmartUcfCoordinationResult::processing(SmartUcfSessionCoordinator::CUSTOMER_PROCESSING);
-$rIdle = (new PostControlPanelLifecycleService($storeCpOnly, new Phase11MailNoop(), $bankCpOnly))->handle(
+$rIdle = (eurTestPostService($storeCpOnly, new Phase11MailNoop(), $bankCpOnly))->handle(
     $order,
     ['uni_proces' => 0],
     $ctx,
@@ -168,7 +171,7 @@ $smartFail->queue[] = SmartUcfCoordinationResult::failed(
     false,
     SmartUcfFailureClassification::CLASS_REMOTE_REJECT
 );
-$rFail = (new PostControlPanelLifecycleService($storeFail, new Phase11MailNoop(), $bankFail))->handle(
+$rFail = (eurTestPostService($storeFail, new Phase11MailNoop(), $bankFail))->handle(
     $order,
     ['uni_proces' => 0],
     $ctx,
@@ -192,7 +195,7 @@ $mailOk = new Phase11MailNoop();
 $smartOk = new Phase11SmartPort();
 $smartOk->queue[] = SmartUcfCoordinationResult::created($trusted, 'sess-1');
 $smartOk->queue[] = SmartUcfCoordinationResult::created($trusted, 'sess-1');
-$svcOk = new PostControlPanelLifecycleService($storeOk, $mailOk, $bankOk, new SmartUcfEndpointPolicy());
+$svcOk = eurTestPostService($storeOk, $mailOk, $bankOk, new SmartUcfEndpointPolicy());
 $rOk = $svcOk->handle($order, ['uni_proces' => 0], $ctx, $smartOk);
 assertPhase11($rOk->isCreated(), 'SmartUCF created');
 assertPhase11(($rOk->finalBankStatus()['status_id'] ?? '') === BankStatus::SENT_PROCESS1, 'result carries bank_sent_process1');

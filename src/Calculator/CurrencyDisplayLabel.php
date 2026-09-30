@@ -4,49 +4,14 @@ declare(strict_types=1);
 
 namespace PrestaShop\Module\Unipayment\Calculator;
 
-/**
- * Display currency suffixes aligned with Woo (лв. / евро / лева).
- * Bulgarian source strings; ISO codes stay EUR/BGN for business logic.
- */
+/** Financing amounts are displayed in EUR only. */
 final class CurrencyDisplayLabel
 {
     private const DOMAIN = 'Modules.Unipayment.Shop';
 
-    /** Popup / amount display suffixes (Woo mtuc_get_currency_display_config). */
-    public function forAmount(string $iso): string
+    public function forAmount(): string
     {
-        $iso = strtoupper(trim($iso));
-        if ($iso === 'EUR') {
-            return $this->trans('евро');
-        }
-        if ($iso === 'BGN') {
-            return $this->trans('лв.');
-        }
-
-        return $iso;
-    }
-
-    /** Button dual-currency suffixes (Woo mtuc_format_installment_price_text uses лева/евро). */
-    public function forButton(string $iso, bool $dual): string
-    {
-        $iso = strtoupper(trim($iso));
-        if (!$dual) {
-            return $this->forAmount($iso);
-        }
-        if ($iso === 'EUR') {
-            return $this->trans('евро');
-        }
-        if ($iso === 'BGN') {
-            return $this->trans('лева');
-        }
-
-        return $iso;
-    }
-
-    /** @deprecated Use forAmount(); kept for call-site compatibility. */
-    public function forIso(string $iso): string
-    {
-        return $this->forAmount($iso);
+        return $this->trans('евро');
     }
 
     private function trans(string $message): string

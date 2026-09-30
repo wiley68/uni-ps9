@@ -12,6 +12,8 @@ use PrestaShop\Module\Unipayment\Order\ControlPanelOrderClientAdapter;
 use PrestaShop\Module\Unipayment\Order\ControlPanelStatusSyncService;
 use PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository;
 use PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository;
+use PrestaShop\Module\Unipayment\Order\OrderCurrencyGuard;
+use PrestaShop\Module\Unipayment\Order\ControlPanelSuccessReplayGuard;
 use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateConsumerLease;
 use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateSynchronizer;
 use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateSyncException;
@@ -56,6 +58,9 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
     private $context;
     /** @var ControlPanelStatusSyncService|null */
     private $statusSync;
+    private OrderCurrencyGuard $currencyGuard;
+    /** @var callable */
+    private $cpSuccessVerifier;
 
     public function __construct(
         ?SmartUcfLifecycleRepository $lifecycle = null,
@@ -68,7 +73,9 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
         ?\Context $context = null,
         ?ControlPanelClient $controlPanelApi = null,
         ?CertificateSynchronizer $certificateSynchronizer = null,
-        ?ControlPanelStatusSyncService $statusSync = null
+        ?ControlPanelStatusSyncService $statusSync = null,
+        ?OrderCurrencyGuard $currencyGuard = null,
+        ?callable $cpSuccessVerifier = null
     ) {
         $this->payloadBuilder = $payloadBuilder ?? new SmartUcfPayloadBuilder();
         $this->lifecycle = $lifecycle ?? new SmartUcfLifecycleRepository();
@@ -81,6 +88,10 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
         $this->controlPanelApi = $controlPanelApi;
         $this->certificateSynchronizer = $certificateSynchronizer;
         $this->statusSync = $statusSync;
+        $this->currencyGuard = $currencyGuard ?? new OrderCurrencyGuard();
+        $this->cpSuccessVerifier = $cpSuccessVerifier ?? static function (int $id, array $row): void {
+            (new ControlPanelSuccessReplayGuard())->assertAttempt($id, $row);
+        };
     }
 
     private function statusSync(): ControlPanelStatusSyncService
@@ -102,15 +113,20 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
         bool $process2,
         ?array $snapshot = null
     ): SmartUcfCoordinationResult {
-        if ($process2) {
-            return SmartUcfCoordinationResult::process2();
-        }
-
         if ($snapshot === null) {
             $snapshot = $this->snapshots->findByAttempt($attemptId);
         }
         if ($snapshot === null) {
             return SmartUcfCoordinationResult::failed(self::CUSTOMER_FAILED, true, SmartUcfFailureClassification::CLASS_PRE_SEND);
+        }
+        try {
+            $this->currencyGuard->assertNativeSnapshot($snapshot);
+            ($this->cpSuccessVerifier)($attemptId, $snapshot);
+        } catch (\Throwable $exception) {
+            return SmartUcfCoordinationResult::failed(self::CUSTOMER_FAILED, false, SmartUcfFailureClassification::CLASS_PRE_SEND);
+        }
+        if ($process2) {
+            return SmartUcfCoordinationResult::process2();
         }
 
         $row = $this->lifecycle->readAndNormalize($attemptId);
@@ -179,7 +195,6 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
             return SmartUcfCoordinationResult::processing(self::CUSTOMER_PROCESSING);
         }
 
-        $shop['_currency_iso'] = (string) ($shop['_currency_iso'] ?? ($snapshot['currency_iso'] ?? 'BGN'));
         $smartUcfPayload = null;
 
         try {

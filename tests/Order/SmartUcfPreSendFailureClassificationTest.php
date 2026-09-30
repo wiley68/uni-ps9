@@ -12,6 +12,7 @@ if (PHP_SAPI !== 'cli') {
 
 $root = dirname(__DIR__, 2);
 require $root . '/vendor/autoload.php';
+require dirname(__DIR__) . '/Support/EurOrderCurrencyGuardFixture.php';
 require $root . '/tests/fixtures/shop_snapshot.php';
 
 use PrestaShop\Module\Unipayment\Order\BankStatus;
@@ -210,7 +211,9 @@ function preSendCoordinatorWith(
     foreach ([
         'lifecycle' => $lifecycle,
         'client' => $gateway,
-        'payloadBuilder' => new SmartUcfPayloadBuilder(),
+        'payloadBuilder' => new SmartUcfPayloadBuilder(eurTestOrderCurrencyGuard()),
+        'currencyGuard' => eurTestOrderCurrencyGuard(),
+        'cpSuccessVerifier' => eurTestCpSuccessVerifier(),
         'classifier' => new \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfFailureClassifier(),
         'snapshots' => null,
         'cpClient' => null,
@@ -233,10 +236,12 @@ function preSendLifecycleHandle(
     PreSendBankSpy $bankSpy
 ): PostControlPanelLifecycleResult {
     $order = new OrderOrchestrationResult(1, 'cp_created', 55, 'ABCD12345', 901);
-    $ctx = new PostControlPanelLifecycleContext(1, 'BGN');
+    $ctx = new PostControlPanelLifecycleContext(1, 'EUR');
     $snapshot = [
         'id_attempt' => 1,
         'id_order' => 55,
+        'id_currency' => 1,
+        'currency_iso' => 'EUR',
         'order_reference' => 'ABCD12345',
         'customer_json' => ['email' => 'a@b.c'],
     ];
@@ -245,7 +250,7 @@ function preSendLifecycleHandle(
     $smart = new PreSendSmartPort();
     $smart->queue[] = $smartResult;
 
-    return (new PostControlPanelLifecycleService($store, new PreSendMailNoop(), $bankSpy))->handle(
+    return (eurTestPostService($store, new PreSendMailNoop(), $bankSpy))->handle(
         $order,
         ['uni_proces' => 0],
         $ctx,
@@ -254,7 +259,7 @@ function preSendLifecycleHandle(
 }
 
 $order = new OrderOrchestrationResult(1, 'cp_created', 55, 'ABCD12345', 901);
-$ctx = new PostControlPanelLifecycleContext(1, 'BGN');
+$ctx = new PostControlPanelLifecycleContext(1, 'EUR');
 $snapshot = [
     'id_attempt' => 1,
     'id_order' => 55,
@@ -267,7 +272,8 @@ $snapshot = [
     'first_installment' => 0,
     'months' => 12,
     'monthly_installment' => 10,
-    'currency_iso' => 'BGN',
+    'currency_iso' => 'EUR',
+    'id_currency' => 1,
 ];
 $trusted = 'https://online.ucfin.bg/sucf-online/Request/Start/sess-retry';
 
@@ -380,7 +386,7 @@ $store7->rows[1] = $snapshot;
 $bank7 = new PreSendBankSpy();
 $smart7 = new PreSendSmartPort();
 $smart7->queue[] = SmartUcfCoordinationResult::created($trusted, 'sess-retry');
-$result7 = (new PostControlPanelLifecycleService(
+$result7 = (eurTestPostService(
     $store7,
     new PreSendMailNoop(),
     $bank7,

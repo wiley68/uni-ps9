@@ -11,6 +11,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
+require dirname(__DIR__) . '/Support/EurOrderCurrencyGuardFixture.php';
 
 use PrestaShop\Module\Unipayment\Order\BankStatus;
 use PrestaShop\Module\Unipayment\Order\DeferredOrderMailQueue;
@@ -217,16 +218,75 @@ $root = dirname(__DIR__, 2);
 $order = new OrderOrchestrationResult(10, 'cp_created', 100, 'REF100', 555);
 $shopProcess2 = ['uni_proces' => 1];
 $shopProcess1 = ['uni_proces' => 0];
-$snapshot = ['currency_iso' => 'BGN', 'customer_json' => [], 'address_json' => []];
-$context = new PostControlPanelLifecycleContext(1, 'BGN');
-$replayContext = new PostControlPanelLifecycleContext(1, 'BGN', true, false);
+$snapshot = ['id_order' => 100, 'id_currency' => 1, 'currency_iso' => 'EUR', 'customer_json' => [], 'address_json' => []];
+$context = new PostControlPanelLifecycleContext(1, 'EUR');
+$replayContext = new PostControlPanelLifecycleContext(1, 'EUR', true, false);
+
+// EUR-PS9-004 — direct post-CP entry must prove persisted CP success before P1 or P2.
+$replayPayload = [
+    'order_id' => 'REF100', 'name' => 'Buyer', 'phone' => '', 'email' => '',
+    'address' => '', 'address2' => '', 'price' => 100.0, 'vnoska' => 10.0,
+    'gpr' => 1.0, 'vnoski' => 10, 'parva' => 0.0, 'products_id' => '1',
+    'products_name' => 'Item', 'products_q' => '1', 'type_client' => 1,
+    'currency' => 'EUR', 'version' => '2.0.3',
+];
+$replaySnapshot = array_replace($snapshot, [
+    'id_attempt' => 10, 'order_reference' => 'REF100', 'order_total' => 100,
+    'control_panel_order_id' => 555, 'lifecycle_status' => 'cp_created',
+]);
+$replayAttempt = [
+    'id_attempt' => 10, 'id_order' => 100, 'state' => 'cp_created',
+    'control_panel_order_id' => 555,
+    'cp_payload' => json_encode($replayPayload, JSON_THROW_ON_ERROR),
+];
+$realCpGuard = new \PrestaShop\Module\Unipayment\Order\ControlPanelSuccessReplayGuard(
+    eurTestOrderCurrencyGuard(),
+    static function (int $attemptId) use (&$replayAttempt): ?array {
+        return $attemptId === 10 ? $replayAttempt : null;
+    }
+);
+$realCpGuard->assertAttempt(10, $replaySnapshot, 555);
+$replayStore = new Aud018MemorySnapshotStore();
+$replayStore->seed(10, $replaySnapshot);
+$replayBank = new Aud018BankStatusSpy();
+$replaySmart = new Aud018FakeSmartUcfPort();
+$replayService = new PostControlPanelLifecycleService(
+    $replayStore, new Aud018NoopMailDispatcher(), $replayBank, null, null, null,
+    eurTestOrderCurrencyGuard(),
+    static function (int $attemptId, array $row, ?int $cpId) use ($realCpGuard): void {
+        $realCpGuard->assertAttempt($attemptId, $row, $cpId);
+    }
+);
+$replayNoMail = new PostControlPanelLifecycleContext(1, 'EUR', false, false);
+$replayGood = $replayService->handle($order, $shopProcess2, $replayNoMail, $replaySmart);
+assertAud018($replayGood->isProcess2(), 'EUR: valid durable CP success reaches Process 2');
+$baselineBankCount = count($replayBank->updates);
+$baselineSnapshot = $replayStore->findByAttempt(10);
+foreach ([
+    ['state' => 'cp_outcome_unknown'],
+    ['control_panel_order_id' => 0],
+    ['control_panel_order_id' => 556],
+] as $invalidAttempt) {
+    $replayAttempt = array_replace($replayAttempt, $invalidAttempt);
+    foreach ([$shopProcess2, $shopProcess1] as $mode) {
+        $rejected = $replayService->handle($order, $mode, $replayNoMail, $replaySmart);
+        assertAud018($rejected->outcome() === PostControlPanelLifecycleResult::OUTCOME_POST_ORDER_FAILURE && !$rejected->isCreated() && !$rejected->isProcess2(),
+            'EUR: invalid CP result must not continue post-CP lifecycle');
+    }
+    assertAud018(count($replayBank->updates) === $baselineBankCount && $replaySmart->runCalls === 0,
+        'EUR: rejected CP result has no bank status or SmartUCF side effect');
+    assertAud018($replayStore->findByAttempt(10) === $baselineSnapshot,
+        'EUR: rejected CP result does not repair snapshot');
+    $replayAttempt['state'] = 'cp_created';
+    $replayAttempt['control_panel_order_id'] = 555;
+}
 
 // Test A — Process 2
 $storeA = new Aud018MemorySnapshotStore();
 $storeA->seed(10, $snapshot);
 $bankSpy = new Aud018BankStatusSpy();
 $smartFake = new Aud018FakeSmartUcfPort();
-$serviceA = new PostControlPanelLifecycleService($storeA, new Aud018NoopMailDispatcher(), $bankSpy);
+$serviceA = eurTestPostService($storeA, new Aud018NoopMailDispatcher(), $bankSpy);
 $resultA = $serviceA->handle($order, $shopProcess2, $context, $smartFake);
 assertAud018($resultA->outcome() === PostControlPanelLifecycleResult::OUTCOME_PROCESS2, 'A: process2 outcome');
 assertAud018($smartFake->runCalls === 0 && $smartFake->resumeCalls === 0, 'A: SmartUCF not invoked for process2');
@@ -238,8 +298,8 @@ $storeA2 = new Aud018MemorySnapshotStore();
 $storeA2->seed(10, $snapshot);
 $bankSpyA2 = new Aud018BankStatusSpy();
 $mailSpyA2 = new Aud018NoopMailDispatcher();
-$noMailContext = new PostControlPanelLifecycleContext(1, 'BGN', false, false);
-$resultA2 = (new PostControlPanelLifecycleService($storeA2, $mailSpyA2, $bankSpyA2))->handle(
+$noMailContext = new PostControlPanelLifecycleContext(1, 'EUR', false, false);
+$resultA2 = (eurTestPostService($storeA2, $mailSpyA2, $bankSpyA2))->handle(
     $order,
     $shopProcess2,
     $noMailContext,
@@ -263,7 +323,7 @@ $trustedRedirect = (new SmartUcfEndpointPolicy())->buildApplicationRedirect(
 $storeB = new Aud018MemorySnapshotStore();
 $storeB->seed(10, $snapshot);
 $smartCreated = new Aud018FakeSmartUcfPort(SmartUcfCoordinationResult::created($trustedRedirect, 'session123'));
-$resultB = (new PostControlPanelLifecycleService($storeB, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
+$resultB = (eurTestPostService($storeB, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
     $order,
     $shopProcess1,
     $context,
@@ -280,7 +340,7 @@ $smartUntrusted = new Aud018FakeSmartUcfPort(
     SmartUcfCoordinationResult::created('https://evil.example/sucf-online/Request/Start/session123', 'session123')
 );
 PrestaShopLogger::$logs = [];
-$resultC = (new PostControlPanelLifecycleService($storeC, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
+$resultC = (eurTestPostService($storeC, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
     $order,
     $shopProcess1,
     $context,
@@ -298,7 +358,7 @@ assertAud018(
 $storeD = new Aud018MemorySnapshotStore();
 $storeD->seed(10, $snapshot);
 $smartProcessing = new Aud018FakeSmartUcfPort(SmartUcfCoordinationResult::processing('still working'));
-$resultD = (new PostControlPanelLifecycleService($storeD, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
+$resultD = (eurTestPostService($storeD, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
     $order,
     $shopProcess1,
     $context,
@@ -313,7 +373,7 @@ $storeE->seed(10, $snapshot);
 $smartUnknown = new Aud018FakeSmartUcfPort(
     SmartUcfCoordinationResult::outcomeUnknown(SmartUcfSessionCoordinator::CUSTOMER_OUTCOME_UNKNOWN)
 );
-$resultE = (new PostControlPanelLifecycleService($storeE, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
+$resultE = (eurTestPostService($storeE, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
     $order,
     $shopProcess1,
     $context,
@@ -335,7 +395,7 @@ $smartFailed = new Aud018FakeSmartUcfPort(SmartUcfCoordinationResult::failed(
     SmartUcfFailureClassification::CLASS_REMOTE_REJECT
 ));
 $failedBankSpy = new Aud018BankStatusSpy();
-$resultF = (new PostControlPanelLifecycleService($storeF, new Aud018NoopMailDispatcher(), $failedBankSpy))->handle(
+$resultF = (eurTestPostService($storeF, new Aud018NoopMailDispatcher(), $failedBankSpy))->handle(
     $order,
     $shopProcess1,
     $context,
@@ -358,7 +418,7 @@ DeferredOrderMailQueue::intercept([
 ]);
 $storeG = new Aud018MemorySnapshotStore();
 $smartG = new Aud018FakeSmartUcfPort();
-$resultG = (new PostControlPanelLifecycleService($storeG, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
+$resultG = (eurTestPostService($storeG, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
     $order,
     $shopProcess1,
     $context,
@@ -372,7 +432,7 @@ DeferredOrderMailQueue::discard();
 // Test H — email failure
 $storeH = new Aud018MemorySnapshotStore();
 $storeH->seed(10, $snapshot);
-$resultH = (new PostControlPanelLifecycleService(
+$resultH = (eurTestPostService(
     $storeH,
     new Aud018ThrowingMailDispatcher(),
     new Aud018NoopBankStatusPersistence()
@@ -385,7 +445,7 @@ $storeI = new Aud018MemorySnapshotStore();
 $storeI->seed(10, $snapshot);
 $bankFail = new Aud018BankStatusSpy();
 $bankFail->throwOnUpdate = true;
-$resultI = (new PostControlPanelLifecycleService($storeI, new Aud018NoopMailDispatcher(), $bankFail))->handle(
+$resultI = (eurTestPostService($storeI, new Aud018NoopMailDispatcher(), $bankFail))->handle(
     $order,
     $shopProcess2,
     $context,
@@ -397,7 +457,7 @@ assertAud018($resultI->isProcess2(), 'I: process2 result still returned');
 $storeJ = new Aud018MemorySnapshotStore();
 $storeJ->seed(10, $snapshot);
 $smartReplay = new Aud018FakeSmartUcfPort(SmartUcfCoordinationResult::processing('replay'));
-$resultJ = (new PostControlPanelLifecycleService($storeJ, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
+$resultJ = (eurTestPostService($storeJ, new Aud018NoopMailDispatcher(), new Aud018NoopBankStatusPersistence()))->handle(
     $order,
     $shopProcess1,
     $replayContext,

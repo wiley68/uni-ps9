@@ -38,7 +38,7 @@ $stateB = new CartContext(
     ['id_cart' => 9, 'carrier_id' => 1, 'shipping_total' => '0.00', 'cart_rules' => [], 'delivery_option' => []]
 );
 assertFp(
-    $snapshot->fingerprint($stateA, 'BGN') !== $snapshot->fingerprint($stateB, 'BGN'),
+    $snapshot->fingerprint($stateA, 'EUR') !== $snapshot->fingerprint($stateB, 'EUR'),
     'same total different product must change fingerprint'
 );
 
@@ -53,7 +53,7 @@ $qty2x100 = new CartContext(
     ['id_cart' => 1, 'carrier_id' => 1, 'shipping_total' => '0.00', 'cart_rules' => []]
 );
 assertFp(
-    $snapshot->fingerprint($qty1x200, 'BGN') !== $snapshot->fingerprint($qty2x100, 'BGN'),
+    $snapshot->fingerprint($qty1x200, 'EUR') !== $snapshot->fingerprint($qty2x100, 'EUR'),
     '1x200 vs 2x100 quantity composition must differ'
 );
 
@@ -83,7 +83,7 @@ $carrierB = new CartContext(
     ['id_cart' => 1, 'carrier_id' => 11, 'shipping_total' => '15.00', 'cart_rules' => []]
 );
 assertFp(
-    $snapshot->fingerprint($carrierA, 'BGN') !== $snapshot->fingerprint($carrierB, 'BGN'),
+    $snapshot->fingerprint($carrierA, 'EUR') !== $snapshot->fingerprint($carrierB, 'EUR'),
     'carrier/shipping change must change fingerprint'
 );
 
@@ -98,8 +98,8 @@ $sameShippingOtherCarrier = new CartContext(
     ['id_cart' => 1, 'carrier_id' => 99, 'shipping_total' => '5.00', 'cart_rules' => []]
 );
 assertFp(
-    $snapshot->fingerprint($sameShippingDifferentCarrier, 'BGN')
-        !== $snapshot->fingerprint($sameShippingOtherCarrier, 'BGN'),
+    $snapshot->fingerprint($sameShippingDifferentCarrier, 'EUR')
+        !== $snapshot->fingerprint($sameShippingOtherCarrier, 'EUR'),
     'carrier_id alone must change fingerprint even when shipping total equal'
 );
 
@@ -118,7 +118,7 @@ $voucherB = new CartContext(
     ]]
 );
 assertFp(
-    $snapshot->fingerprint($voucherA, 'BGN') !== $snapshot->fingerprint($voucherB, 'BGN'),
+    $snapshot->fingerprint($voucherA, 'EUR') !== $snapshot->fingerprint($voucherB, 'EUR'),
     'different cart-rule identity must change fingerprint'
 );
 
@@ -145,12 +145,12 @@ $ordered = new CartContext(
     ]]
 );
 assertFp(
-    $snapshot->fingerprint($unordered, 'BGN') === $snapshot->fingerprint($ordered, 'BGN'),
+    $snapshot->fingerprint($unordered, 'EUR') === $snapshot->fingerprint($ordered, 'EUR'),
     'deterministic sorting must normalize line/cart_rule order'
 );
 
 assertFp(
-    $snapshot->fingerprint($stateA, 'BGN') !== $snapshot->fingerprint($stateA, 'EUR'),
+    $snapshot->fingerprint($stateA, 'EUR') !== $snapshot->fingerprint($stateA, 'USD'),
     'currency must be part of fingerprint'
 );
 

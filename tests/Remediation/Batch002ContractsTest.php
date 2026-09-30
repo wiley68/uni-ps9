@@ -94,10 +94,10 @@ $afterShip = rem002Cart(110.0, [
     'shipping_total' => '10.00',
     'cart_rules' => [],
 ]);
-$fpBefore = $snapshot->fingerprint($beforeShip, 'BGN');
-$fpAfter = $snapshot->fingerprint($afterShip, 'BGN');
-$linesBefore = $snapshot->linesFingerprint($beforeShip, 'BGN');
-$linesAfter = $snapshot->linesFingerprint($afterShip, 'BGN');
+$fpBefore = $snapshot->fingerprint($beforeShip, 'EUR');
+$fpAfter = $snapshot->fingerprint($afterShip, 'EUR');
+$linesBefore = $snapshot->linesFingerprint($beforeShip, 'EUR');
+$linesAfter = $snapshot->linesFingerprint($afterShip, 'EUR');
 assertRem002($fpBefore !== $fpAfter, '1: full fingerprint must change when shipping/total evolves');
 assertRem002($linesBefore === $linesAfter, '1: lines fingerprint must ignore shipping total');
 
@@ -143,7 +143,7 @@ $drift = new CartContext(
     $afterShip->checkoutState
 );
 assertRem002(
-    $store->load($cookie, 55, 0, $snapshot->fingerprint($drift, 'BGN'), $snapshot->linesFingerprint($drift, 'BGN')) === null,
+    $store->load($cookie, 55, 0, $snapshot->fingerprint($drift, 'EUR'), $snapshot->linesFingerprint($drift, 'EUR')) === null,
     '10: material product/qty drift rejects preference'
 );
 

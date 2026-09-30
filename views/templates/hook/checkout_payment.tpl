@@ -35,11 +35,9 @@
                             <div class="unipayment-checkout__label">{l s='Цена на поръчката' d='Modules.Unipayment.Shop'}
                             </div>
                             <div
-                                class="unipayment-checkout__value{if $unipayment_checkout.currency_dual} unipayment-checkout__value--dual{/if}">
+                                class="unipayment-checkout__value">
                                 <span class="unipayment-checkout__amount-primary"
                                     data-unipayment-display="price-primary"></span>
-                                <span class="unipayment-checkout__amount-secondary"
-                                    data-unipayment-display="price-secondary"></span>
                             </div>
                         </div>
 
@@ -81,11 +79,9 @@
                             <div class="unipayment-checkout__label">{l s='Обща сума на заема' d='Modules.Unipayment.Shop'}
                             </div>
                             <div
-                                class="unipayment-checkout__value{if $unipayment_checkout.currency_dual} unipayment-checkout__value--dual{/if}">
+                                class="unipayment-checkout__value">
                                 <span class="unipayment-checkout__amount-primary"
                                     data-unipayment-display="financed_amount-primary"></span>
-                                <span class="unipayment-checkout__amount-secondary"
-                                    data-unipayment-display="financed_amount-secondary"></span>
                             </div>
                         </div>
 
@@ -93,11 +89,9 @@
                             <div class="unipayment-checkout__label">
                                 {l s='Размер на погасителна вноска' d='Modules.Unipayment.Shop'}</div>
                             <div
-                                class="unipayment-checkout__value{if $unipayment_checkout.currency_dual} unipayment-checkout__value--dual{/if}">
+                                class="unipayment-checkout__value">
                                 <span class="unipayment-checkout__amount-primary"
                                     data-unipayment-display="monthly_installment-primary"></span>
-                                <span class="unipayment-checkout__amount-secondary"
-                                    data-unipayment-display="monthly_installment-secondary"></span>
                             </div>
                         </div>
 
@@ -105,11 +99,9 @@
                             <div class="unipayment-checkout__label">{l s='Обща дължима сума' d='Modules.Unipayment.Shop'}
                             </div>
                             <div
-                                class="unipayment-checkout__value{if $unipayment_checkout.currency_dual} unipayment-checkout__value--dual{/if}">
+                                class="unipayment-checkout__value">
                                 <span class="unipayment-checkout__amount-primary"
                                     data-unipayment-display="total_payable-primary"></span>
-                                <span class="unipayment-checkout__amount-secondary"
-                                    data-unipayment-display="total_payable-secondary"></span>
                             </div>
                         </div>
 

@@ -199,9 +199,7 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
                 (new CheckoutPreferenceStore())->clear($this->context->cookie);
                 /** @var Unipayment $module */
                 $module = $this->module;
-                Tools::redirect(
-                    (new OrderConfirmationUrlBuilder())->build($this->context, $module, $exception->idOrder())
-                );
+                $this->handleLockLoser($idShop, $idCart);
 
                 return;
             }
@@ -220,9 +218,7 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
                 (new CheckoutPreferenceStore())->clear($this->context->cookie);
                 /** @var Unipayment $module */
                 $module = $this->module;
-                Tools::redirect(
-                    (new OrderConfirmationUrlBuilder())->build($this->context, $module, $recoveredOrderId)
-                );
+                $this->handleLockLoser($idShop, $idCart);
 
                 return;
             }

@@ -69,6 +69,7 @@ final class PhpEncryption
 }
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
+require dirname(__DIR__) . '/Support/EurOrderCurrencyGuardFixture.php';
 
 use PrestaShop\Module\Unipayment\Order\BankStatus;
 use PrestaShop\Module\Unipayment\Order\BankStatusPersistencePort;
@@ -125,6 +126,9 @@ function completionSnapshot(string $customerEmail): array
 {
     return [
         'order_reference' => 'REFMAIL01',
+        'id_order' => 100,
+        'id_currency' => 1,
+        'currency_iso' => 'EUR',
         'customer_json' => ['email' => $customerEmail],
         'status_label' => BankStatus::LABEL_SENT_PROCESS1,
         'kop_code' => 'KOP1',
@@ -368,14 +372,14 @@ final class CompletionIdleSmart implements PostControlPanelSmartUcfPort
 $store11 = new CompletionSnapStore();
 $store11->rows[11] = completionSnapshot('customer@example.com');
 $bank11 = new CompletionBankSpy();
-$result11 = (new PostControlPanelLifecycleService(
+$result11 = (eurTestPostService(
     $store11,
     new CompletionFailingMail(),
     $bank11
 ))->handle(
     new OrderOrchestrationResult(11, 'cp_created', 100, 'REFMAIL01', 555),
     ['uni_proces' => 1],
-    new PostControlPanelLifecycleContext(1, 'BGN'),
+    new PostControlPanelLifecycleContext(1, 'EUR'),
     new CompletionIdleSmart()
 );
 assertMailCompletion($result11->isProcess2(), '11: Process 2 outcome preserved');

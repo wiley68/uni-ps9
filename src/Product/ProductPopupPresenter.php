@@ -31,7 +31,6 @@ final class ProductPopupPresenter
             'banner_url' => $this->url($shop['uni_picture'] ?? ''),
             'banner_url_mobile' => $this->url($shop['uni_picturem'] ?? ''),
             'banner_link' => $bannerLink,
-            'currency_mode' => (int) ($shop['uni_eur'] ?? 0),
             'button_action' => $buttonAction === 'buy' ? 'buy' : 'add_to_cart',
             'secondary_label' => $buttonAction === 'buy' ? 'Купи' : 'Добави в количката',
             'customer' => array_replace([

@@ -88,7 +88,9 @@ $snapshot = [
     'gpr' => 0.0,
     'months' => 10,
     'first_installment' => 10.0,
-    'currency_iso' => 'BGN',
+    'currency_iso' => 'EUR',
+    'id_order' => 1,
+    'id_currency' => 1,
     'module_version' => '2.0.3',
     'customer_json' => [
         'first_name' => 'Ivan',
@@ -106,8 +108,9 @@ $snapshot = [
         ['id_product' => 1, 'id_product_attribute' => 0, 'name' => 'Item', 'quantity' => 1],
     ],
 ];
-$p1 = $builder->build($snapshot, ['uni_proces' => 0]);
-$p2 = $builder->build($snapshot, ['uni_proces' => 1]);
+$created = new \PrestaShop\Module\Unipayment\Order\CreatedOrder(1, 'ABCDEFGHIJKLM', 100.0, 'EUR', 1, [], [], []);
+$p1 = $builder->build($snapshot, ['uni_proces' => 0], $created);
+$p2 = $builder->build($snapshot, ['uni_proces' => 1], $created);
 assertCanon($p1['order_id'] === 'ABCDEFGHIJKLM', 'order_id truncated outbound to 13');
 assertCanon(!isset($p1['status']) && !isset($p1['status_id']), 'P1 create has no status');
 assertCanon(!isset($p2['status']) && !isset($p2['status_id']), 'P2 create has no status');

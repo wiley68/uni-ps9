@@ -40,12 +40,7 @@
         var primary = root.querySelector(
             '[data-unipayment-display="' + name + '-primary"]',
         );
-        var secondary = root.querySelector(
-            '[data-unipayment-display="' + name + '-secondary"]',
-        );
         if (primary) primary.textContent = (display && display.primary) || "";
-        if (secondary)
-            secondary.textContent = (display && display.secondary) || "";
     }
 
     function setup(root) {

@@ -27,7 +27,7 @@ function assertCartPopupCalc(bool $condition, string $message): void
 $calculator = new Calculator('2026-08-17');
 $resolver = new CartSchemeResolver($calculator);
 $popup = new CartPopupCalculator($calculator, $resolver);
-$shop = calculatorFixture(['uni_eur' => 0]);
+$shop = calculatorFixture();
 $cart = new CartContext([new CartLine(new ProductContext(42, [7], 1000), 0, 1, 1000)], 1000.0);
 
 $schemes = $popup->commonSchemes($shop, $cart, 'standard');
@@ -38,7 +38,7 @@ $key = ProductPopupSchemeList::key($scheme);
 $result = $popup->calculate(
     $shop,
     $cart,
-    'BGN',
+    'EUR',
     'standard',
     $scheme->type,
     $scheme->kopCode,
@@ -54,7 +54,7 @@ assertCartPopupCalc(isset($result['monthly_installment'], $result['price_display
 
 $thrown = false;
 try {
-    $popup->calculate($shop, $cart, 'BGN', 'standard', $scheme->type, $scheme->kopCode, $scheme->months, $scheme->filterId, 'bad-key', 0.0);
+    $popup->calculate($shop, $cart, 'EUR', 'standard', $scheme->type, $scheme->kopCode, $scheme->months, $scheme->filterId, 'bad-key', 0.0);
 } catch (Throwable $exception) {
     $thrown = true;
 }

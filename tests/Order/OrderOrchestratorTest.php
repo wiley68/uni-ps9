@@ -116,6 +116,7 @@ final class MemorySnapshots implements FinancingSnapshotStoreInterface
     public $rows = [];
     public function save(int $id, array $snapshot): void
     {
+        $snapshot['id_attempt'] = $id;
         $this->rows[$id] = $snapshot;
     }
     public function findByAttempt(int $id): ?array
@@ -218,12 +219,12 @@ final class MemoryBankStatus implements \PrestaShop\Module\Unipayment\Order\Bank
 }
 
 $calculator = new Calculator('2026-08-17');
-$shop = calculatorFixture(['uni_eur' => 0]);
+$shop = calculatorFixture();
 $cart = new CartContext([new CartLine(new ProductContext(42, [7], 1050), 3, 2, 1000)], 1050, ['carrier_id' => 2, 'shipping_total' => '50.00']);
 $scheme = (new CartSchemeResolver($calculator))->resolve($shop, $cart)->standardSchemes[0];
 $calculation = $calculator->calculateScheme($shop, 1050, $scheme, 100);
 $request = new ValidatedPaymentRequest($calculation, ['first_name' => 'Ivan', 'last_name' => 'Ivanov', 'phone' => '+359888123', 'email' => 'ivan@example.com', 'egn' => '1990010199', 'phone2' => '+3592123'], [7], hash('sha256', 'cart'), [['id' => 7, 'name' => 'Terms', 'url' => 'https://example.com/terms', 'mandatory' => true]]);
-$created = new CreatedOrder(55, 'ABCD12345', 1050, 'BGN', 1, ['first_name' => 'Ivan', 'last_name' => 'Ivanov', 'phone' => '+359888123', 'email' => 'ivan@example.com'], ['invoice' => ['address1' => 'Sofia 1'], 'delivery' => ['address1' => 'Sofia 2']], [['id_product' => 42, 'id_product_attribute' => 3, 'name' => 'Product_Name', 'quantity' => 2, 'total' => 1000]]);
+$created = new CreatedOrder(55, 'ABCD12345', 1050, 'EUR', 1, ['first_name' => 'Ivan', 'last_name' => 'Ivanov', 'phone' => '+359888123', 'email' => 'ivan@example.com'], ['invoice' => ['address1' => 'Sofia 1'], 'delivery' => ['address1' => 'Sofia 2']], [['id_product' => 42, 'id_product_attribute' => 3, 'name' => 'Product_Name', 'quantity' => 2, 'total' => 1000]]);
 $attempts = new MemoryAttempts();
 $snapshots = new MemorySnapshots();
 $orders = new FakeOrders($created);
@@ -245,6 +246,82 @@ assertOrder(array_keys($cp->calls[0]) === ['order_id', 'name', 'phone', 'email',
 assertOrder($cp->calls[0]['products_id'] === '3' && $cp->calls[0]['products_name'] === 'Product-Name' && $cp->calls[0]['products_q'] === '2', 'Woo product formatting differs');
 
 assertOrder($orders->validateOrderCalls === 1, 'fresh flow must call validateOrder once');
+
+// A successful historical CP replay needs the frozen, complete EUR payload.
+$replayKey = '1:9:' . $request->cartFingerprint;
+$validReplayRow = $attempts->rows[$replayKey];
+$validPayload = json_decode((string) $validReplayRow['cp_payload'], true, 512, JSON_THROW_ON_ERROR);
+assertOrder($validPayload['currency'] === 'EUR', 'new CP payload must be EUR');
+(new \PrestaShop\Module\Unipayment\Order\OrderCurrencyGuard())->assertSavedCpPayload(
+    array_replace($validPayload, ['cp_future_extra' => 'allowed']), $snapshots->rows[1]
+);
+$invalidPayloads = [
+    null,
+    '',
+    '{',
+    '[]',
+    '{}',
+    json_encode(array_diff_key($validPayload, ['currency' => true]), JSON_THROW_ON_ERROR),
+    json_encode(array_replace($validPayload, ['currency' => 'BGN']), JSON_THROW_ON_ERROR),
+    json_encode(array_replace($validPayload, ['currency' => 'USD']), JSON_THROW_ON_ERROR),
+    json_encode(array_replace($validPayload, ['order_id' => 'OTHERORDER']), JSON_THROW_ON_ERROR),
+    json_encode(array_diff_key($validPayload, ['products_q' => true]), JSON_THROW_ON_ERROR),
+    json_encode(array_replace($validPayload, ['name' => []]), JSON_THROW_ON_ERROR),
+    json_encode(array_replace($validPayload, ['price' => '1050.00']), JSON_THROW_ON_ERROR),
+    json_encode(array_replace($validPayload, ['type_client' => []]), JSON_THROW_ON_ERROR),
+];
+foreach ($invalidPayloads as $invalidPayload) {
+    $attempts->rows[$replayKey]['cp_payload'] = $invalidPayload;
+    try {
+        $orchestrator->orchestrate(1, 9, $request, $shop);
+        assertOrder(false, 'invalid saved CP payload was replayed');
+    } catch (OrderOrchestrationException $e) {
+        assertOrder($e->isPostOrder() && !$e->isRetryable(), 'invalid CP replay must stay order-aware and closed');
+    }
+    assertOrder(count($cp->calls) === 1 && $orders->created === 1, 'invalid CP replay issued a new create');
+}
+$attempts->rows[$replayKey] = $validReplayRow;
+$validSnapshot = $snapshots->rows[1];
+foreach ([null, 0, -1, 902] as $badCpId) {
+    $attempts->rows[$replayKey] = array_replace($validReplayRow, ['control_panel_order_id' => $badCpId]);
+    try {
+        $orchestrator->orchestrate(1, 9, $request, $shop);
+        assertOrder(false, 'CP_CREATED replay accepted missing or mismatched CP ID');
+    } catch (OrderOrchestrationException $e) {
+        assertOrder($e->isPostOrder() && !$e->isRetryable(), 'invalid CP ID replay must remain order-aware and closed');
+    }
+    assertOrder(count($cp->calls) === 1 && $orders->created === 1, 'invalid CP ID replay caused a new create');
+}
+$attempts->rows[$replayKey] = $validReplayRow;
+$snapshots->rows[1] = array_replace($validSnapshot, ['control_panel_order_id' => 902]);
+try {
+    $orchestrator->orchestrate(1, 9, $request, $shop);
+    assertOrder(false, 'CP_CREATED replay accepted mismatched snapshot CP ID');
+} catch (OrderOrchestrationException $e) {
+    assertOrder($e->isPostOrder(), 'snapshot CP ID mismatch lost order identity');
+}
+assertOrder(count($cp->calls) === 1, 'snapshot CP ID mismatch caused a new CP create');
+$snapshots->rows[1] = $validSnapshot;
+foreach ([['currency_iso' => 'BGN'], ['currency_iso' => ''], ['id_currency' => 2]] as $badSnapshot) {
+    $snapshots->rows[1] = array_replace($validSnapshot, $badSnapshot);
+    try {
+        $orchestrator->orchestrate(1, 9, $request, $shop);
+        assertOrder(false, 'invalid durable snapshot was replayed');
+    } catch (OrderOrchestrationException $e) {
+        assertOrder($e->isPostOrder(), 'invalid snapshot replay lost order identity');
+    }
+    assertOrder(count($cp->calls) === 1, 'invalid snapshot replay issued CP HTTP');
+}
+$snapshots->rows[1] = $validSnapshot;
+$orders->order = new CreatedOrder(55, 'ABCD12345', 1050, 'BGN', 2, $created->customer, $created->addresses, $created->lines);
+try {
+    $orchestrator->orchestrate(1, 9, $request, $shop);
+    assertOrder(false, 'old native BGN order was replayed');
+} catch (OrderOrchestrationException $e) {
+    assertOrder($e->isPostOrder(), 'native BGN replay lost order identity');
+}
+assertOrder(count($cp->calls) === 1, 'native BGN replay issued CP HTTP');
+$orders->order = $created;
 
 // Crash window: reserved attempt, id_order NULL, PS order already exists on cart.
 $crashAttempts = new MemoryAttempts();
@@ -537,7 +614,7 @@ try {
 }
 assertOrder(count($echoCp->calls) === 1, 'echo mismatch replay createOrder count must remain 1');
 
-$badOrder = new CreatedOrder(56, 'BADTOTAL', 1049, 'BGN', 1, $created->customer, $created->addresses, $created->lines);
+$badOrder = new CreatedOrder(56, 'BADTOTAL', 1049, 'EUR', 1, $created->customer, $created->addresses, $created->lines);
 $badOrders = new FakeOrders($badOrder);
 $badCp = new FakeCp();
 $badFlow = new OrderOrchestrator(new MemoryAttempts(), new MemorySnapshots(), $badOrders, $badCp, new FinancingSnapshotFactory(new SensitiveDataCipher()), new ControlPanelOrderPayloadBuilder());
@@ -547,4 +624,19 @@ try {
 } catch (OrderOrchestrationException $e) {
 }
 assertOrder($badCp->calls === [] && $badOrders->failed === [], 'total mismatch reached CP or changed native order state');
+
+foreach ([['BGN', 2], ['', 1], ['EUR', 0]] as [$iso, $currencyId]) {
+    $nonEurOrder = new CreatedOrder(57, 'BADCURR', 1050, $iso, $currencyId, $created->customer, $created->addresses, $created->lines);
+    $nonEurOrders = new FakeOrders($nonEurOrder);
+    $nonEurCp = new FakeCp();
+    $nonEurFlow = new OrderOrchestrator(new MemoryAttempts(), new MemorySnapshots(), $nonEurOrders, $nonEurCp,
+        new FinancingSnapshotFactory(new SensitiveDataCipher()), new ControlPanelOrderPayloadBuilder());
+    try {
+        $nonEurFlow->orchestrate(3, 99, $request, $shop);
+        assertOrder(false, 'unexpected non-EUR native order accepted');
+    } catch (OrderOrchestrationException $e) {
+        assertOrder($e->isPostOrder() && $e->idOrder() === 57, 'native currency failure lost order identity');
+    }
+    assertOrder($nonEurCp->calls === [] && $nonEurOrders->created === 1, 'invalid native order triggered CP or duplicate order');
+}
 fwrite(STDOUT, "OK (Phase 10 order orchestration)\n");

@@ -44,7 +44,7 @@ assertCartAmount(
 $calculator = new Calculator('2026-08-17');
 $resolver = new CartSchemeResolver($calculator);
 $popup = new CartPopupCalculator($calculator, $resolver);
-$shop = calculatorFixture(['uni_eur' => 0]);
+$shop = calculatorFixture();
 
 // Vector: unit 100 × qty 1 → cart total 100 (single-line cart, no shipping in fixture)
 $cart100 = new CartContext([new CartLine(new ProductContext(1, [7], 100.0), 0, 1, 100.0)], 100.0);
@@ -52,7 +52,7 @@ $res100 = $resolver->resolve($shop, $cart100);
 assertCartAmount($res100->standardOffer !== null, 'qty1 cart total 100 must remain eligible');
 $scheme = $res100->standardSchemes[0];
 $key = ProductPopupSchemeList::key($scheme);
-$calc100 = $popup->calculate($shop, $cart100, 'BGN', 'standard', $scheme->type, $scheme->kopCode, $scheme->months, $scheme->filterId, $key, 0.0);
+$calc100 = $popup->calculate($shop, $cart100, 'EUR', 'standard', $scheme->type, $scheme->kopCode, $scheme->months, $scheme->filterId, $key, 0.0);
 assertCartAmount(($calc100['price'] ?? null) === 100.0, 'qty1 financing price must be cart total 100');
 
 // Vector: unit 100 × qty 3 → cart total 300 (not unit 100)
@@ -61,7 +61,7 @@ $res300 = $resolver->resolve($shop, $cart300);
 assertCartAmount($res300->standardOffer !== null, 'qty3 cart total 300 must remain eligible');
 $scheme300 = $res300->standardSchemes[0];
 $key300 = ProductPopupSchemeList::key($scheme300);
-$calc300 = $popup->calculate($shop, $cart300, 'BGN', 'standard', $scheme300->type, $scheme300->kopCode, $scheme300->months, $scheme300->filterId, $key300, 0.0);
+$calc300 = $popup->calculate($shop, $cart300, 'EUR', 'standard', $scheme300->type, $scheme300->kopCode, $scheme300->months, $scheme300->filterId, $key300, 0.0);
 assertCartAmount(($calc300['price'] ?? null) === 300.0, 'qty3 financing price must be cart total 300, not unit 100');
 assertCartAmount(($calc300['monthly_installment'] ?? 0) > ($calc100['monthly_installment'] ?? 0), 'qty3 installment must exceed qty1');
 

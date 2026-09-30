@@ -141,6 +141,18 @@ final class OrderAttemptRepository implements OrderAttemptStoreInterface
         return is_array($row) ? $row : null;
     }
 
+    public function findById(int $attemptId): ?array
+    {
+        if ($attemptId <= 0) {
+            return null;
+        }
+        $row = $this->database->getRow(
+            'SELECT * FROM `' . _DB_PREFIX_ . self::TABLE . '` WHERE `id_attempt`=' . (int) $attemptId
+        );
+
+        return is_array($row) ? $row : null;
+    }
+
     /** @return array<string, mixed> */
     private function requireById(int $attemptId): array
     {

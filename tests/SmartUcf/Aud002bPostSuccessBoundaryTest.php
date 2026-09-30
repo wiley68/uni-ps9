@@ -12,6 +12,7 @@ if (PHP_SAPI !== 'cli') {
 
 $root = dirname(__DIR__, 2);
 require $root . '/vendor/autoload.php';
+require dirname(__DIR__) . '/Support/EurOrderCurrencyGuardFixture.php';
 
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfCoordinationResult;
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfFailureClassification;
@@ -180,7 +181,9 @@ function aud002bCoordinatorWith(Aud002bMemoryLifecycle $lifecycle, Aud002bFakeSe
     $props = [
         'lifecycle' => $lifecycle,
         'client' => $gateway,
-        'payloadBuilder' => new \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfPayloadBuilder(),
+        'payloadBuilder' => new \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfPayloadBuilder(eurTestOrderCurrencyGuard()),
+        'currencyGuard' => eurTestOrderCurrencyGuard(),
+        'cpSuccessVerifier' => eurTestCpSuccessVerifier(),
         'classifier' => new SmartUcfFailureClassifier(),
         'snapshots' => null,
         'cpClient' => null,
@@ -204,6 +207,7 @@ $snapshot = [
     'id_order' => 42,
     'order_reference' => 'POSTSUCC42',
     'currency_iso' => 'EUR',
+    'id_currency' => 1,
     'kop_code' => 'X',
     'order_total' => 100,
     'first_installment' => 0,
@@ -214,7 +218,6 @@ $snapshot = [
     'address_json' => ['address1' => 'Addr', 'city' => 'Sofia', 'postcode' => '1000'],
 ];
 $shop = [
-    '_currency_iso' => 'EUR',
     'uni_user' => 'demo-user',
     'uni_password' => 'demo-secret-password',
     'uni_sertificat' => 0,
@@ -277,6 +280,14 @@ assertPostSuccess($result3b->isCreated(), '3 replay: created');
 assertPostSuccess($result3b->redirectUrl() === $result3->redirectUrl(), '3 replay: same redirect');
 assertPostSuccess($gateway3->createCalls === 1, '3 replay: no second createSession');
 
+foreach ([['currency_iso' => 'BGN'], ['currency_iso' => ''], ['id_currency' => 2]] as $badCurrency) {
+    $badReplay = $coord3->run(42, $shop, false, array_replace($snapshot, $badCurrency));
+    assertPostSuccess($badReplay->isFailed() && !$badReplay->isCreated(), 'invalid EUR provenance replayed SmartUCF redirect');
+    $badP2 = $coord3->run(42, $shop, true, array_replace($snapshot, $badCurrency));
+    assertPostSuccess($badP2->isFailed(), 'invalid EUR provenance entered Process 2');
+}
+assertPostSuccess($gateway3->createCalls === 1, 'invalid replay must not send a new SmartUCF session');
+
 // 4) Timeout / outcome_unknown path remains non-retryable (classifier + coordinator)
 $classifier = new SmartUcfFailureClassifier();
 $timeout = $classifier->classify(new SmartUcfSessionException(
@@ -330,6 +341,70 @@ $gateway5->throwOnCreate = null;
 $result5b = $coord5->run(42, $shop, false, $snapshot);
 assertPostSuccess($result5b->isCreated(), '5: safe retry after pre-send can create');
 assertPostSuccess($gateway5->createCalls === 2, '5: second createSession only after retryable failed');
+
+// EUR-PS9-004 — direct coordinator rejects an unproven CP result before replay, claim or send.
+$cpPayload = [
+    'order_id' => 'POSTSUCC42', 'name' => 'Buyer', 'phone' => '', 'email' => '',
+    'address' => '', 'address2' => '', 'price' => 100.0, 'vnoska' => 10.0,
+    'gpr' => 1.0, 'vnoski' => 12, 'parva' => 0.0, 'products_id' => '1',
+    'products_name' => 'Item', 'products_q' => '1', 'type_client' => 1,
+    'currency' => 'EUR', 'version' => '2.0.3',
+];
+$cpSnapshot = array_replace($snapshot, ['control_panel_order_id' => 901, 'lifecycle_status' => 'cp_created']);
+$cpAttempt = [
+    'id_attempt' => 42, 'id_order' => 42, 'state' => 'cp_created',
+    'control_panel_order_id' => 901,
+    'cp_payload' => json_encode($cpPayload, JSON_THROW_ON_ERROR),
+];
+$cpGuard = new \PrestaShop\Module\Unipayment\Order\ControlPanelSuccessReplayGuard(
+    eurTestOrderCurrencyGuard(),
+    static function (int $attemptId) use (&$cpAttempt): ?array {
+        return $attemptId === 42 ? $cpAttempt : null;
+    }
+);
+$cpLife = new Aud002bMemoryLifecycle($baseRow);
+$cpGateway = new Aud002bFakeSessionGateway();
+$cpCoord = aud002bCoordinatorWith($cpLife, $cpGateway);
+$cpProp = (new ReflectionClass(SmartUcfSessionCoordinator::class))->getProperty('cpSuccessVerifier');
+$cpProp->setAccessible(true);
+$cpProp->setValue($cpCoord, static function (int $attemptId, array $row) use ($cpGuard): void {
+    $cpGuard->assertAttempt($attemptId, $row);
+});
+assertPostSuccess($cpCoord->run(42, $shop, true, $cpSnapshot)->kind() === SmartUcfCoordinationResult::KIND_PROCESS2,
+    'EUR: proven CP success permits Process 2');
+foreach ([
+    ['state' => 'cp_outcome_unknown'],
+    ['control_panel_order_id' => 0],
+    ['control_panel_order_id' => 902],
+] as $badCp) {
+    $cpAttempt = array_replace($cpAttempt, $badCp);
+    foreach ([true, false] as $process2) {
+        $blocked = $cpCoord->run(42, $shop, $process2, $cpSnapshot);
+        assertPostSuccess($blocked->isFailed() && !$blocked->isRetryable(),
+            'EUR: invalid CP result blocks SmartUCF continuation');
+    }
+    assertPostSuccess($cpLife->createSessionAuthorizedClaims === 0 && $cpGateway->createCalls === 0,
+        'EUR: invalid CP result makes no claim and sends no session request');
+    assertPostSuccess($cpLife->row === $baseRow, 'EUR: invalid CP result does not repair journal');
+    $cpAttempt['state'] = 'cp_created';
+    $cpAttempt['control_panel_order_id'] = 901;
+}
+$cpSnapshot['control_panel_order_id'] = 902;
+assertPostSuccess($cpCoord->run(42, $shop, false, $cpSnapshot)->isFailed(),
+    'EUR: mismatched snapshot CP ID blocks SmartUCF');
+$cpSnapshot['control_panel_order_id'] = 901;
+$cpLife->row = array_replace($baseRow, [
+    'smartucf_state' => SmartUcfLifecycleStates::CREATED,
+    'smartucf_session_id' => 'remote-sess-1',
+    'smartucf_redirect_url' => $cpGateway->session['redirect_url'],
+]);
+assertPostSuccess($cpCoord->run(42, $shop, false, $cpSnapshot)->isCreated(),
+    'EUR: proven CP success permits existing SmartUCF replay');
+$cpAttempt['state'] = 'cp_outcome_unknown';
+assertPostSuccess($cpCoord->run(42, $shop, false, $cpSnapshot)->isFailed(),
+    'EUR: CP outcome unknown cannot expose existing SmartUCF redirect');
+assertPostSuccess($cpGateway->createCalls === 0 && $cpLife->createSessionAuthorizedClaims === 0,
+    'EUR: replay proof never triggers a new SmartUCF send');
 
 // Classifier must not be used for post-success local throw classification path in coordinator source
 $coordSrc = (string) file_get_contents($root . '/src/SmartUcf/SmartUcfSessionCoordinator.php');

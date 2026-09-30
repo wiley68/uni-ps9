@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PrestaShop\Module\Unipayment\Cart;
 
 use PrestaShop\Module\Unipayment\Calculator\ProductContext;
+use PrestaShop\Module\Unipayment\Calculator\CartCurrencyGuard;
 
 /**
  * Builds authoritative cart financing context from PrestaShop Cart.
@@ -19,6 +20,9 @@ final class CartContextFactory
 {
     public function create(\Cart $cart): CartContext
     {
+        if ((new CartCurrencyGuard())->supportedIso($cart, \Context::getContext()) !== 'EUR') {
+            throw new \InvalidArgumentException('The cart currency must be EUR and match the active context.');
+        }
         $products = $cart->getProducts(true);
         $total = $this->payableTotal($cart);
 
@@ -27,6 +31,9 @@ final class CartContextFactory
 
     public function createForCheckout(\Cart $cart): CartContext
     {
+        if ((new CartCurrencyGuard())->supportedIso($cart, \Context::getContext()) !== 'EUR') {
+            throw new \InvalidArgumentException('The cart currency must be EUR and match the active context.');
+        }
         $products = $cart->getProducts(true);
         $total = $this->payableTotal($cart);
         $rules = [];

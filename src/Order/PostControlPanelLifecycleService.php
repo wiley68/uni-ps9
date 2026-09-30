@@ -34,6 +34,9 @@ final class PostControlPanelLifecycleService
 
     /** @var ControlPanelStatusSyncService */
     private $statusSync;
+    private OrderCurrencyGuard $currencyGuard;
+    /** @var callable */
+    private $cpSuccessVerifier;
 
     public function __construct(
         ?FinancingSnapshotStoreInterface $snapshots = null,
@@ -41,9 +44,17 @@ final class PostControlPanelLifecycleService
         ?BankStatusPersistencePort $bankStatus = null,
         ?SmartUcfEndpointPolicy $endpointPolicy = null,
         ?ControlPanelOrderClientInterface $cpClient = null,
-        ?ControlPanelStatusSyncService $statusSync = null
+        ?ControlPanelStatusSyncService $statusSync = null,
+        ?OrderCurrencyGuard $currencyGuard = null,
+        ?callable $cpSuccessVerifier = null
     ) {
         $this->snapshots = $snapshots ?? new FinancingSnapshotRepository();
+        $this->currencyGuard = $currencyGuard ?? new OrderCurrencyGuard();
+        $this->cpSuccessVerifier = $cpSuccessVerifier ?? static function (
+            int $attemptId, array $snapshot, ?int $cpId
+        ): void {
+            (new ControlPanelSuccessReplayGuard())->assertAttempt($attemptId, $snapshot, $cpId);
+        };
         $this->mailDispatcher = $mailDispatcher ?? new FinancingOrderMailDispatcher();
         $this->bankStatus = $bankStatus ?? new OrderBankStatusRepository();
         $this->endpointPolicy = $endpointPolicy ?? new SmartUcfEndpointPolicy();
@@ -95,6 +106,14 @@ final class PostControlPanelLifecycleService
 
             return PostControlPanelLifecycleResult::snapshotMissing();
         }
+        $this->currencyGuard->assertNativeSnapshot($snapshot);
+        if ((int) ($snapshot['id_order'] ?? 0) !== $order->idOrder) {
+            throw new \RuntimeException('The financing snapshot does not match the created order.');
+        }
+        if ($order->state !== OrderOrchestrator::CP_CREATED || $order->controlPanelOrderId <= 0) {
+            throw new \RuntimeException('The successful Control Panel create cannot be proven.');
+        }
+        ($this->cpSuccessVerifier)($order->attemptId, $snapshot, $order->controlPanelOrderId);
 
         $process2 = ShopConfigurationFlags::isProcess2($shop);
         $finalStatus = BankStatus::successfulSend($process2);
@@ -119,7 +138,6 @@ final class PostControlPanelLifecycleService
         // Opportunistic retry of a previously pending P1 CP status sync before/alongside SmartUCF resume.
         $this->statusSync->retryPending($order->attemptId, $order->orderReference);
 
-        $shop['_currency_iso'] = $context->currencyIso;
         $smart = $context->resumeSmartUcf
             ? $smartUcfCoordinator->resume($order->attemptId, $shop, false)
             : $smartUcfCoordinator->run($order->attemptId, $shop, false, $snapshot);

@@ -31,7 +31,7 @@ final class ProductCalculatorPresenter
     /** @param array<string, mixed> $shop @return array<string, mixed>|null */
     public function present(array $shop, ProductContext $product, string $currencyIso): ?array
     {
-        if (!$this->currencyGate->supports($shop, $currencyIso)) {
+        if (!$this->currencyGate->supports($currencyIso)) {
             return null;
         }
 
@@ -79,8 +79,7 @@ final class ProductCalculatorPresenter
                 'monthly_installment' => $preferred[$type]->monthlyInstallment,
                 'installment_label' => (new InstallmentLabelFormatter())->format(
                     $preferred[$type]->months,
-                    $preferred[$type]->monthlyInstallment,
-                    (int) ($shop['uni_eur'] ?? 0)
+                    $preferred[$type]->monthlyInstallment
                 ),
                 'schemes' => $schemes,
             ];

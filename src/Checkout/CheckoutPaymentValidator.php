@@ -42,7 +42,7 @@ final class CheckoutPaymentValidator
     /** @param array<string, mixed> $shop @param array<string, mixed> $posted @param array<string, mixed> $customer */
     public function validate(array $shop, CartContext $cart, string $currencyIso, array $posted, array $customer): ValidatedPaymentRequest
     {
-        if (!$this->currencyGate->supports($shop, $currencyIso)) {
+        if (!$this->currencyGate->supports($currencyIso)) {
             throw new CheckoutValidationException('This payment method is unavailable for the selected currency.');
         }
         $fingerprint = $this->snapshot->fingerprint($cart, $currencyIso);

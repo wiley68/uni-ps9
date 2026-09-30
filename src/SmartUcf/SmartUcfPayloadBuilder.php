@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace PrestaShop\Module\Unipayment\SmartUcf;
 
+use PrestaShop\Module\Unipayment\Order\OrderCurrencyGuard;
+
 /**
  * Builds the JSON payload for SmartUCF sucfOnlineSessionStart.
  * Field mapping follows the Woo reference (class-gateway.php lines 929-944).
  */
 final class SmartUcfPayloadBuilder
 {
+    private OrderCurrencyGuard $currencyGuard;
+
+    public function __construct(?OrderCurrencyGuard $currencyGuard = null)
+    {
+        $this->currencyGuard = $currencyGuard ?? new OrderCurrencyGuard();
+    }
     /**
      * @param array<string, mixed> $shop     Cached shop configuration
      * @param array<string, mixed> $snapshot Financing snapshot row
@@ -17,6 +25,7 @@ final class SmartUcfPayloadBuilder
      */
     public function build(array $shop, array $snapshot): array
     {
+        $this->currencyGuard->assertNativeSnapshot($snapshot);
         $customer = is_array($snapshot['customer_json'] ?? null) ? $snapshot['customer_json'] : [];
         $lines = is_array($snapshot['lines_json'] ?? null) ? $snapshot['lines_json'] : [];
         $addresses = is_array($snapshot['address_json'] ?? null) ? $snapshot['address_json'] : [];
@@ -41,11 +50,11 @@ final class SmartUcfPayloadBuilder
             'clientEmail' => $this->clean((string) ($customer['email'] ?? '')),
             'clientDeliveryAddress' => $this->clean($deliveryAddress),
             'onlineProductCode' => (string) $snapshot['kop_code'],
-            'totalPrice' => $this->formatAmount((float) $snapshot['order_total'], $shop),
-            'initialPayment' => $this->formatAmount((float) $snapshot['first_installment'], $shop),
+            'totalPrice' => $this->formatAmount((float) $snapshot['order_total']),
+            'initialPayment' => $this->formatAmount((float) $snapshot['first_installment']),
             'installmentCount' => (int) $snapshot['months'],
-            'monthlyPayment' => $this->formatAmount((float) $snapshot['monthly_installment'], $shop),
-            'items' => $this->buildItems($lines, $shop),
+            'monthlyPayment' => $this->formatAmount((float) $snapshot['monthly_installment']),
+            'items' => $this->buildItems($lines),
         ];
 
         if ($payload['user'] === '' || $payload['pass'] === '') {
@@ -57,10 +66,9 @@ final class SmartUcfPayloadBuilder
 
     /**
      * @param array<int, array<string, mixed>> $lines
-     * @param array<string, mixed> $shop
      * @return array<int, array<string, mixed>>
      */
-    private function buildItems(array $lines, array $shop): array
+    private function buildItems(array $lines): array
     {
         $items = [];
         foreach ($lines as $line) {
@@ -72,10 +80,9 @@ final class SmartUcfPayloadBuilder
                 'code' => (int) ($line['id_product'] ?? 0),
                 'type' => 0,
                 'count' => max(1, (int) ($line['quantity'] ?? 1)),
-                'singlePrice' => $this->convertUnitPrice(
-                    (float) ($line['total'] ?? 0),
-                    max(1, (int) ($line['quantity'] ?? 1)),
-                    $shop
+                'singlePrice' => number_format(
+                    abs((float) ($line['total'] ?? 0) / max(1, (int) ($line['quantity'] ?? 1))),
+                    2, '.', ''
                 ),
             ];
         }
@@ -83,28 +90,7 @@ final class SmartUcfPayloadBuilder
         return $items;
     }
 
-    /**
-     * Currency conversion matching Woo reference (lines 855-869).
-     * uni_eur: 0 = BGN only, 1 = BGN+EUR display (bank works in BGN),
-     *          2 = EUR+BGN display (bank works in EUR), 3 = EUR only
-     */
-    private function convertUnitPrice(float $lineTotal, int $quantity, array $shop): string
-    {
-        $unitPrice = $lineTotal / $quantity;
-        $uniEur = (int) ($shop['uni_eur'] ?? 0);
-        $currencyIso = (string) ($shop['_currency_iso'] ?? 'BGN');
-
-        if ($uniEur === 1 && strtoupper($currencyIso) === 'EUR') {
-            $unitPrice = $unitPrice * 1.95583;
-        } elseif (in_array($uniEur, [2, 3], true) && strtoupper($currencyIso) === 'BGN') {
-            $unitPrice = $unitPrice / 1.95583;
-        }
-
-        return number_format(abs($unitPrice), 2, '.', '');
-    }
-
-    /** @param array<string, mixed> $shop */
-    private function formatAmount(float $amount, array $shop): string
+    private function formatAmount(float $amount): string
     {
         return number_format(abs($amount), 2, '.', '');
     }

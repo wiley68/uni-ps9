@@ -44,7 +44,7 @@ final class CheckoutPaymentCalculator
      */
     public function calculate(array $shop, CartContext $cart, string $currencyIso, array $posted): array
     {
-        if (!$this->currencyGate->supports($shop, $currencyIso)) {
+        if (!$this->currencyGate->supports($currencyIso)) {
             throw new UnavailableSchemeException('The selected financing scheme is unavailable.');
         }
         $selection = SchemeSelection::fromPosted($posted);
@@ -76,10 +76,10 @@ final class CheckoutPaymentCalculator
             'total_payable' => $result->totalPayable,
             'glp' => $result->glp,
             'gpr' => $result->gpr,
-            'price_display' => $this->amounts->format($result->price, $shop),
-            'financed_amount_display' => $this->amounts->format($result->financedAmount, $shop),
-            'monthly_installment_display' => $this->amounts->format($result->monthlyInstallment, $shop),
-            'total_payable_display' => $this->amounts->format($result->totalPayable, $shop),
+            'price_display' => $this->amounts->format($result->price),
+            'financed_amount_display' => $this->amounts->format($result->financedAmount),
+            'monthly_installment_display' => $this->amounts->format($result->monthlyInstallment),
+            'total_payable_display' => $this->amounts->format($result->totalPayable),
             'glp_display' => number_format(abs($result->glp), 2, '.', ''),
             'gpr_display' => number_format(abs($result->gpr), 2, '.', ''),
         ];

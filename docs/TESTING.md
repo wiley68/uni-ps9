@@ -11,6 +11,14 @@ UniPayment CLI tests run against the module checkout in the PrestaShop test shop
 | Production PHP baseline | **8.1**            |
 | Supported CLI matrix    | PHP **8.1–8.5**    |
 
+## EUR-only regression gate
+
+`tests/Calculator/EurCurrencyGuardsTest.php` covers ISO normalization and cart/context currency ID and ISO coherence. Snapshot validation tests confirm `uni_eur` is optional and opaque. `tests/Order/OrderOrchestratorTest.php` exercises new EUR CP create and rejects incomplete, malformed, non-EUR or mismatched frozen CP payloads without another HTTP call. `tests/Order/EurPopupReplayTest.php` exercises durable provenance for both product and cart popup replay. The SmartUCF boundary tests cover invalid snapshot replay and Process 2; the checkout lock-loser test rejects old non-EUR or missing durable evidence before exposing a stored redirect.
+
+EUR-PS9-004 coverage also checks positive and inconsistent CP state/ID combinations in the orchestrator, both popup replay paths, checkout lock-loser recovery, direct post-CP lifecycle and direct SmartUCF coordination. The lock-loser negative cases each restore a known-valid snapshot before changing one cause; invalid replay tests assert no extra CP/SmartUCF request, journal claim or durable rewrite.
+
+Run `composer test`, `node tests/Product/ProductCalculatorJsTest.js`, PHP syntax checks for changed PHP files, JS syntax checks, and `git diff --check`. The safe suite uses test doubles and does not create live shop orders or call external financing endpoints.
+
 ## Automated checks
 
 Safe default:

@@ -238,7 +238,7 @@ final class Aud019Cp implements ControlPanelOrderClientInterface
 }
 
 $calculator = new Calculator('2026-08-17');
-$shop = calculatorFixture(['uni_eur' => 0]);
+$shop = calculatorFixture();
 $cart = new CartContext([new CartLine(new ProductContext(42, [7], 1050), 3, 2, 1000)], 1050, ['carrier_id' => 2, 'shipping_total' => '50.00']);
 $scheme = (new CartSchemeResolver($calculator))->resolve($shop, $cart)->standardSchemes[0];
 $calculation = $calculator->calculateScheme($shop, 1050, $scheme, 100);
@@ -253,7 +253,7 @@ $created = new CreatedOrder(
     55,
     'AUD019ORD01',
     1050,
-    'BGN',
+    'EUR',
     1,
     ['first_name' => 'Ivan', 'last_name' => 'Ivanov', 'phone' => '+359888123', 'email' => 'ivan@example.com'],
     ['invoice' => ['address1' => 'Sofia 1'], 'delivery' => ['address1' => 'Sofia 2']],

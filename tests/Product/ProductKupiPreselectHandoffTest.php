@@ -107,7 +107,7 @@ $productCart = new CartContext(
     199.99,
     []
 );
-$linesFp = $snapshot->linesFingerprint($productCart, 'BGN');
+$linesFp = $snapshot->linesFingerprint($productCart, 'EUR');
 
 $preference = [
     'product_id' => 42,
@@ -147,8 +147,8 @@ $checkoutCart = new CartContext(
         'cart_rules' => [],
     ]
 );
-$fullFp = $snapshot->fingerprint($checkoutCart, 'BGN');
-$linesAtCheckout = $snapshot->linesFingerprint($checkoutCart, 'BGN');
+$fullFp = $snapshot->fingerprint($checkoutCart, 'EUR');
+$linesAtCheckout = $snapshot->linesFingerprint($checkoutCart, 'EUR');
 assertKupiPreselect($linesAtCheckout === $linesFp, 'lines fingerprint ignores shipping/total');
 
 $bound = $store->load($cookie, 9001, 0, $fullFp, $linesAtCheckout);
@@ -169,8 +169,8 @@ assertKupiPreselect(
         $cookie,
         9001,
         0,
-        $snapshot->fingerprint($driftCart, 'BGN'),
-        $snapshot->linesFingerprint($driftCart, 'BGN')
+        $snapshot->fingerprint($driftCart, 'EUR'),
+        $snapshot->linesFingerprint($driftCart, 'EUR')
     ) === null,
     'material quantity drift after binding rejects preference'
 );

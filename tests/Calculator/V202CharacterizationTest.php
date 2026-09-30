@@ -93,7 +93,7 @@ $checkout = new CheckoutPaymentPresenter(
     new ConsentResolver()
 );
 $cart = new CartContext([new CartLine($product, 0, 1, 1000)], 1000);
-$view = $checkout->present(true, $shop, $cart, 'BGN');
+$view = $checkout->present(true, $shop, $cart, 'EUR');
 assertChar(is_array($view), 'checkout view present');
 assertChar(array_key_exists('preference_unresolved', $view), 'PS9 preference_unresolved field present');
 assertChar($view['preference_unresolved'] === false, 'no preference → preference_unresolved false');
@@ -115,7 +115,7 @@ foreach ($view['schemes'] as $scheme) {
     }
 }
 assertChar($short !== null, 'fixture exposes shorter standard scheme');
-$pref = $checkout->present(true, $shop, $cart, 'BGN', [
+$pref = $checkout->present(true, $shop, $cart, 'EUR', [
     'scheme_type' => $short['scheme_type'],
     'kop_code' => $short['kop_code'],
     'months' => $short['months'],
@@ -134,7 +134,7 @@ $resolved = CheckoutSchemeIdentity::resolve($view['schemes'], [
 ]);
 assertChar($resolved !== null && $resolved['key'] === $short['key'], 'CheckoutSchemeIdentity exact match');
 
-$invalid = $checkout->present(true, $shop, $cart, 'BGN', [
+$invalid = $checkout->present(true, $shop, $cart, 'EUR', [
     'scheme_type' => 'standard',
     'kop_code' => 'NO_SUCH_KOP',
     'months' => 99,

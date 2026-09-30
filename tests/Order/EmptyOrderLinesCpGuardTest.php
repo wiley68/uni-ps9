@@ -172,7 +172,7 @@ final class EmptyLinesCp implements ControlPanelOrderClientInterface
 }
 
 $calculator = new Calculator('2026-08-17');
-$shop = calculatorFixture(['uni_eur' => 0]);
+$shop = calculatorFixture();
 $cart = new CartContext([new CartLine(new ProductContext(42, [7], 555.46), 0, 1, 555.46)], 555.46, ['carrier_id' => 2, 'shipping_total' => '0.00']);
 $scheme = (new CartSchemeResolver($calculator))->resolve($shop, $cart)->standardSchemes[0];
 $calculation = $calculator->calculateScheme($shop, 555.46, $scheme, 0.0);

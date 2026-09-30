@@ -52,7 +52,7 @@ final class CartPopupCalculator
         float $firstInstallment
     ): array {
         $allowedTypes = $popupType === 'standard' ? ['standard', 'promo'] : ($popupType === 'promo' ? ['promo'] : []);
-        if (!$this->currencyGate->supports($shop, $currencyIso) || !in_array($schemeType, $allowedTypes, true)) {
+        if (!$this->currencyGate->supports($currencyIso) || !in_array($schemeType, $allowedTypes, true)) {
             throw new UnavailableSchemeException('The selected financing scheme is unavailable.');
         }
 
@@ -135,6 +135,6 @@ final class CartPopupCalculator
     /** @param array<string, mixed> $shop @return array{primary:string,secondary:string,dual:bool} */
     private function amountDisplay(float $amount, array $shop): array
     {
-        return $this->amounts->format($amount, $shop);
+        return $this->amounts->format($amount);
     }
 }

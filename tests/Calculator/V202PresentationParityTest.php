@@ -156,7 +156,7 @@ assertV202(
 );
 
 // Test 5: multiple 0% → longest
-$viewZeros = $checkout->present(true, calculatorFixture(), new CartContext([v202Line(42, 1000)], 1000), 'BGN');
+$viewZeros = $checkout->present(true, calculatorFixture(), new CartContext([v202Line(42, 1000)], 1000), 'EUR');
 $zeros = array_values(array_filter($viewZeros['schemes'], static function (array $s): bool {
     return !empty($s['zero_interest']);
 }));
@@ -251,7 +251,7 @@ $noZeroShop = calculatorFixture([
 foreach ([6, 12, 18] as $m) {
     $noZeroShop['uni_meseci_' . $m] = 1;
 }
-$noZeroView = $checkout->present(true, $noZeroShop, new CartContext([v202Line(1, 1000)], 1000), 'BGN');
+$noZeroView = $checkout->present(true, $noZeroShop, new CartContext([v202Line(1, 1000)], 1000), 'EUR');
 assertV202(is_array($noZeroView), '7: checkout without 0% renders');
 $nzDefaults = array_values(array_filter($noZeroView['schemes'], static function (array $s): bool {
     return ($s['presentation_category'] ?? '') === SchemePresentationCategory::NONZERO_PROMO;
@@ -265,7 +265,7 @@ assertV202($noZeroView['default_scheme_key'] === $maxNz . ':2' || $noZeroView['d
 // Test 8 covered by test 5.
 
 // Test 9: valid explicit preference beats longer 0%
-$baseView = $checkout->present(true, calculatorFixture(), new CartContext([v202Line(42, 1000)], 1000), 'BGN');
+$baseView = $checkout->present(true, calculatorFixture(), new CartContext([v202Line(42, 1000)], 1000), 'EUR');
 $short = null;
 foreach ($baseView['schemes'] as $scheme) {
     if ($scheme['scheme_type'] === 'standard' && (int) $scheme['months'] === 6) {
@@ -274,7 +274,7 @@ foreach ($baseView['schemes'] as $scheme) {
     }
 }
 assertV202($short !== null, '9: shorter standard exists');
-$prefView = $checkout->present(true, calculatorFixture(), new CartContext([v202Line(42, 1000)], 1000), 'BGN', [
+$prefView = $checkout->present(true, calculatorFixture(), new CartContext([v202Line(42, 1000)], 1000), 'EUR', [
     'scheme_type' => $short['scheme_type'],
     'kop_code' => $short['kop_code'],
     'months' => $short['months'],
@@ -288,7 +288,7 @@ assertV202(
     '9 PS9: valid preference keeps preference_unresolved false'
 );
 
-$invalidPref = $checkout->present(true, calculatorFixture(), new CartContext([v202Line(42, 1000)], 1000), 'BGN', [
+$invalidPref = $checkout->present(true, calculatorFixture(), new CartContext([v202Line(42, 1000)], 1000), 'EUR', [
     'scheme_type' => 'standard',
     'kop_code' => 'MISSING',
     'months' => 99,
@@ -349,16 +349,16 @@ assertV202(
         && $resolver->unifiedSchemes($orderB, $conflictShop) === [],
     '13: Checkout calculable membership excludes ambiguous scheme in both orders'
 );
-$popupAB = $cartPresenter->present($conflictShop, $cartAB, 'BGN');
-$popupBA = $cartPresenter->present($conflictShop, $cartBA, 'BGN');
+$popupAB = $cartPresenter->present($conflictShop, $cartAB, 'EUR');
+$popupBA = $cartPresenter->present($conflictShop, $cartBA, 'EUR');
 assertV202($popupAB === null && $popupBA === null, '13: Cart popup presentable membership excludes ambiguous-only cart');
-$checkoutAB = $checkout->present(true, $conflictShop, $cartAB, 'BGN');
-$checkoutBA = $checkout->present(true, $conflictShop, $cartBA, 'BGN');
+$checkoutAB = $checkout->present(true, $conflictShop, $cartAB, 'EUR');
+$checkoutBA = $checkout->present(true, $conflictShop, $cartBA, 'EUR');
 assertV202($checkoutAB === null && $checkoutBA === null, '13: Checkout presentable membership identical (unsupported) for both orders');
 $calcFailedAB = false;
 $calcFailedBA = false;
 try {
-    $checkoutCalc->calculate($conflictShop, $cartAB, 'BGN', [
+    $checkoutCalc->calculate($conflictShop, $cartAB, 'EUR', [
         'scheme_key' => '12:61',
         'kop_code' => 'CAT',
         'first_installment' => 0,
@@ -367,7 +367,7 @@ try {
     $calcFailedAB = true;
 }
 try {
-    $checkoutCalc->calculate($conflictShop, $cartBA, 'BGN', [
+    $checkoutCalc->calculate($conflictShop, $cartBA, 'EUR', [
         'scheme_key' => '12:62',
         'kop_code' => 'CAT',
         'first_installment' => 0,
@@ -459,7 +459,7 @@ assertV202(
     'F1: standard button chooses standard or non-zero promo'
 );
 assertV202($zeroRes->promoOffer !== null && $zeroRes->promoOffer->kopCode === 'ZERO', 'F1: dedicated 0% promo button unchanged');
-$zeroCheckout = $checkout->present(true, $zeroStdShop, $zeroCart, 'BGN');
+$zeroCheckout = $checkout->present(true, $zeroStdShop, $zeroCart, 'EUR');
 assertV202(is_array($zeroCheckout), 'F1: checkout still lists 0% membership');
 $zeroKeys = array_column($zeroCheckout['schemes'], 'kop_code');
 assertV202(in_array('ZERO', $zeroKeys, true), 'F1: 0% remains in Checkout membership');

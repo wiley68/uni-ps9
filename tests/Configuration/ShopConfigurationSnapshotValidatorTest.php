@@ -26,6 +26,11 @@ $unicid = '123e4567-e89b-12d3-a456-426614174000';
 
 $validator->validate(unipayment_valid_shop_snapshot());
 $validator->validate(unipayment_valid_shop_snapshot(['uni_proces' => 1]));
+$withoutCurrencyMode = unipayment_valid_shop_snapshot();
+$validator->validate($withoutCurrencyMode);
+foreach ([0, 1, 2, 3, 9, 'obsolete'] as $historicalMode) {
+    $validator->validate(unipayment_valid_shop_snapshot(['uni_eur' => $historicalMode]));
+}
 
 try {
     $validator->validate(unipayment_valid_shop_snapshot(['unicid' => '00000000-0000-0000-0000-000000000099']), $unicid);

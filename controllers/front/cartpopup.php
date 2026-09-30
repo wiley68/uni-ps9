@@ -15,6 +15,7 @@ use PrestaShop\Module\Unipayment\Order\FinancingSnapshotFactory;
 use PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository;
 use PrestaShop\Module\Unipayment\Order\NativePrestaShopOrderGateway;
 use PrestaShop\Module\Unipayment\Order\OrderAttemptRepository;
+use PrestaShop\Module\Unipayment\Order\PopupOrderReplayCurrencyGuard;
 use PrestaShop\Module\Unipayment\Order\OrderConfirmationUrlBuilder;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrationException;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrationResult;
@@ -525,6 +526,7 @@ final class UnipaymentCartPopupModuleFrontController extends ModuleFrontControll
         Unipayment $module,
         ControlPanelOrderClientAdapter $cpClient
     ): array {
+        (new PopupOrderReplayCurrencyGuard())->assertReplay($row, (int) $this->context->shop->id);
         $response = [
             'success' => true,
             'step' => 'order_created',

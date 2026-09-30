@@ -11,6 +11,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
+require dirname(__DIR__) . '/Support/EurOrderCurrencyGuardFixture.php';
 
 use PrestaShop\Module\Unipayment\Checkout\CheckoutLockLoserRecovery;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
@@ -184,18 +185,32 @@ $recoveryD = new CheckoutLockLoserRecovery(
         unset($idCart);
 
         return 55;
-    }
+    },
+    eurTestOrderCurrencyGuard()
 );
 $resolvedD = $recoveryD->resolve(1, 9);
-assertDbl($resolvedD['kind'] === CheckoutLockLoserRecovery::KIND_CONFIRMATION, 'D: existing order → confirmation');
+assertDbl($resolvedD['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN, 'D: missing provenance cannot confirm');
 assertDbl((int) $resolvedD['id_order'] === 55, 'D: recovers id_order');
 
 // E. after CP success (no SmartUCF redirect yet) → confirmation, no CP call in recovery class
 $attempts->row['control_panel_order_id'] = 901;
 $attempts->row['state'] = OrderOrchestrator::CP_CREATED;
+$attempts->row['cp_payload'] = json_encode([
+    'order_id' => 'DBLCLKORDER1', 'name' => 'Buyer', 'phone' => '', 'email' => '',
+    'address' => '', 'address2' => '', 'price' => 100.0, 'vnoska' => 10.0,
+    'gpr' => 1.0, 'vnoski' => 10, 'parva' => 0.0, 'products_id' => '1',
+    'products_name' => 'Product', 'products_q' => '1', 'type_client' => 1,
+    'currency' => 'EUR', 'version' => '2.0.3',
+], JSON_THROW_ON_ERROR);
 $snapshots->byOrder = [
     'order_reference' => 'DBLCLKORDER1',
+    'order_total' => 100.0,
+    'id_attempt' => 7,
+    'id_order' => 55,
+    'id_currency' => 1,
+    'currency_iso' => 'EUR',
     'control_panel_order_id' => 901,
+    'lifecycle_status' => OrderOrchestrator::CP_CREATED,
     'smartucf_state' => SmartUcfLifecycleStates::NOT_STARTED,
     'smartucf_redirect_url' => '',
 ];
@@ -206,7 +221,13 @@ assertDbl((int) $resolvedE['control_panel_order_id'] === 901, 'E: reuses CP id')
 // F. SmartUCF created with trusted redirect
 $snapshots->byOrder = [
     'order_reference' => 'DBLCLKORDER1',
+    'order_total' => 100.0,
+    'id_attempt' => 7,
+    'id_order' => 55,
+    'id_currency' => 1,
+    'currency_iso' => 'EUR',
     'control_panel_order_id' => 901,
+    'lifecycle_status' => OrderOrchestrator::CP_CREATED,
     'smartucf_state' => SmartUcfLifecycleStates::CREATED,
     'smartucf_redirect_url' => 'https://onlinetest.ucfin.bg/sucf-online/Request/Start/SID123',
 ];
@@ -214,15 +235,78 @@ $resolvedF = $recoveryD->resolve(1, 9);
 assertDbl($resolvedF['kind'] === CheckoutLockLoserRecovery::KIND_SMARTUCF_REDIRECT, 'F: durable SmartUCF redirect reused');
 assertDbl($resolvedF['redirect_url'] !== '', 'F: redirect present');
 
-// Untrusted redirect must not be followed
-$snapshots->byOrder['smartucf_redirect_url'] = 'https://evil.example/sucf-online/Request/Start/SID123';
-$resolvedBad = $recoveryD->resolve(1, 9);
-assertDbl($resolvedBad['kind'] !== CheckoutLockLoserRecovery::KIND_SMARTUCF_REDIRECT, 'F: untrusted redirect rejected');
+$validRedirectSnapshot = $snapshots->byOrder;
+$validCpAttempt = $attempts->row;
+foreach ([['currency_iso' => 'BGN'], ['id_currency' => 2], ['id_order' => 56]] as $badSnapshot) {
+    $snapshots->byOrder = array_replace($validRedirectSnapshot, $badSnapshot);
+    $invalidRecovery = $recoveryD->resolve(1, 9);
+    assertDbl($invalidRecovery['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN
+        && $invalidRecovery['redirect_url'] === '', 'invalid durable provenance exposed SmartUCF redirect');
+}
+$snapshots->byOrder = $validRedirectSnapshot;
+$snapshots->byOrder = null;
+assertDbl($recoveryD->resolve(1, 9)['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN,
+    'missing snapshot exposed redirect');
+
+$snapshots->byOrder = $validRedirectSnapshot;
+$attempts->row = array_replace($validCpAttempt, ['cp_payload' => null]);
+assertDbl($recoveryD->resolve(1, 9)['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN,
+    'missing frozen CP payload exposed SmartUCF redirect');
+$attempts->row = array_replace($validCpAttempt, ['cp_payload' => '{']);
+assertDbl($recoveryD->resolve(1, 9)['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN,
+    'malformed frozen CP payload exposed SmartUCF redirect');
+$malformedPayload = json_decode((string) $validCpAttempt['cp_payload'], true, 512, JSON_THROW_ON_ERROR);
+$malformedPayload['name'] = [];
+$attempts->row = array_replace($validCpAttempt, [
+    'cp_payload' => json_encode($malformedPayload, JSON_THROW_ON_ERROR),
+]);
+assertDbl($recoveryD->resolve(1, 9)['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN,
+    'malformed CP field type exposed SmartUCF redirect');
+$attempts->row = array_replace($validCpAttempt, ['state' => OrderOrchestrator::CP_OUTCOME_UNKNOWN]);
+assertDbl($recoveryD->resolve(1, 9)['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN,
+    'CP_OUTCOME_UNKNOWN exposed SmartUCF redirect');
+foreach ([null, 0, 902] as $badCpId) {
+    $attempts->row = array_replace($validCpAttempt, ['control_panel_order_id' => $badCpId]);
+    assertDbl($recoveryD->resolve(1, 9)['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN,
+        'missing or mismatched attempt CP ID exposed redirect');
+}
+$attempts->row = $validCpAttempt;
+$snapshots->byOrder = array_replace($validRedirectSnapshot, ['control_panel_order_id' => 902]);
+assertDbl($recoveryD->resolve(1, 9)['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN,
+    'mismatched snapshot CP ID exposed redirect');
+
+$snapshots->byOrder = array_replace($validRedirectSnapshot, ['lifecycle_status' => OrderOrchestrator::CP_OUTCOME_UNKNOWN]);
+assertDbl($recoveryD->resolve(1, 9)['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN,
+    'mismatched snapshot CP state exposed redirect');
+$snapshots->byOrder = $validRedirectSnapshot;
+$bgnNativeRecovery = new CheckoutLockLoserRecovery(
+    $attempts, $snapshots, $policy,
+    static function (int $idCart): int { return 55; },
+    new \PrestaShop\Module\Unipayment\Order\OrderCurrencyGuard(
+        static function (int $idOrder): array { return ['id_currency' => 2, 'currency_iso' => 'BGN']; }
+    )
+);
+assertDbl($bgnNativeRecovery->resolve(1, 9)['kind'] === CheckoutLockLoserRecovery::KIND_OUTCOME_UNKNOWN,
+    'old native BGN order exposed redirect under EUR context');
+
+$snapshots->byOrder = array_replace($validRedirectSnapshot, [
+    'smartucf_redirect_url' => 'https://evil.example/sucf-online/Request/Start/SID123',
+]);
+assertDbl($recoveryD->resolve(1, 9)['kind'] !== CheckoutLockLoserRecovery::KIND_SMARTUCF_REDIRECT,
+    'untrusted redirect accepted despite valid CP and EUR state');
+$snapshots->byOrder = $validRedirectSnapshot;
+assertDbl($attempts->row === $validCpAttempt, 'recovery mutated attempt state');
 
 // Outcome unknown
 $snapshots->byOrder = [
     'order_reference' => 'DBLCLKORDER1',
+    'order_total' => 100.0,
+    'id_attempt' => 7,
+    'id_order' => 55,
+    'id_currency' => 1,
+    'currency_iso' => 'EUR',
     'control_panel_order_id' => 901,
+    'lifecycle_status' => OrderOrchestrator::CP_CREATED,
     'smartucf_state' => SmartUcfLifecycleStates::OUTCOME_UNKNOWN,
     'smartucf_redirect_url' => '',
 ];

@@ -13,6 +13,20 @@ uni-ps9 = PS9-native adapter/port
 
 ---
 
+## EUR-only financing boundary (EUR-PS9-002)
+
+Financing is available only when the active transaction ISO is EUR. `CurrencyGate` normalizes the ISO and does not consume `uni_eur`; the CP field is accepted as opaque snapshot data, including temporary value `3` and historical values. The shop's global default currency does not have to be EUR.
+
+For cart-derived hooks, calculators, popup application, checkout and direct submission, `CartCurrencyGuard` requires a loaded context currency and cart currency with matching IDs and ISO, then EUR. It rejects inconsistent state before the cart total or financing fingerprint is calculated. Product-only presentation uses the active context ISO; when a cart participates in product application or preselection, the cart/context guard also applies. No currency is rewritten to make financing eligible.
+
+After PrestaShop creates an order, its native `id_currency` and resolved ISO are authoritative. The financing snapshot must record matching `id_currency` and `currency_iso = EUR`. `OrderCurrencyGuard` checks this durable provenance before CP create, SmartUCF send or replay, Process 1/2, popup replay and checkout lock-loser recovery. A saved successful CP create also requires its complete frozen payload with `currency = EUR` and matching order reference/total; missing or invalid historical evidence is never reconstructed as a successful create. Invalid provenance remains an order-aware failure and never causes an automatic duplicate external send.
+
+A successful durable CP replay is accepted only when both the attempt state and snapshot `lifecycle_status` are `cp_created`, the attempt has a positive `control_panel_order_id`, and the snapshot belongs to the same attempt and PrestaShop order with the same positive CP ID. Where the caller has another authoritative ID (popup submission or `OrderOrchestrationResult`), it must equal that ID too. The frozen CP request must be a JSON object with the required PS9-created primitive field types, `currency = EUR`, and matching order reference and total; unrelated additional fields are tolerated. Native order/snapshot EUR identity is checked separately before this CP proof. `cp_outcome_unknown`, missing or mismatched CP IDs, and malformed historical payloads cannot produce a successful replay, Process 2 result, SmartUCF continuation or recovered redirect. Existing records are not repaired or resent by this check.
+
+CP and SmartUCF numeric payloads use the EUR order amounts directly. UniPayment has no fixed FX conversion or secondary currency presentation. Financial formulas, rounding, cart fingerprint, cache lifetimes, CP failure taxonomy and bank status contract remain unchanged.
+
+---
+
 ## Intended layering
 
 ```text

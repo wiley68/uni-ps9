@@ -12,6 +12,7 @@ if (PHP_SAPI !== 'cli') {
 
 $root = dirname(__DIR__, 2);
 require $root . '/vendor/autoload.php';
+require dirname(__DIR__) . '/Support/EurOrderCurrencyGuardFixture.php';
 require $root . '/tests/fixtures/shop_snapshot.php';
 
 use PrestaShop\Module\Unipayment\Configuration\Exception\ShopConfigurationSnapshotValidationException;
@@ -457,7 +458,8 @@ $snapshotRow = [
     'first_installment' => 0,
     'months' => 12,
     'monthly_installment' => 10,
-    'currency_iso' => 'BGN',
+    'currency_iso' => 'EUR',
+    'id_currency' => 1,
 ];
 $ref = new ReflectionClass(SmartUcfSessionCoordinator::class);
 /** @var SmartUcfSessionCoordinator $coordinator */
@@ -465,7 +467,9 @@ $coordinator = $ref->newInstanceWithoutConstructor();
 foreach ([
     'lifecycle' => $lifecycle,
     'client' => $client,
-    'payloadBuilder' => new SmartUcfPayloadBuilder(),
+    'payloadBuilder' => new SmartUcfPayloadBuilder(eurTestOrderCurrencyGuard()),
+    'currencyGuard' => eurTestOrderCurrencyGuard(),
+    'cpSuccessVerifier' => eurTestCpSuccessVerifier(),
     'classifier' => new \PrestaShop\Module\Unipayment\SmartUcf\SmartUcfFailureClassifier(),
     'snapshots' => null,
     'cpClient' => null,
@@ -499,8 +503,11 @@ assertCred($resultOk->isCreated(), 'repaired pair proceeds');
 assertCred($client->calls === 1, 'client called once');
 
 try {
-    (new SmartUcfPayloadBuilder())->build(['uni_user' => '', 'uni_password' => 'x'], [
+    (new SmartUcfPayloadBuilder(eurTestOrderCurrencyGuard()))->build(['uni_user' => '', 'uni_password' => 'x'], [
         'order_reference' => 'R',
+        'id_order' => 9,
+        'id_currency' => 1,
+        'currency_iso' => 'EUR',
         'customer_json' => [],
         'lines_json' => [],
         'address_json' => [],

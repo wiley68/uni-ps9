@@ -7,8 +7,9 @@ namespace PrestaShop\Module\Unipayment\Order;
 final class ControlPanelOrderPayloadBuilder
 {
     /** @param array<string, mixed> $snapshot @param array<string, mixed> $shop @return array<string, mixed> */
-    public function build(array $snapshot, array $shop): array
+    public function build(array $snapshot, array $shop, CreatedOrder $order): array
     {
+        (new OrderCurrencyGuard())->assertMatchesSnapshot($order, $snapshot);
         $customer = is_array($snapshot['customer_json'] ?? null) ? $snapshot['customer_json'] : [];
         $addresses = is_array($snapshot['address_json'] ?? null) ? $snapshot['address_json'] : [];
         $invoice = is_array($addresses['invoice'] ?? null) ? $addresses['invoice'] : [];
@@ -45,7 +46,7 @@ final class ControlPanelOrderPayloadBuilder
             'products_name' => substr(implode('_', $names), 0, 255),
             'products_q' => implode('_', $quantities),
             'type_client' => !empty($shop['_is_mobile']) ? 0 : 1,
-            'currency' => (string) $snapshot['currency_iso'],
+            'currency' => 'EUR',
             'version' => (string) $snapshot['module_version'],
         ];
     }

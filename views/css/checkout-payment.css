@@ -120,20 +120,10 @@
 }
 
 .unipayment-checkout__amount-primary,
-.unipayment-checkout__amount-secondary,
 .unipayment-checkout__percent {
   color: var(--unipayment-checkout-red);
 }
 
-.unipayment-checkout__amount-secondary {
-  display: none;
-  margin-left: 6px;
-  font-size: 70%;
-}
-
-.unipayment-checkout__value--dual .unipayment-checkout__amount-secondary {
-  display: inline;
-}
 
 /* Product / cart / Woo popup controls: red text, bottom border only. */
 .unipayment-checkout__select,

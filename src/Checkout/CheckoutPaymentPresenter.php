@@ -51,7 +51,7 @@ final class CheckoutPaymentPresenter
     /** @param array<string, mixed> $shop @return array<string, mixed>|null */
     public function present(bool $operational, array $shop, CartContext $cart, string $currencyIso, ?array $preference = null): ?array
     {
-        if (!$operational || !$this->currencyGate->supports($shop, $currencyIso)) {
+        if (!$operational || !$this->currencyGate->supports($currencyIso)) {
             return null;
         }
         $resolution = $this->cartResolver->resolve($shop, $cart);
@@ -94,9 +94,9 @@ final class CheckoutPaymentPresenter
                 'total_payable' => $result->totalPayable,
                 'glp' => $result->glp,
                 'gpr' => $result->gpr,
-                'financed_amount_display' => $this->amounts->format($result->financedAmount, $shop),
-                'monthly_installment_display' => $this->amounts->format($result->monthlyInstallment, $shop),
-                'total_payable_display' => $this->amounts->format($result->totalPayable, $shop),
+                'financed_amount_display' => $this->amounts->format($result->financedAmount),
+                'monthly_installment_display' => $this->amounts->format($result->monthlyInstallment),
+                'total_payable_display' => $this->amounts->format($result->totalPayable),
                 'glp_display' => number_format(abs($result->glp), 2, '.', ''),
                 'gpr_display' => number_format(abs($result->gpr), 2, '.', ''),
             ];
@@ -143,14 +143,11 @@ final class CheckoutPaymentPresenter
             }
         }
         $fingerprint = $this->snapshot->fingerprint($cart, $currencyIso);
-        $currencyMode = (int) ($shop['uni_eur'] ?? 0);
 
         return [
             'cart_total' => $cart->total,
-            'cart_total_display' => $this->amounts->format($cart->total, $shop),
+            'cart_total_display' => $this->amounts->format($cart->total),
             'currency_iso' => strtoupper($currencyIso),
-            'currency_mode' => $currencyMode,
-            'currency_dual' => in_array($currencyMode, [1, 2], true),
             'schemes' => $schemes,
             'default_scheme_key' => $defaultKey,
             'default_first_installment' => $preferredFirstInstallment,

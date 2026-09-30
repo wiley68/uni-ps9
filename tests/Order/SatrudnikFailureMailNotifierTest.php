@@ -218,7 +218,7 @@ function satrudnikSnapshot(array $overrides = []): array
         'monthly_installment' => '90.00',
         'financed_amount' => '1000.00',
         'total_payable' => '1080.00',
-        'currency_iso' => 'BGN',
+        'currency_iso' => 'EUR',
         'status_label' => BankStatus::LABEL_SEND_FAILED_CP,
     ], $overrides);
 }

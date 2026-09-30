@@ -880,12 +880,7 @@
                 '[data-unipayment-display="' + target + '"]',
             );
             if (element)
-                element.textContent = display
-                    ? display.primary +
-                      (display.dual && display.secondary
-                          ? " (" + display.secondary + ")"
-                          : "")
-                    : "";
+                element.textContent = display ? display.primary : "";
         }
 
         function applyCalculation(calculation) {

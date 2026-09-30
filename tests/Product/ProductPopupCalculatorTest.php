@@ -25,7 +25,7 @@ function assertProductPopup(bool $condition, string $message): void
 
 $popup = new ProductPopupCalculator(new Calculator('2026-08-17'));
 $product = new ProductContext(42, [7, 9], 1000.0);
-$shop = calculatorFixture(['uni_eur' => 3]);
+$shop = calculatorFixture();
 $standard = $popup->calculate($shop, $product, 'EUR', 'standard', 'standard', 'STD', 12, 0, 'standard|STD|12|0', 100.0);
 assertProductPopup($standard['scheme_type'] === 'standard' && $standard['months'] === 12, 'Standard popup context was not preserved');
 assertProductPopup($standard['scheme_key'] === 'standard|STD|12|0', 'popup calculation must return the canonical scheme key');
@@ -57,11 +57,10 @@ try {
 }
 
 $schemaShop = calculatorFixture([
-    'uni_eur' => 0,
     'uni_typekop' => 1,
     'kop' => ['by_schema' => ['filters' => schemaFiltersFixture()]],
 ]);
-$locked = $popup->calculate($schemaShop, $product, 'BGN', 'standard', 'standard', 'PRODUCT', 24, 11, 'standard|PRODUCT|24|11', 200.0);
+$locked = $popup->calculate($schemaShop, $product, 'EUR', 'standard', 'standard', 'PRODUCT', 24, 11, 'standard|PRODUCT|24|11', 200.0);
 assertProductPopup($locked['first_installment_locked'] && $locked['first_installment'] === 41.67, 'scheme-locked first installment must ignore browser input');
 
 try {

@@ -11,6 +11,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
+require dirname(__DIR__) . '/Support/EurOrderCurrencyGuardFixture.php';
 
 use PrestaShop\Module\Unipayment\Api\Exception\TimeoutException;
 use PrestaShop\Module\Unipayment\Order\BankStatus;
@@ -175,6 +176,8 @@ $store->save(42, [
     'id_attempt' => 42,
     'order_reference' => 'REF42',
     'id_order' => 42,
+    'id_currency' => 1,
+    'currency_iso' => 'EUR',
     'leasing_email_sent' => 0,
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
     'cp_status_sync_status_id' => null,
@@ -189,7 +192,7 @@ $cp = new P2WireCpClient();
 $bank = new P2WireBank();
 $mail = new P2WireMail();
 $syncStore = new ControlPanelStatusSyncStoreAdapter($store);
-$service = new PostControlPanelLifecycleService(
+$service = eurTestPostService(
     $store,
     $mail,
     $bank,
@@ -200,7 +203,7 @@ $service = new PostControlPanelLifecycleService(
 
 $order = new OrderOrchestrationResult(42, 'cp_created', 42, 'REF42', 900);
 $shop = ['uni_proces' => 1];
-$ctx = new PostControlPanelLifecycleContext(1, 'BGN', false, true);
+$ctx = new PostControlPanelLifecycleContext(1, 'EUR', false, true);
 $result = $service->handle($order, $shop, $ctx, new P2WireSmartUcf());
 
 assertP2Wire($result->isProcess2(), 'P2 handoff result');
@@ -219,6 +222,8 @@ $store2->save(43, [
     'id_attempt' => 43,
     'order_reference' => 'REF43',
     'id_order' => 43,
+    'id_currency' => 1,
+    'currency_iso' => 'EUR',
     'leasing_email_sent' => 0,
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
     'cp_status_sync_status_id' => null,
@@ -232,7 +237,7 @@ $cp2 = new P2WireCpClient();
 $cp2->queue[] = new TimeoutException('timeout');
 $bank2 = new P2WireBank();
 $mail2 = new P2WireMail();
-$service2 = new PostControlPanelLifecycleService(
+$service2 = eurTestPostService(
     $store2,
     $mail2,
     $bank2,
@@ -243,7 +248,7 @@ $service2 = new PostControlPanelLifecycleService(
 $service2->handle(
     new OrderOrchestrationResult(43, 'cp_created', 43, 'REF43', 901),
     $shop,
-    new PostControlPanelLifecycleContext(1, 'BGN', false, true),
+    new PostControlPanelLifecycleContext(1, 'EUR', false, true),
     new P2WireSmartUcf()
 );
 assertP2Wire(count($cp2->patches) === 1, 'transient failure still attempted PATCH');
@@ -263,7 +268,7 @@ $cp2->queue[] = [
 $service2->handle(
     new OrderOrchestrationResult(43, 'cp_created', 43, 'REF43', 901),
     $shop,
-    new PostControlPanelLifecycleContext(1, 'BGN', true, false),
+    new PostControlPanelLifecycleContext(1, 'EUR', true, false),
     new P2WireSmartUcf()
 );
 assertP2Wire(count($cp2->patches) === 2, 'pending replay retries PATCH');

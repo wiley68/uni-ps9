@@ -64,6 +64,30 @@ final class OrderOrchestrator
     {
         $attempt = $this->attempts->reserve($idShop, $idCart, $request->cartFingerprint);
         $attemptId = (int) $attempt['id_attempt'];
+        $currencyGuard = new OrderCurrencyGuard();
+        if ((int) ($attempt['id_order'] ?? 0) > 0) {
+            try {
+                $existingOrder = $this->orders->load((int) $attempt['id_order']);
+                $currencyGuard->assertOrder($existingOrder);
+                $existingSnapshot = $this->snapshots->findByAttempt($attemptId);
+                if ($existingSnapshot !== null) {
+                    $currencyGuard->assertMatchesSnapshot($existingOrder, $existingSnapshot);
+                } elseif ((string) $attempt['state'] === self::CP_CREATED) {
+                    throw new \RuntimeException('The financing snapshot is unavailable for the created order.');
+                }
+                if ((string) $attempt['state'] === self::CP_CREATED) {
+                    (new ControlPanelSuccessReplayGuard($currencyGuard))->assertSuccessful($attempt, $existingSnapshot);
+                }
+            } catch (\Throwable $exception) {
+                throw new OrderOrchestrationException(
+                    'The created financing order currency could not be verified.', false, $exception,
+                    (int) $attempt['id_order'], $attemptId, (string) $attempt['state'], false,
+                    (string) ($attempt['order_reference'] ?? '')
+                );
+            }
+        } elseif ((string) $attempt['state'] === self::CP_CREATED) {
+            throw new OrderOrchestrationException('The created financing order is unavailable.', false, null, 0, $attemptId, self::CP_CREATED);
+        }
         if ((string) $attempt['state'] === self::CP_CREATED) {
             return $this->result($attempt, true);
         }
@@ -142,6 +166,7 @@ final class OrderOrchestrator
                             $order->reference
                         );
                     }
+                    $currencyGuard->assertOrder($order);
                     $snapshot = $this->snapshotFactory->create($request, $order, $submissionSource);
                     $this->persistSnapshot($attemptId, $snapshot, $order);
                 }
@@ -181,6 +206,7 @@ final class OrderOrchestrator
                         $order->reference
                     );
                 }
+                $currencyGuard->assertOrder($order);
                 $snapshot = $this->snapshotFactory->create($request, $order, $submissionSource);
                 $this->persistSnapshot($attemptId, $snapshot, $order);
             }
@@ -203,6 +229,7 @@ final class OrderOrchestrator
                 );
             }
 
+            $currencyGuard->assertMatchesSnapshot($order, $snapshot);
             return $this->submitToControlPanel($attempt, $attemptId, $order, $snapshot, $idShop, $shop);
         } catch (OrderOrchestrationException $exception) {
             throw $exception;
@@ -229,14 +256,19 @@ final class OrderOrchestrator
         int $idShop,
         array $shop
     ): OrderOrchestrationResult {
+        $currencyGuard = new OrderCurrencyGuard();
+        $currencyGuard->assertMatchesSnapshot($order, $snapshot);
+        $savedPayload = $attempt['cp_payload'] ?? null;
+        if (is_string($savedPayload) && trim($savedPayload) !== '') {
+            $payload = $currencyGuard->decodeSavedCpPayload($savedPayload, $snapshot);
+        } elseif ((string) ($attempt['state'] ?? '') === self::PS_ORDER_CREATED) {
+            // A first create may freeze a payload only after durable EUR proof.
+            $payload = $this->payloads->build($snapshot, $shop, $order);
+            $attempt = $this->attempts->update($attemptId, ['cp_payload' => json_encode($payload, JSON_THROW_ON_ERROR)]);
+        } else {
+            throw new \RuntimeException('The saved Control Panel payload is unavailable.');
+        }
         try {
-            $payload = isset($attempt['cp_payload']) && is_string($attempt['cp_payload']) && $attempt['cp_payload'] !== ''
-                ? json_decode($attempt['cp_payload'], true)
-                : null;
-            if (!is_array($payload)) {
-                $payload = $this->payloads->build($snapshot, $shop);
-                $attempt = $this->attempts->update($attemptId, ['cp_payload' => json_encode($payload, JSON_THROW_ON_ERROR)]);
-            }
             $this->attempts->update($attemptId, ['state' => self::CP_SUBMITTING, 'last_error_class' => null]);
 
             $response = $this->cp->createOrder($payload);

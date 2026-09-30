@@ -23,9 +23,9 @@ function assertProductPresenter(bool $condition, string $message): void
 
 $presenter = new ProductCalculatorPresenter(new Calculator('2026-08-17'));
 $product = new ProductContext(42, [7, 9], 1000.0);
-$view = $presenter->present(calculatorFixture(['uni_eur' => 0]), $product, 'BGN');
+$view = $presenter->present(calculatorFixture(), $product, 'EUR');
 
-assertProductPresenter(is_array($view), 'BGN product calculator must be available');
+assertProductPresenter(is_array($view), 'EUR product calculator must be available');
 assertProductPresenter(isset($view['offers']['standard'], $view['offers']['promo']), 'standard and promo buttons must be present');
 assertProductPresenter($view['design'] === 'standard' && $view['dark_button'] === false, 'standard design must be the safe default');
 assertProductPresenter($view['button_type'] === 'image' && $view['show_installment'] === false, 'image-oriented button must hide installment information');
@@ -55,18 +55,18 @@ $sameMonthShop['coeff_list'] = [
     ['onlineProductCode' => 'POS COM 50', 'installmentCount' => 6, 'coeff' => 0.18, 'interestPercent' => 20],
     ['onlineProductCode' => 'POS COM 0%V1', 'installmentCount' => 6, 'coeff' => 0.166667, 'interestPercent' => 0],
 ];
-$sameMonthView = $presenter->present($sameMonthShop, $product, 'BGN');
+$sameMonthView = $presenter->present($sameMonthShop, $product, 'EUR');
 assertProductPresenter(is_array($sameMonthView) && count($sameMonthView['offers']['standard']['schemes']) === 2, 'same-month Standard and Promo schemes must both remain in the Standard popup');
 assertProductPresenter($sameMonthView['offers']['standard']['schemes'][0]['key'] === 'standard|POS%20COM%2050|6|0', 'same-month Standard identity must include its KOP');
 assertProductPresenter($sameMonthView['offers']['standard']['schemes'][1]['key'] === 'promo|POS%20COM%200%25V1|6|0', 'same-month Promo identity must include its distinct KOP');
 assertProductPresenter($sameMonthView['offers']['standard']['preferred_scheme_key'] === 'standard|POS%20COM%2050|6|0', 'same-month Promo option must not replace the preferred Standard selection');
 assertProductPresenter($sameMonthView['offers']['standard']['schemes'][1]['description'] === $sameMonthShop['kop']['by_default']['uni_kop_promo_desc'], 'same-month Promo option label must use the CP description');
-assertProductPresenter($presenter->present(calculatorFixture(['uni_eur' => 0]), $product, 'EUR') === null, 'mismatched currency must hide calculator');
-assertProductPresenter($presenter->present(calculatorFixture(['uni_eur' => 3]), $product, 'EUR') !== null, 'EUR-only configuration must support EUR');
-assertProductPresenter($presenter->present(calculatorFixture(['uni_status' => 0]), $product, 'BGN') === null, 'inactive shop must hide calculator');
+assertProductPresenter($presenter->present(calculatorFixture(), $product, 'USD') === null, 'mismatched currency must hide calculator');
+assertProductPresenter($presenter->present(calculatorFixture(), $product, 'EUR') !== null, 'EUR-only configuration must support EUR');
+assertProductPresenter($presenter->present(calculatorFixture(['uni_status' => 0]), $product, 'EUR') === null, 'inactive shop must hide calculator');
 
 $eurLabelView = $presenter->present(
-    calculatorFixture(['uni_eur' => 3]),
+    calculatorFixture(),
     new ProductContext(42, [7, 9], 1026.21),
     'EUR'
 );
@@ -77,8 +77,8 @@ assertProductPresenter(strpos($eurLabelView['offers']['standard']['installment_l
 assertProductPresenter((bool) preg_match('/^12 x \d+\.\d{2} евро$/', $eurLabelView['offers']['standard']['installment_label']), 'button label must contain months, dot separator and exactly two decimals');
 assertProductPresenter((bool) preg_match('/^12 x \d+\.\d{2} евро$/', $eurLabelView['offers']['promo']['installment_label']), 'promo label must use the same English EUR contract');
 
-$bgnLabelView = $presenter->present(calculatorFixture(['uni_eur' => 0]), $product, 'BGN');
-assertProductPresenter(is_array($bgnLabelView) && (bool) preg_match('/ лв\.$/u', $bgnLabelView['offers']['standard']['installment_label']), 'BGN-only button label must use the Woo лв. suffix');
+$bgnLabelView = $presenter->present(calculatorFixture(), $product, 'EUR');
+assertProductPresenter(is_array($bgnLabelView) && (bool) preg_match('/ евро$/u', $bgnLabelView['offers']['standard']['installment_label']), 'EUR-only button label must use the EUR suffix');
 
 $visualView = $presenter->present(calculatorFixture([
     'uni_vnoska' => 1,
@@ -87,7 +87,7 @@ $visualView = $presenter->present(calculatorFixture([
     'uni_button_width' => 420,
     'uni_button_height' => 72,
     'uni_zaglavie' => 'Финансиране от УниКредит',
-]), $product, 'BGN');
+]), $product, 'EUR');
 assertProductPresenter(is_array($visualView), 'visual configuration must preserve an available calculator');
 assertProductPresenter($visualView['design'] === 'alternative' && $visualView['dark_button'] === true, 'alternative design must use the red Woo variant');
 assertProductPresenter($visualView['button_type'] === 'standard' && $visualView['show_installment'] === true, 'standard button type must expose installment information');
@@ -98,19 +98,19 @@ assertProductPresenter($visualView['heading'] === 'Финансиране от �
 $invalidDimensions = $presenter->present(calculatorFixture([
     'uni_button_width' => 99,
     'uni_button_height' => 121,
-]), $product, 'BGN');
+]), $product, 'EUR');
 assertProductPresenter(is_array($invalidDimensions), 'invalid visual configuration must not disable financing');
 assertProductPresenter($invalidDimensions['button_width'] === 290 && $invalidDimensions['button_height'] === 56, 'out-of-contract dimensions must use Woo defaults');
 
 $standardOnly = $presenter->present(calculatorFixture([
     'kop' => ['by_default' => ['uni_kop_promo' => '']],
-]), $product, 'BGN');
+]), $product, 'EUR');
 assertProductPresenter(is_array($standardOnly) && isset($standardOnly['offers']['standard']) && !isset($standardOnly['offers']['promo']), 'standard-only product must expose only its available button');
 assertProductPresenter(count($standardOnly['offers']['standard']['schemes']) === 3, 'standard-only popup must not add unavailable Promo schemes');
 
 $promoOnly = $presenter->present(calculatorFixture([
     'kop' => ['by_default' => ['uni_kop_default' => '']],
-]), $product, 'BGN');
+]), $product, 'EUR');
 assertProductPresenter(is_array($promoOnly) && isset($promoOnly['offers']['promo']) && !isset($promoOnly['offers']['standard']), 'promo-only product must expose only its available button');
 assertProductPresenter(count($promoOnly['offers']['promo']['schemes']) === 2, 'promo-only popup must preserve available Promo schemes');
 
@@ -118,7 +118,7 @@ $schema = calculatorFixture([
     'uni_typekop' => 1,
     'kop' => ['by_schema' => ['filters' => schemaFiltersFixture()]],
 ]);
-$schemaView = $presenter->present($schema, $product, 'BGN');
+$schemaView = $presenter->present($schema, $product, 'EUR');
 assertProductPresenter(is_array($schemaView), 'matching schema calculator must be available');
 assertProductPresenter(count($schemaView['offers']['standard']['schemes']) === 4, 'schema Standard popup must include Standard and Promo schemes');
 assertProductPresenter($schemaView['offers']['standard']['schemes'][2]['description'] === '0% schema promotion', 'schema Promo label must come from filter uni_kop_desc');

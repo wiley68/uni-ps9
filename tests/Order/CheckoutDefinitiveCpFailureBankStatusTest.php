@@ -237,7 +237,7 @@ $created = new CreatedOrder(
     201,
     'CHKCPFAIL01',
     1000.0,
-    'BGN',
+    'EUR',
     1,
     ['email' => 'c@example.com'],
     [],

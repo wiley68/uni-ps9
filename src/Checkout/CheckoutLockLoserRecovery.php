@@ -7,6 +7,8 @@ namespace PrestaShop\Module\Unipayment\Checkout;
 use PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository;
 use PrestaShop\Module\Unipayment\Order\OrderAttemptRepository;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
+use PrestaShop\Module\Unipayment\Order\OrderCurrencyGuard;
+use PrestaShop\Module\Unipayment\Order\ControlPanelSuccessReplayGuard;
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfEndpointPolicy;
 use PrestaShop\Module\Unipayment\SmartUcf\SmartUcfLifecycleStates;
 
@@ -30,6 +32,7 @@ final class CheckoutLockLoserRecovery
     private $endpointPolicy;
     /** @var callable */
     private $orderIdByCartResolver;
+    private OrderCurrencyGuard $currencyGuard;
 
     /**
      * @param OrderAttemptRepository|object|null $attempts
@@ -40,9 +43,11 @@ final class CheckoutLockLoserRecovery
         $attempts = null,
         $snapshots = null,
         ?SmartUcfEndpointPolicy $endpointPolicy = null,
-        ?callable $orderIdByCartResolver = null
+        ?callable $orderIdByCartResolver = null,
+        ?OrderCurrencyGuard $currencyGuard = null
     ) {
         $this->attempts = $attempts ?? new OrderAttemptRepository();
+        $this->currencyGuard = $currencyGuard ?? new OrderCurrencyGuard();
         $this->snapshots = $snapshots ?? new FinancingSnapshotRepository();
         $this->endpointPolicy = $endpointPolicy ?? new SmartUcfEndpointPolicy();
         $this->orderIdByCartResolver = $orderIdByCartResolver ?? static function (int $idCart): int {
@@ -89,6 +94,52 @@ final class CheckoutLockLoserRecovery
         $snapshot = $this->snapshots->findByOrderId($idOrder);
         if ($snapshot === null && is_array($attempt)) {
             $snapshot = $this->snapshots->findByAttempt((int) ($attempt['id_attempt'] ?? 0));
+        }
+        $cpSuccessProven = false;
+        try {
+            if (!is_array($snapshot) || (int) ($snapshot['id_order'] ?? 0) !== $idOrder) {
+                throw new \RuntimeException('The financing snapshot is unavailable.');
+            }
+            $this->currencyGuard->assertNativeSnapshot($snapshot);
+            if (is_array($attempt) && (int) ($attempt['id_order'] ?? 0) > 0
+                && (int) $attempt['id_order'] !== $idOrder
+            ) {
+                throw new \RuntimeException('The financing attempt does not match the order.');
+            }
+            $hasCpResult = (string) ($attempt['state'] ?? '') === OrderOrchestrator::CP_CREATED
+                || (int) ($snapshot['control_panel_order_id'] ?? 0) > 0
+                || (int) ($attempt['control_panel_order_id'] ?? 0) > 0
+                || (string) ($snapshot['smartucf_state'] ?? '') === SmartUcfLifecycleStates::CREATED;
+            if ($hasCpResult) {
+                if (!is_array($attempt) || (int) ($attempt['id_order'] ?? 0) !== $idOrder) {
+                    throw new \RuntimeException('The Control Panel attempt is unavailable.');
+                }
+                (new ControlPanelSuccessReplayGuard($this->currencyGuard))->assertSuccessful($attempt, $snapshot);
+                $cpSuccessProven = true;
+            }
+        } catch (\Throwable $exception) {
+            return [
+                'kind' => self::KIND_OUTCOME_UNKNOWN,
+                'id_order' => $idOrder,
+                'order_reference' => $reference,
+                'control_panel_order_id' => $cpId,
+                'redirect_url' => '',
+                'message' => 'Поръчката е създадена, но финансирането не може да бъде потвърдено.',
+            ];
+        }
+        if (!$cpSuccessProven) {
+            $unknown = is_array($attempt)
+                && (string) ($attempt['state'] ?? '') === OrderOrchestrator::CP_OUTCOME_UNKNOWN;
+            return [
+                'kind' => $unknown ? self::KIND_OUTCOME_UNKNOWN : self::KIND_PROCESSING,
+                'id_order' => $idOrder,
+                'order_reference' => $reference,
+                'control_panel_order_id' => 0,
+                'redirect_url' => '',
+                'message' => $unknown
+                    ? 'Поръчката е създадена, но потвърждението от банковата система не беше получено. Не изпращайте заявката повторно.'
+                    : 'Заявката за финансиране се обработва. Моля, изчакайте.',
+            ];
         }
         if (is_array($snapshot)) {
             if ($reference === '') {

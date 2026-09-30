@@ -15,6 +15,7 @@ if (PHP_SAPI !== 'cli') {
 
 $root = dirname(__DIR__, 2);
 require $root . '/vendor/autoload.php';
+require dirname(__DIR__) . '/Support/EurOrderCurrencyGuardFixture.php';
 require $root . '/tests/fixtures/shop_snapshot.php';
 
 use PrestaShop\Module\Unipayment\Api\ShopConfigurationProviderInterface;
@@ -685,11 +686,11 @@ $preSend = SmartUcfCoordinationResult::failed(
 assertScope($preSend->isPreSendFailure(), '21: credentials unavailable is pre-send');
 
 $order = new OrderOrchestrationResult(1, 'cp_created', 55, 'ABCD12345', 901);
-$ctx = new PostControlPanelLifecycleContext(1, 'BGN');
+$ctx = new PostControlPanelLifecycleContext(1, 'EUR');
 $snap = new ExactScopeSnapStore();
-$snap->rows[1] = ['id_attempt' => 1, 'id_order' => 55, 'order_reference' => 'ABCD12345', 'customer_json' => []];
+$snap->rows[1] = ['id_attempt' => 1, 'id_order' => 55, 'order_reference' => 'ABCD12345', 'id_currency' => 1, 'currency_iso' => 'EUR', 'customer_json' => []];
 $bank = new ExactScopeBankSpy();
-$resultPre = (new PostControlPanelLifecycleService($snap, new ExactScopeMailNoop(), $bank))->handle(
+$resultPre = (eurTestPostService($snap, new ExactScopeMailNoop(), $bank))->handle(
     $order,
     ['uni_proces' => 0],
     $ctx,
@@ -699,7 +700,7 @@ assertScope($resultPre->isPreSendFailure(), '22: pre-send outcome');
 assertScope($bank->updates === [], '22: no bank_send_failed_smartucf');
 
 $bank2 = new ExactScopeBankSpy();
-$resultRemote = (new PostControlPanelLifecycleService($snap, new ExactScopeMailNoop(), $bank2))->handle(
+$resultRemote = (eurTestPostService($snap, new ExactScopeMailNoop(), $bank2))->handle(
     $order,
     ['uni_proces' => 0],
     $ctx,
@@ -713,7 +714,7 @@ assertScope($resultRemote->isFailed(), '23: definitive remote failure');
 assertScope($bank2->updates === [BankStatus::SEND_FAILED_SMARTUCF], '23: persists bank_send_failed_smartucf');
 
 $bank3 = new ExactScopeBankSpy();
-$resultUnknown = (new PostControlPanelLifecycleService($snap, new ExactScopeMailNoop(), $bank3))->handle(
+$resultUnknown = (eurTestPostService($snap, new ExactScopeMailNoop(), $bank3))->handle(
     $order,
     ['uni_proces' => 0],
     $ctx,

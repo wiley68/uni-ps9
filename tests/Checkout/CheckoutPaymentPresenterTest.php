@@ -29,15 +29,15 @@ function assertCheckoutPresenter(bool $condition, string $message): void
 $calculator = new Calculator('2026-08-17');
 $presenter = new CheckoutPaymentPresenter($calculator, new CartSchemeResolver($calculator), new CurrencyGate(), new CartSnapshot(), new CartSnapshotSigner('test-key'), new ConsentResolver());
 $cart = new CartContext([new CartLine(new ProductContext(42, [7], 1000), 0, 1, 1000)], 1000);
-$shop = calculatorFixture(['uni_eur' => 0, 'consents' => [
+$shop = calculatorFixture(['consents' => [
     ['id' => 2, 'name' => 'Optional information', 'mandatory' => 0],
     ['id' => 1, 'name' => 'Mandatory terms', 'mandatory' => 1],
 ]]);
 
-assertCheckoutPresenter($presenter->present(false, $shop, $cart, 'BGN') === null, 'disabled module exposed payment option');
-assertCheckoutPresenter($presenter->present(true, $shop, $cart, 'EUR') === null, 'unsupported currency exposed payment option');
-assertCheckoutPresenter($presenter->present(true, $shop, new CartContext([], 0), 'BGN') === null, 'cart without schemes exposed payment option');
-$view = $presenter->present(true, $shop, $cart, 'BGN');
+assertCheckoutPresenter($presenter->present(false, $shop, $cart, 'EUR') === null, 'disabled module exposed payment option');
+assertCheckoutPresenter($presenter->present(true, $shop, $cart, 'USD') === null, 'unsupported currency exposed payment option');
+assertCheckoutPresenter($presenter->present(true, $shop, new CartContext([], 0), 'EUR') === null, 'cart without schemes exposed payment option');
+$view = $presenter->present(true, $shop, $cart, 'EUR');
 assertCheckoutPresenter(is_array($view) && count($view['schemes']) === 5, 'unified standard/promo schemes missing');
 assertCheckoutPresenter(isset($view['schemes'][0]['description'], $view['cart_total_display']['primary']), 'checkout schemes must expose Woo display metadata');
 assertCheckoutPresenter($view['consents'][0]['mandatory'] && !$view['consents'][1]['mandatory'], 'mandatory/optional consent distinction failed');
@@ -58,7 +58,7 @@ assertCheckoutPresenter(
 );
 
 $preferredScheme = $view['schemes'][1];
-$preferredView = $presenter->present(true, $shop, $cart, 'BGN', [
+$preferredView = $presenter->present(true, $shop, $cart, 'EUR', [
     'scheme_type' => $preferredScheme['scheme_type'],
     'kop_code' => $preferredScheme['kop_code'],
     'months' => $preferredScheme['months'],
@@ -69,7 +69,7 @@ assertCheckoutPresenter(is_array($preferredView) && $preferredView['preselect_pa
 assertCheckoutPresenter($preferredView['default_scheme_key'] === $preferredScheme['key'], 'matching cart-wide scheme must be preselected');
 assertCheckoutPresenter($preferredView['default_first_installment'] === 100.0, 'valid preferred first installment must reach Checkout UI');
 
-$invalidPreferredView = $presenter->present(true, $shop, $cart, 'BGN', [
+$invalidPreferredView = $presenter->present(true, $shop, $cart, 'EUR', [
     'scheme_type' => 'standard',
     'kop_code' => 'STALE',
     'months' => 99,

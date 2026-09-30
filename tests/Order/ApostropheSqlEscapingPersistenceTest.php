@@ -386,7 +386,7 @@ $db->attemptRows[7] = [
     'last_error_class' => null,
 ];
 
-$payload = (new ControlPanelOrderPayloadBuilder())->build($loaded, ['uni_proces' => 0, 'unicid' => 'u']);
+$payload = (new ControlPanelOrderPayloadBuilder())->build($loaded, ['uni_proces' => 0, 'unicid' => 'u'], $order);
 assertApos(($payload['products_name'] ?? null) === $productName, 'CP builder keeps product apostrophe');
 assertApos(strpos((string) ($payload['name'] ?? ''), "'") !== false, 'CP builder keeps customer apostrophe');
 assertApos(strpos((string) ($payload['address'] ?? ''), "'") !== false, 'CP builder keeps address apostrophe');

@@ -38,6 +38,11 @@ final class ProductPopupCheckoutPreselectionService
             throw new ProductPopupCheckoutPreselectionException('Продуктът не може да бъде добавен в количката.');
         }
 
+        if ($context->cart instanceof \Cart && (int) $context->cart->id > 0
+            && (new \PrestaShop\Module\Unipayment\Calculator\CartCurrencyGuard())->supportedIso($context->cart, $context) !== 'EUR'
+        ) {
+            throw new ProductPopupCheckoutPreselectionException('Финансирането не е налично за валутата на количката.');
+        }
         $this->operations->validateOperationToken($operationToken);
         $this->operations->clearLegacyMarker($context->cookie);
 
