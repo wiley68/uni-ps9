@@ -67,7 +67,7 @@ Infrastructure
 | Post-CP lifecycle           | Process 1 SmartUCF / Process 2 handoff + bank status                                            |
 | Post-order communication    | Financing emails, order_conf, Thank You, BO diagnostics                                         |
 | Homepage advertising        | Cache-only CP promo via `displayFooter` (index only)                                            |
-| mTLS private-key passphrase | `secrets/smartucf-key.php` in module ZIP (AUD-021) — no server env requirement                  |
+| mTLS private-key passphrase | Deployment-local `secrets/smartucf-key.php` (AUD-021); excluded from public distribution ZIP |
 
 ### Shop configuration cache flow
 
@@ -107,6 +107,8 @@ assert endpoint operation (shop-cache | order-bank-status | smartucf-debug-log)
         ↓
 endpoint handler → canonical envelope {success,error,message,data}
 ```
+
+Header extraction ignores non-string SERVER keys and values before string operations. Unexpected failures log controller, exception class, source filename and line only; exception messages, traces, headers and bodies remain private.
 
 See [`SECURITY-OPERATIONS.md`](SECURITY-OPERATIONS.md) for HMAC/nonce, lowercase nonce, durable CP status sync, and baselines
 (`CP 0facb672…`, `PS8 c62c3be…`).
@@ -572,9 +574,9 @@ No SSH / PHP-FPM / environment-variable setup is required for merchants.
 | File                       | Role                                                         |
 | -------------------------- | ------------------------------------------------------------ |
 | `config/environment.php`   | Authoritative CP host (`control_panel_url`)                  |
-| `secrets/smartucf-key.php` | SmartUCF mTLS private-key passphrase (Git-ignored; ZIP fill) |
+| `secrets/smartucf-key.php` | SmartUCF mTLS private-key passphrase (Git-ignored; separately provisioned) |
 
-Maintainer prepares development / test / production ZIPs by editing **only** those deployment files (plus PEMs under `keys/` when shipping certificates).
+`composer package` builds a distribution ZIP in an isolated staging tree with fresh production Composer autoload and a verified runtime manifest. It copies the source `config/environment.php` unchanged, preserving the standard public CP endpoint `https://uni.avalonbg.com`. Prepare environment-specific endpoints manually in that file before packaging. The build excludes credentials, PEMs and runtime data; provision deployment secrets/certificates separately using the existing file-based mechanism. Runtime contracts are unchanged. See [RELEASE.md](RELEASE.md).
 
 ---
 

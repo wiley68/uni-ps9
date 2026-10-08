@@ -26,15 +26,9 @@ Themes: Hummingbird 2.0 (primary) and Classic 3.1.1.
 
 ## 2. ZIP packaging (maintainer)
 
-Prepare development / test / production packages by editing **only**:
+Run `composer package` (or `php bin/build-distribution.php`) from the module root. It creates `dist/CC_PrestaShop_9.x_UNI_v.<MODULE_VERSION>.zip` with production dependencies in an isolated staging tree and verifies the archive before success. See [RELEASE.md](RELEASE.md) for the manifest/parity checks and build prerequisites.
 
-| File                               | Purpose                                               |
-| ---------------------------------- | ----------------------------------------------------- |
-| `config/environment.php`           | `control_panel_url` (CP host; API = host + `/api/v1`) |
-| `secrets/smartucf-key.php`         | SmartUCF mTLS private-key passphrase                  |
-| `keys/*.pem` (when shipping certs) | SmartUCF client certificate + private key             |
-
-Then ZIP the module and send it for BO install.
+The package copies the current source `config/environment.php` unchanged. Its standard configuration is `control_panel_url = https://uni.avalonbg.com` (API = host + `/api/v1`). Prepare environment-specific CP hosts manually in this file before packaging; the builder performs no configuration substitution or rewriting. Provision SmartUCF passphrase/certificates separately through the established `secrets/smartucf-key.php` and `keys/` mechanism. The reproducible distribution ZIP never contains these credentials.
 
 ### Git vs ZIP material
 

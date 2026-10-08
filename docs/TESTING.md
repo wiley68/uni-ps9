@@ -50,6 +50,8 @@ Destructive Aud006 DB purge test **SKIPs** in the safe suite.
 | Calculator / parity                             | `tests/Calculator/*`                            |
 | Configuration / shared cache lifecycle / LKG     | `tests/Configuration/*`                         |
 | Inbound API / CP client                         | `tests/Api/*`                                   |
+| Header type safety / private error diagnostics   | `tests/Api/InboundHeaderHardeningTest.php`        |
+| Production ZIP / runtime parity / repeatability   | `tests/Infrastructure/DistributionPackageTest.php` |
 | Security / tokens / AUD-021 secrets             | `tests/Security/*`                              |
 | Product FO / popup                              | `tests/Product/*`, `tests/Frontend/Product*`    |
 | Cart FO / popup / twin-order contracts          | `tests/Cart/*`, `tests/Frontend/Cart*`          |
@@ -70,10 +72,12 @@ Do not hard-code a permanent test file count here — it changes with each remed
 | Cart        | Calculator + financing popup; **guest cart** → exactly one authoritative PS order                                                |
 | Checkout    | PaymentOption; Process 1 / Process 2; double-click stays post-order (AUD-019)                                                    |
 | Advertising | Fresh cache is local; stale refreshes; transient <=6h may show valid LKG; Class B/C and too-old hide safely                       |
-| Packaging   | ZIP with `config/environment.php` + `secrets/smartucf-key.php` only (no SSH/env)                                                 |
+| Packaging   | Byte parity for source `config/environment.php`; fresh production autoload; manifest/source parity; no credentials/PEMs/runtime data in distribution ZIP |
 | Privacy     | Process 1/2 mail audiences; no customer EGN; public bank status only on emails/Thank You (see ARCHITECTURE bank-status contract) |
 
 Historical phase STOP gates (7–13) are **completed** delivery milestones; they are not the current release gate.
+
+`InboundHeaderHardeningTest` runs all three inbound controllers in isolated CLI processes with typed PrestaShop doubles: unsigned POST, malformed SERVER keys/values, GET, header fallback and unexpected-error logging. `DistributionPackageTest` builds twice, checks byte repeatability/source immutability and unchanged source environment configuration, executes nine cases from the extracted production ZIP and rejects eight corrupted/development archives, including rewritten environment configuration with a recomputed manifest. These tests do not bootstrap the live shop or contact CP. Run the native HTTP smoke on both PS 9.1.x and 9.2.x under PHP 8.4 before deployment; CLI doubles do not certify the remote Apache/FPM lifecycle.
 
 ## Authoritative manual-test contract
 

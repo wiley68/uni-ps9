@@ -37,14 +37,43 @@ Do **not** create or push a Git tag automatically from agent workflows — taggi
 - [ ] `composer test` green on PHP 8.1–8.5
 - [ ] `git diff --check` clean
 - [ ] Manual browser smoke (product/cart/checkout; CP failure Thank You; SmartUCF failure; Satrudnik mail when configured)
-- [ ] Confirm `secrets/smartucf-key.php` and PEMs are present in the **package** only (not committed)
+- [ ] Confirm the distribution ZIP contains no credentials, passphrases, PEMs, logs or runtime data
 
-### Packaging (future / operator)
+### Reproducible distribution command
 
-- [ ] `composer install --no-dev --optimize-autoloader` in staging tree
-- [ ] Fill `config/environment.php` + `secrets/smartucf-key.php` (+ PEMs) for the target environment
-- [ ] Artifact excludes Git-ignored secrets/PEMs from the **source** tree unless intentionally packaged
-- [ ] Search tree for accidental EGN/token/key leakage
+From the module root, run:
+
+```bash
+composer package
+# Equivalent: php bin/build-distribution.php
+```
+
+Requires CLI PHP 8.1–8.5 with zip/SimpleXML, Composer and Git. The command uses current contents of Git-indexed runtime files, including uncommitted changes to those files. Add newly created runtime files to the Git index before building; untracked files are excluded. The build never installs dependencies into the working module.
+
+Output naming is exactly `dist/CC_PrestaShop_9.x_UNI_v.<MODULE_VERSION>.zip`. The version comes from the single literal `$this->version` assignment in `unipayment.php`; an absent, dynamic or ambiguous declaration fails the build. The ZIP contains the top-level `unipayment/` directory, and its filename version is checked against both packaged PHP and XML metadata.
+
+The builder creates a private temporary staging tree under ignored `dist/`, copies an allowlist of indexed runtime paths, and runs:
+
+```bash
+composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --no-plugins --no-scripts
+```
+
+The source lockfile is used for that install. The shipped `composer.json` omits development autoload/dependencies and scripts; the build-only lockfile is omitted from the ZIP to avoid shipping a stale hash after metadata normalization. Production `vendor/` is generated fresh; source `vendor/` is never copied. No runtime dependency has been added.
+
+`config/environment.php` is copied byte-for-byte from the current source. The standard configuration points to `https://uni.avalonbg.com`. Prepare any environment-specific endpoint manually in that file before running the command; packaging performs no environment substitution, template generation or configuration rewriting. The package contains only protection/index files under `keys/`, `secrets/` and `var/`. Credentials, private keys, certificates, passphrases, `.env` files, logs, caches, uploaded data, tests, docs, IDE files, `.git`, previous artifacts and `ps92-installed/` are excluded. SmartUCF deployment credentials/certificates must be provisioned separately through the established file-based mechanism; the builder never imports or embeds them.
+
+Before reporting success, the builder reopens the ZIP and checks required runtime files, safe paths, production autoload, PHP/XML/filename versions, a complete SHA-256 inventory and byte parity with the current runtime source. `package-manifest.json` records version, source Git SHA, dirty-tree status and normalized timestamp. It is a parity record, not a cryptographic signature.
+
+Standalone verification against the current source:
+
+```bash
+php bin/verify-distribution.php dist/CC_PrestaShop_9.x_UNI_v.2.0.3.zip
+php tests/Infrastructure/DistributionPackageTest.php
+```
+
+The command prints ZIP path, file count, byte size and source Git SHA; any build/verification failure exits non-zero. Entries are sorted with normalized permissions and timestamps. By default the timestamp is the source HEAD commit time; `SOURCE_DATE_EPOCH` can override it. Identical source, toolchain and epoch produce identical ZIP bytes. The SHA identifies HEAD; `source_dirty=true` records a build containing uncommitted changes. For a release, build again after the intended source commit.
+
+Do not commit generated ZIPs or `dist/` contents. This command creates a local artifact only; tagging and publishing remain explicit operator actions.
 
 ### Deferred product work
 
@@ -63,4 +92,4 @@ Uninstall removes module-owned data only. Historical PS orders remain. Reinstall
 1. Confirm this commit is the intended release HEAD
 2. Confirm safe suite + manual smoke
 3. Create annotated local tag only when explicitly approved: `git tag -a v2.0.3 -m "UniPayment 2.0.3"`
-4. Push tag / attach `unipayment-2.0.3.zip` only when distribution is approved
+4. Push tag / attach `CC_PrestaShop_9.x_UNI_v.2.0.3.zip` only when distribution is approved

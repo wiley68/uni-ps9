@@ -13,7 +13,7 @@ Related: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`TESTING.md`](TESTING.md)
 | **UNICID**              | Shop identity in Control Panel                                                                                             |
 | **Shared secret**       | HMAC for CP → module signed requests; CP auth login                                                                        |
 | **CP access token**     | Bearer for outbound CP calls (`TokenRepository`, encrypted)                                                                |
-| **mTLS key passphrase** | SmartUCF client private-key decryption (`secrets/smartucf-key.php` in the module ZIP only; never in env, BO config, or DB) |
+| **mTLS key passphrase** | SmartUCF client private-key decryption (deployment-local `secrets/smartucf-key.php`; never in public ZIP, env, BO config, or DB) |
 
 Never log secrets, tokens, Authorization headers, decrypted SECRET, or the mTLS private-key passphrase.
 
@@ -21,7 +21,7 @@ Never log secrets, tokens, Authorization headers, decrypted SECRET, or the mTLS 
 
 Self-contained ZIP deployment — **no** SSH / PHP-FPM / environment variables.
 
-Edit before packaging (real value only in prepared ZIP; file is Git-ignored):
+Provision separately for the target installation (the file is Git-ignored and excluded from the public distribution ZIP):
 
 ```php
 <?php
@@ -39,7 +39,7 @@ Tracked under `secrets/`: `.htaccess`, `index.php` only.
 
 Single authoritative host in `config/environment.php` (`control_panel_url`). Outbound API calls use `{control_panel_url}/api/v1`.
 
-Maintainer switches development / test / production CP hosts by editing **only** that file before ZIP packaging.
+The builder copies `config/environment.php` unchanged from the source; the standard endpoint is `https://uni.avalonbg.com`. Prepare deployment-specific hosts manually in this file before packaging. The builder performs no environment substitution, template generation or configuration rewriting.
 
 ---
 

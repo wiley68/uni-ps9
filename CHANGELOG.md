@@ -2,6 +2,13 @@
 
 Notable notes for the UniPayment PrestaShop **9** development line.
 
+## Unreleased — 2026-10-08
+
+- Inbound header extraction skips non-string SERVER keys/values before string operations; all three signed API endpoints retain controlled unsigned POST/GET responses.
+- Unexpected inbound failures log exception class, source filename and line without exception messages, traces or request material.
+- Reproducible public ZIP build with fresh production autoload, exact module-version naming, SHA-256 manifest/source parity and no deployment credentials/runtime data.
+- No CP/SmartUCF contract, database schema or order lifecycle change.
+
 ## 2.0.3 — 2026-09-18
 
 - Definitive CP create failure: persist `bank_send_failed_cp` / `Неуспешно изпратен Банка - КП` for Process 1 and Process 2; finalize standard emails once; Thank You redirect (not ambiguous popup-only UX).

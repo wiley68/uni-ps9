@@ -17,7 +17,8 @@
     }
   },
   "scripts": {
-    "test": "php tests/run.php"
+    "test": "php tests/run.php",
+    "package": "@php bin/build-distribution.php"
   },
   "config": {
     "optimize-autoloader": true,

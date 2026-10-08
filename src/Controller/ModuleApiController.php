@@ -52,7 +52,13 @@ abstract class ModuleApiController extends \ModuleFrontController
             );
         } catch (\Throwable $exception) {
             \PrestaShopLogger::addLog(
-                sprintf('UniPayment module API failure in %s.', static::class),
+                sprintf(
+                    'UniPayment module API failure in %s; exception=%s; file=%s; line=%d.',
+                    static::class,
+                    get_class($exception),
+                    basename($exception->getFile()),
+                    $exception->getLine()
+                ),
                 3
             );
             $this->sendJson(
@@ -172,7 +178,7 @@ abstract class ModuleApiController extends \ModuleFrontController
         }
 
         foreach ($_SERVER as $key => $value) {
-            if (!is_string($value) || strpos($key, 'HTTP_') !== 0) {
+            if (!is_string($key) || !is_string($value) || strpos($key, 'HTTP_') !== 0) {
                 continue;
             }
 
