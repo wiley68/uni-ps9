@@ -11,6 +11,8 @@ use ZipArchive;
 final class DistributionPackage
 {
     private const MANIFEST = 'package-manifest.json';
+    // Explicit deployment-file exception: copied locally, never added to Git.
+    private const DEPLOYMENT_FILES = ['secrets/smartucf-key.php'];
     private const REQUIRED = [
         'unipayment.php', 'index.php', 'config.xml', 'logo.png', 'composer.json',
         'config/environment.php', 'config/services.yml', 'vendor/autoload.php',
@@ -22,7 +24,7 @@ final class DistributionPackage
         'src/Security/ModuleRequestSignatureProtocol.php', 'src/Security/BoundedRawBodyReader.php',
         'src/Security/ApiNonceRepository.php', 'src/Security/SystemClock.php', 'src/Security/ClockInterface.php',
         'controllers/front/shopcache.php', 'controllers/front/smartucfdebuglog.php',
-        'controllers/front/orderbankstatus.php', 'keys/.htaccess', 'secrets/.htaccess',
+        'controllers/front/orderbankstatus.php', 'keys/.htaccess', 'secrets/.htaccess', 'secrets/smartucf-key.php',
     ];
 
     public function __construct(private string $sourceRoot)
@@ -40,7 +42,7 @@ final class DistributionPackage
             'unipayment.php', 'index.php', 'logo.png', 'composer.json',
             'config/environment.php',
             'bin/index.php', 'bin/signed-module-request.php',
-            'keys/index.php', 'keys/.htaccess', 'secrets/index.php', 'secrets/.htaccess', 'var/index.php',
+            'keys/index.php', 'keys/.htaccess', 'secrets/index.php', 'secrets/.htaccess', 'secrets/smartucf-key.php', 'var/index.php',
         ], true)) {
             return true;
         }
@@ -113,6 +115,13 @@ final class DistributionPackage
             }
             $files[$path] = $absolute;
         }
+        foreach (self::DEPLOYMENT_FILES as $path) {
+            $absolute = $this->sourceRoot . '/' . $path;
+            if (is_link($absolute) || !is_file($absolute) || !is_readable($absolute)) {
+                throw new RuntimeException('Deployment source is missing, unreadable or a symlink: ' . $path);
+            }
+            $files[$path] = $absolute;
+        }
         ksort($files);
 
         return $files;
@@ -135,6 +144,11 @@ final class DistributionPackage
             throw new RuntimeException('dist must not be a symlink.');
         }
         $this->makeDirectory($dist);
+        // Artifacts now contain a deployment passphrase; deny HTTP access in Apache.
+        if (is_link($dist . '/.htaccess')) {
+            throw new RuntimeException('dist protection file must not be a symlink.');
+        }
+        $this->write($dist . '/.htaccess', $this->read($this->sourceRoot . '/keys/.htaccess'));
         $stage = $dist . '/.build-' . bin2hex(random_bytes(8));
         $module = $stage . '/unipayment';
         $this->makeDirectory($module);

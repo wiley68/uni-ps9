@@ -43,14 +43,14 @@ foreach ([
     expectPackageFailure(static fn (): string => DistributionPackage::resolveVersion($php), 'Ambiguous version accepted');
 }
 foreach (['tests/Api/Test.php', 'docs/RELEASE.md', '.git/config', 'ps92-installed/unipayment.php',
-    'dist/previous.zip', 'keys/private.pem', 'secrets/smartucf-key.php',
+    'dist/previous.zip', 'keys/private.pem', 'secrets/other-key.php',
     'config/environment.local.php', 'var/runtime.php', 'views/cache/private.php', 'src/.env',
     'src/test/Fixture.php', 'src/Service.tmp.php', 'bin/build-distribution.php',
 ] as $path) {
     assertPackage(!DistributionPackage::isRuntimePath($path), 'Development/secret path allowed: ' . $path);
 }
 foreach (['src/Security/SystemClock.php', 'controllers/front/shopcache.php', 'views/templates/hook/cart_calculator.tpl',
-    'mails/bg/ordersend.html', 'keys/.htaccess', 'secrets/index.php', 'config/services.yml', 'config/environment.php',
+    'mails/bg/ordersend.html', 'keys/.htaccess', 'secrets/index.php', 'secrets/smartucf-key.php', 'config/services.yml', 'config/environment.php',
 ] as $path) {
     assertPackage(DistributionPackage::isRuntimePath($path), 'Runtime file excluded: ' . $path);
 }
@@ -58,7 +58,7 @@ foreach (['src/Security/SystemClock.php', 'controllers/front/shopcache.php', 'vi
 $root = dirname(__DIR__, 2);
 $builder = new DistributionPackage($root);
 $before = [];
-foreach (['composer.json', 'composer.lock', 'config/environment.php', 'vendor/composer/autoload_classmap.php', 'vendor/composer/autoload_psr4.php'] as $path) {
+foreach (['composer.json', 'composer.lock', 'config/environment.php', 'secrets/smartucf-key.php', 'vendor/composer/autoload_classmap.php', 'vendor/composer/autoload_psr4.php'] as $path) {
     $before[$path] = hash_file('sha256', $root . '/' . $path);
 }
 $package = $builder->build();
@@ -68,6 +68,7 @@ assertPackage(hash_file('sha256', $package) === $firstHash, 'Identical inputs mu
 foreach ($before as $path => $hash) {
     assertPackage(hash_file('sha256', $root . '/' . $path) === $hash, 'Source tree mutated: ' . $path);
 }
+assertPackage(file_get_contents($root . '/dist/.htaccess') === file_get_contents($root . '/keys/.htaccess'), 'Artifact directory denies HTTP access');
 
 $zip = new ZipArchive();
 assertPackage($zip->open($package) === true, 'Package opens');
@@ -94,6 +95,14 @@ try {
     $zip->close();
     assertPackage(file_get_contents($testRoot . '/unipayment/config/environment.php')
         === file_get_contents($root . '/config/environment.php'), 'Runtime environment copied byte-for-byte from source');
+    assertPackage(file_get_contents($testRoot . '/unipayment/secrets/smartucf-key.php')
+        === file_get_contents($root . '/secrets/smartucf-key.php'), 'Deployment file copied byte-for-byte from source');
+    $missingSource = $testRoot . '/missing-source';
+    mkdir($missingSource, 0700);
+    expectPackageFailure(static fn (): array => (new DistributionPackage($missingSource))->sourceFiles(), 'Missing deployment source accepted');
+    mkdir($missingSource . '/secrets', 0700);
+    symlink($root . '/secrets/smartucf-key.php', $missingSource . '/secrets/smartucf-key.php');
+    expectPackageFailure(static fn (): array => (new DistributionPackage($missingSource))->sourceFiles(), 'Symlink deployment source accepted');
     // Run production-packaged controllers with the same safe process fixture.
     foreach (['shopcache', 'smartucfdebuglog', 'orderbankstatus'] as $endpoint) {
         foreach (['normal', 'malformed', 'get-malformed'] as $case) {
@@ -110,7 +119,7 @@ try {
             assertPackage($result['body']['error'] === ($case === 'get-malformed' ? 'method_not_allowed' : 'invalid_signature'), 'Packaged inbound envelope');
         }
     }
-    foreach (['missing', 'tampered', 'environment', 'dev', 'autoload', 'manifest', 'root', 'version'] as $case) {
+    foreach (['missing', 'tampered', 'environment', 'missing-secret', 'tampered-secret', 'dev', 'autoload', 'manifest', 'root', 'version'] as $case) {
         $directory = $testRoot . '/' . $case;
         mkdir($directory, 0700);
         $candidate = $directory . '/' . basename($package);
@@ -142,6 +151,16 @@ try {
             case 'autoload':
                 $badZip->addFromString('unipayment/vendor/composer/autoload_psr4.php', "<?php // '/tests/Support'");
                 break;
+            case 'missing-secret':
+                $badZip->deleteName('unipayment/secrets/smartucf-key.php');
+                break;
+            case 'tampered-secret':
+                $changed = "<?php return ['passphrase' => 'synthetic-test-value'];";
+                $badZip->addFromString('unipayment/secrets/smartucf-key.php', $changed);
+                $changedManifest = $manifest;
+                $changedManifest['files']['secrets/smartucf-key.php'] = hash('sha256', $changed);
+                $badZip->addFromString('unipayment/package-manifest.json', json_encode($changedManifest, JSON_THROW_ON_ERROR));
+                break;
             case 'manifest':
                 $badZip->deleteName('unipayment/package-manifest.json');
                 break;
@@ -167,4 +186,4 @@ try {
     rmdir($testRoot);
 }
 
-fwrite(STDOUT, "OK (repeatable production ZIP, source parity, nine packaged inbound cases and eight archive rejection cases)\n");
+fwrite(STDOUT, "OK (repeatable production ZIP, deployment source parity/guards, nine packaged inbound cases and ten archive rejection cases)\n");

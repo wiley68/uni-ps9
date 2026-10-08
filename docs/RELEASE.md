@@ -37,7 +37,7 @@ Do **not** create or push a Git tag automatically from agent workflows — taggi
 - [ ] `composer test` green on PHP 8.1–8.5
 - [ ] `git diff --check` clean
 - [ ] Manual browser smoke (product/cart/checkout; CP failure Thank You; SmartUCF failure; Satrudnik mail when configured)
-- [ ] Confirm the distribution ZIP contains no credentials, passphrases, PEMs, logs or runtime data
+- [ ] Confirm the ZIP contains the intended `secrets/smartucf-key.php` deployment file and no other credentials, PEMs, logs or runtime data
 
 ### Reproducible distribution command
 
@@ -48,7 +48,7 @@ composer package
 # Equivalent: php bin/build-distribution.php
 ```
 
-Requires CLI PHP 8.1–8.5 with zip/SimpleXML, Composer and Git. The command uses current contents of Git-indexed runtime files, including uncommitted changes to those files. Add newly created runtime files to the Git index before building; untracked files are excluded. The build never installs dependencies into the working module.
+Requires CLI PHP 8.1–8.5 with zip/SimpleXML, Composer and Git, plus the local deployment file `secrets/smartucf-key.php`. The command uses current contents of Git-indexed runtime files, including uncommitted changes to those files, and explicitly includes this Git-ignored deployment file. Add newly created non-secret runtime files to the Git index before building; other untracked files are excluded. Never add `secrets/smartucf-key.php` to Git. The build never installs dependencies into the working module.
 
 Output naming is exactly `dist/CC_PrestaShop_9.x_UNI_v.<MODULE_VERSION>.zip`. The version comes from the single literal `$this->version` assignment in `unipayment.php`; an absent, dynamic or ambiguous declaration fails the build. The ZIP contains the top-level `unipayment/` directory, and its filename version is checked against both packaged PHP and XML metadata.
 
@@ -60,7 +60,7 @@ composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction -
 
 The source lockfile is used for that install. The shipped `composer.json` omits development autoload/dependencies and scripts; the build-only lockfile is omitted from the ZIP to avoid shipping a stale hash after metadata normalization. Production `vendor/` is generated fresh; source `vendor/` is never copied. No runtime dependency has been added.
 
-`config/environment.php` is copied byte-for-byte from the current source. The standard configuration points to `https://uni.avalonbg.com`. Prepare any environment-specific endpoint manually in that file before running the command; packaging performs no environment substitution, template generation or configuration rewriting. The package contains only protection/index files under `keys/`, `secrets/` and `var/`. Credentials, private keys, certificates, passphrases, `.env` files, logs, caches, uploaded data, tests, docs, IDE files, `.git`, previous artifacts and `ps92-installed/` are excluded. SmartUCF deployment credentials/certificates must be provisioned separately through the established file-based mechanism; the builder never imports or embeds them.
+`config/environment.php` is copied byte-for-byte from the current source. The standard configuration points to `https://uni.avalonbg.com`. Prepare any environment-specific endpoint manually in that file before running the command; packaging performs no environment substitution, template generation or configuration rewriting. The local `secrets/smartucf-key.php` is also copied byte-for-byte as the sole deployment-secret exception. A missing, unreadable or symlinked source file fails the build. The package otherwise contains only protection/index files under `keys/`, `secrets/` and `var/`. Other credentials, private keys, certificates, `.env` files, logs, caches, uploaded data, tests, docs, IDE files, `.git`, previous artifacts and `ps92-installed/` are excluded. Certificates remain managed separately through the established mechanism.
 
 Before reporting success, the builder reopens the ZIP and checks required runtime files, safe paths, production autoload, PHP/XML/filename versions, a complete SHA-256 inventory and byte parity with the current runtime source. `package-manifest.json` records version, source Git SHA, dirty-tree status and normalized timestamp. It is a parity record, not a cryptographic signature.
 
@@ -73,7 +73,7 @@ php tests/Infrastructure/DistributionPackageTest.php
 
 The command prints ZIP path, file count, byte size and source Git SHA; any build/verification failure exits non-zero. Entries are sorted with normalized permissions and timestamps. By default the timestamp is the source HEAD commit time; `SOURCE_DATE_EPOCH` can override it. Identical source, toolchain and epoch produce identical ZIP bytes. The SHA identifies HEAD; `source_dirty=true` records a build containing uncommitted changes. For a release, build again after the intended source commit.
 
-Do not commit generated ZIPs or `dist/` contents. This command creates a local artifact only; tagging and publishing remain explicit operator actions.
+Do not commit generated ZIPs, `dist/` contents or `secrets/smartucf-key.php`. The archive includes the deployment passphrase and must be handled as a deployment artifact. The builder writes the existing Apache deny-all protection into `dist/.htaccess`; HTTP access requires Apache to honor it. This command creates a local artifact only; tagging and publishing remain explicit operator actions.
 
 ### Deferred product work
 

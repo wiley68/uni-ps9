@@ -13,7 +13,7 @@ Related: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`TESTING.md`](TESTING.md)
 | **UNICID**              | Shop identity in Control Panel                                                                                             |
 | **Shared secret**       | HMAC for CP → module signed requests; CP auth login                                                                        |
 | **CP access token**     | Bearer for outbound CP calls (`TokenRepository`, encrypted)                                                                |
-| **mTLS key passphrase** | SmartUCF client private-key decryption (deployment-local `secrets/smartucf-key.php`; never in public ZIP, env, BO config, or DB) |
+| **mTLS key passphrase** | SmartUCF client private-key decryption (Git-ignored `secrets/smartucf-key.php`, included in the deployment ZIP; never in Git, env, BO config, or DB) |
 
 Never log secrets, tokens, Authorization headers, decrypted SECRET, or the mTLS private-key passphrase.
 
@@ -21,7 +21,7 @@ Never log secrets, tokens, Authorization headers, decrypted SECRET, or the mTLS 
 
 Self-contained ZIP deployment — **no** SSH / PHP-FPM / environment variables.
 
-Provision separately for the target installation (the file is Git-ignored and excluded from the public distribution ZIP):
+Prepare the local file before packaging. The builder copies it unchanged into the deployment ZIP while it remains Git-ignored:
 
 ```php
 <?php
@@ -34,6 +34,8 @@ return [
 Missing/invalid file → certificate validation and SmartUCF mTLS fail closed. No environment-variable fallback.
 
 Tracked under `secrets/`: `.htaccess`, `index.php` only.
+
+The deployment ZIP contains this passphrase file and remains Git-ignored under `dist/`. The builder copies the existing Apache deny-all protection into `dist/.htaccess`. Other secrets, PEMs and runtime data are excluded. Build/verification logs never print file contents.
 
 ### Control Panel base URL
 

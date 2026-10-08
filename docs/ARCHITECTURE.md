@@ -67,7 +67,7 @@ Infrastructure
 | Post-CP lifecycle           | Process 1 SmartUCF / Process 2 handoff + bank status                                            |
 | Post-order communication    | Financing emails, order_conf, Thank You, BO diagnostics                                         |
 | Homepage advertising        | Cache-only CP promo via `displayFooter` (index only)                                            |
-| mTLS private-key passphrase | Deployment-local `secrets/smartucf-key.php` (AUD-021); excluded from public distribution ZIP |
+| mTLS private-key passphrase | Deployment-local `secrets/smartucf-key.php` (AUD-021); Git-ignored, included unchanged in deployment ZIP |
 
 ### Shop configuration cache flow
 
@@ -574,9 +574,9 @@ No SSH / PHP-FPM / environment-variable setup is required for merchants.
 | File                       | Role                                                         |
 | -------------------------- | ------------------------------------------------------------ |
 | `config/environment.php`   | Authoritative CP host (`control_panel_url`)                  |
-| `secrets/smartucf-key.php` | SmartUCF mTLS private-key passphrase (Git-ignored; separately provisioned) |
+| `secrets/smartucf-key.php` | SmartUCF mTLS private-key passphrase (Git-ignored; copied unchanged into ZIP) |
 
-`composer package` builds a distribution ZIP in an isolated staging tree with fresh production Composer autoload and a verified runtime manifest. It copies the source `config/environment.php` unchanged, preserving the standard public CP endpoint `https://uni.avalonbg.com`. Prepare environment-specific endpoints manually in that file before packaging. The build excludes credentials, PEMs and runtime data; provision deployment secrets/certificates separately using the existing file-based mechanism. Runtime contracts are unchanged. See [RELEASE.md](RELEASE.md).
+`composer package` builds a distribution ZIP in an isolated staging tree with fresh production Composer autoload and a verified runtime manifest. It copies the source `config/environment.php` unchanged, preserving the standard public CP endpoint `https://uni.avalonbg.com`. Prepare environment-specific endpoints manually in that file before packaging. It also copies the local, Git-ignored `secrets/smartucf-key.php` unchanged as the sole deployment-secret exception, requiring a readable regular file. Other credentials, PEMs and runtime data remain excluded; certificates use the established mechanism. Runtime contracts are unchanged. See [RELEASE.md](RELEASE.md).
 
 ---
 
