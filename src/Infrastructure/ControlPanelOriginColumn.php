@@ -18,21 +18,33 @@ final class ControlPanelOriginColumn
             return;
         }
         $query = 'SHOW COLUMNS FROM `' . $table . '` LIKE \'cp_origin\'';
-        if (!$database->getRow($query)) {
+        if (!self::columnExists($database, $query)) {
             try {
                 $success = $database->execute('ALTER TABLE `' . $table . '` ADD `cp_origin` VARCHAR(272) NULL DEFAULT NULL');
             } catch (\Throwable $exception) {
                 // Concurrent first requests may both observe the missing column.
-                if (!$database->getRow($query)) {
+                if (!self::columnExists($database, $query)) {
                     throw new \RuntimeException('Control Panel provenance schema could not be upgraded.', 0, $exception);
                 }
                 $success = true;
             }
-            if (!$success && !$database->getRow($query)) {
+            if (!$success && !self::columnExists($database, $query)) {
                 throw new \RuntimeException('Control Panel provenance schema could not be upgraded.');
             }
         }
         $tables[$table] = true;
         self::$ready[$database] = $tables;
+    }
+
+    private static function columnExists(object $database, string $query): bool
+    {
+        // Db::getRow() appends LIMIT 1, which is invalid for SHOW COLUMNS.
+        // Do not cache schema results: another request may have just added the column.
+        $rows = $database->executeS($query, true, false);
+        if (!is_array($rows)) {
+            throw new \RuntimeException('Control Panel provenance schema could not be inspected.');
+        }
+
+        return $rows !== [];
     }
 }

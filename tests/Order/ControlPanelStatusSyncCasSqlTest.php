@@ -78,6 +78,15 @@ final class CasSqlFakeDb
         return $this->row;
     }
 
+    public function executeS(string $sql, bool $array = true, bool $useCache = true): array
+    {
+        if (!str_starts_with($sql, 'SHOW COLUMNS ') || !$array || $useCache || str_contains($sql, 'LIMIT')) {
+            throw new RuntimeException('Unexpected schema probe.');
+        }
+
+        return [['Field' => 'cp_origin', 'Default' => null]];
+    }
+
     public function execute(string $sql): bool
     {
         $this->lastExecuteSql = $sql;

@@ -36,6 +36,7 @@ assertPhp81Compatibility(
 $skipDirectories = [
     $root . DIRECTORY_SEPARATOR . 'vendor',
     $root . DIRECTORY_SEPARATOR . 'tests',
+    $root . DIRECTORY_SEPARATOR . 'dist',
 ];
 
 $php82PlusPatterns = [
@@ -50,7 +51,10 @@ $php82PlusPatterns = [
 
 $checked = 0;
 $iterator = new RecursiveIteratorIterator(
-    new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)
+    new RecursiveCallbackFilterIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        static fn (SplFileInfo $file): bool => !in_array($file->getPathname(), $skipDirectories, true)
+    )
 );
 
 foreach ($iterator as $fileInfo) {

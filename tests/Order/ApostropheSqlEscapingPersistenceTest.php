@@ -71,7 +71,7 @@ if (!class_exists('PhpEncryption', false)) {
         }
 
         /** @return string|false */
-        public function decrypt(string $data)
+        public function decrypt(string $data): string|false
         {
             $decoded = base64_decode($data, true);
 
@@ -143,7 +143,7 @@ function aposUnescapeSqlText(string $escaped): string
  * @param mixed $value
  * @return mixed
  */
-function aposMaterializeDbValue($value)
+function aposMaterializeDbValue(mixed $value): mixed
 {
     if (is_array($value) && isset($value['type']) && $value['type'] === 'sql') {
         if (($value['value'] ?? null) === 'NULL') {
@@ -246,7 +246,7 @@ final class ApostropheQuotingDb
     }
 
     /** @return array<string, mixed>|false */
-    public function getRow(string $sql)
+    public function getRow(string $sql): array|false
     {
         if (!preg_match('/`id_attempt`\s*=\s*(\d+)/', $sql, $match)) {
             return false;
@@ -257,6 +257,15 @@ final class ApostropheQuotingDb
         }
 
         return $this->snapshotRows[$id] ?? false;
+    }
+
+    public function executeS(string $sql, bool $array = true, bool $useCache = true): array
+    {
+        if (!str_starts_with($sql, 'SHOW COLUMNS ') || !$array || $useCache || str_contains($sql, 'LIMIT')) {
+            throw new RuntimeException('Unexpected schema probe.');
+        }
+
+        return [['Field' => 'cp_origin', 'Default' => null]];
     }
 
     public function execute(string $sql): bool

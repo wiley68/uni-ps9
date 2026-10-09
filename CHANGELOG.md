@@ -4,6 +4,8 @@ Notable notes for the UniPayment PrestaShop **9** development line.
 
 ## Unreleased — 2026-10-09
 
+- Installation fix: CP-origin column probes use uncached `Db::executeS()` and exact `SHOW COLUMNS ... LIKE 'cp_origin'`, avoiding the `LIMIT 1` automatically appended by `getRow()`. Both attempt/snapshot migrations remain additive, nullable and idempotent; tests cover native schema installation and preserved legacy rows.
+
 - Control Panel destination remains solely `config/environment.php`: HTTPS/public DNS/root/443 validation, bounded A/AAAA/CNAME checks, cURL IP pinning, no proxy or redirects, unchanged TLS/timeouts; independent client API-base and environment-file overrides removed.
 - Encrypted CP tokens and CP-derived SmartUCF credentials, shop cache/LKG and local certificate metadata now carry normalized CP-origin provenance. Foreign/legacy ephemeral state is unusable and refreshed lazily; certificate fail-open requires the same origin and transient failure.
 - Durable attempt/snapshot rows gain nullable `cp_origin` through additive lazy migration. Foreign/legacy create, successful replay and pending status PATCH are blocked with history and exactly-once identity preserved; no automatic cross-CP migration.

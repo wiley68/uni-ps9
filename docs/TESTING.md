@@ -18,7 +18,8 @@ UniPayment CLI tests run against the module checkout in the PrestaShop test shop
 - `Configuration/ControlPanelOriginSwitchTest`: real token/cipher/cache/service paths across A → B; new login precedes GET, no old Bearer, no foreign fresh/LKG/credential hydration, same-origin TTL/LKG preserved and legacy ephemeral replacement.
 - `SmartUcf/CertificateOriginSwitchTest`: synthetic encrypted PEMs only in a private temporary directory; transient same-origin reuse, auth/protocol denial, foreign/legacy denial and required B bundle even with equal A hashes.
 - `Order/OrderOrchestratorTest` and `Order/ControlPanelStatusSyncServiceTest`: foreign/legacy attempt/snapshot, frozen create, `cp_created`, pending/confirmed PATCH; zero extra HTTP/native orders and identical stored history on block.
-- `Infrastructure/ControlPanelOriginMigrationTest`: additive nullable migration, existing/concurrent/failure paths and no provenance backfill or history mutation.
+- `Infrastructure/ControlPanelOriginMigrationTest`: additive nullable migration, existing/concurrent/failure paths and no provenance backfill or history mutation. The schema probe uses uncached `executeS()`; its regression models `getRow()` appending invalid `LIMIT 1` and asserts exact `SHOW COLUMNS` syntax.
+- `Infrastructure/ControlPanelOriginSchemaRuntimeTest`: opt-in real MySQL/MariaDB integration with native PS Db/DbPDO and randomly named connection-local TEMPORARY tables. Both repositories run fresh, legacy-with-preserved-history and repeated install paths; existing columns also recheck through a new adapter/request. Run `UNIPAYMENT_ORIGIN_SCHEMA_RUNTIME=1 php8.4 tests/Infrastructure/ControlPanelOriginSchemaRuntimeTest.php [core-db-directory] [test-db-parameters-file]`. No shop bootstrap, permanent schema edits or destructive cleanup. Fresh/legacy/repeated paths were verified on MySQL 8.0.46 and isolated MariaDB 10.11.19 through local PS 9.1 and official PS 9.2 Db drivers on PHP 8.4.
 - `Api/NativeInboundCompatibilityTest`: fifteen isolated cases with actual native PS controller inheritance, bypassing constructors/bootstrap. Default uses local PS core; pass an external official core-controller directory to repeat against another line, and an optional extracted module directory to test the production ZIP.
 
 `DeploymentEnvironmentFixture` copies the actual loader and deployment file to `/tmp`, then simulates separate requests by resetting only that isolated loader's private process cache. It never edits the live environment file and is excluded from the ZIP. Fake DNS/transport never contact CP.
@@ -77,6 +78,8 @@ Destructive Aud006 DB purge test **SKIPs** in the safe suite.
 | Advertising / shared presentation resolver      | `tests/Advertising/*`                           |
 | Uninstall                                       | `tests/Uninstall/*`                             |
 | Remediation / infrastructure                    | `tests/Remediation/*`, `tests/Infrastructure/*` |
+
+The PHP baseline scanner prunes vendor, tests and dist before recursion, so protected build artifacts cannot cause unrelated source-lint failures.
 
 Do not hard-code a permanent test file count here — it changes with each remediation. Prefer `composer test` output as the source of truth.
 
