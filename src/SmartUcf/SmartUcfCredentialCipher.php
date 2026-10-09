@@ -29,7 +29,7 @@ final class SmartUcfCredentialCipher
 
     public function encrypt(string $plaintext): string
     {
-        return self::PREFIX . $this->cipher->encrypt($plaintext);
+        return self::PREFIX . $this->cipher->encrypt(\PrestaShop\Module\Unipayment\Security\OriginBoundSecret::encode($plaintext));
     }
 
     public function decrypt(string $encoded): string
@@ -44,7 +44,12 @@ final class SmartUcfCredentialCipher
             throw new \RuntimeException('SmartUCF credential decryption failed.');
         }
 
-        return $plaintext;
+        $value = \PrestaShop\Module\Unipayment\Security\OriginBoundSecret::decode($plaintext);
+        if ($value === null) {
+            throw new \RuntimeException('SmartUCF credential origin is unproven.');
+        }
+
+        return $value;
     }
 
     public function isEncryptedEnvelope(string $value): bool

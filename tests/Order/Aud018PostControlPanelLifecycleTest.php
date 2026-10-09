@@ -218,7 +218,7 @@ $root = dirname(__DIR__, 2);
 $order = new OrderOrchestrationResult(10, 'cp_created', 100, 'REF100', 555);
 $shopProcess2 = ['uni_proces' => 1];
 $shopProcess1 = ['uni_proces' => 0];
-$snapshot = ['id_order' => 100, 'id_currency' => 1, 'currency_iso' => 'EUR', 'customer_json' => [], 'address_json' => []];
+$snapshot = ['cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(), 'id_order' => 100, 'id_currency' => 1, 'currency_iso' => 'EUR', 'customer_json' => [], 'address_json' => []];
 $context = new PostControlPanelLifecycleContext(1, 'EUR');
 $replayContext = new PostControlPanelLifecycleContext(1, 'EUR', true, false);
 
@@ -231,10 +231,12 @@ $replayPayload = [
     'currency' => 'EUR', 'version' => '2.0.3',
 ];
 $replaySnapshot = array_replace($snapshot, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 10, 'order_reference' => 'REF100', 'order_total' => 100,
     'control_panel_order_id' => 555, 'lifecycle_status' => 'cp_created',
 ]);
 $replayAttempt = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 10, 'id_order' => 100, 'state' => 'cp_created',
     'control_panel_order_id' => 555,
     'cp_payload' => json_encode($replayPayload, JSON_THROW_ON_ERROR),

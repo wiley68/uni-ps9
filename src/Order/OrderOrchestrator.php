@@ -64,6 +64,15 @@ final class OrderOrchestrator
     {
         $attempt = $this->attempts->reserve($idShop, $idCart, $request->cartFingerprint);
         $attemptId = (int) $attempt['id_attempt'];
+        if (!\PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::matches($attempt['cp_origin'] ?? null)) {
+            throw new OrderOrchestrationException(
+                'Control Panel origin provenance is unproven; reconciliation is required.',
+                false,
+                new \PrestaShop\Module\Unipayment\Configuration\ControlPanelOriginMismatchException(),
+                (int) ($attempt['id_order'] ?? 0), $attemptId, (string) ($attempt['state'] ?? ''), false,
+                (string) ($attempt['order_reference'] ?? '')
+            );
+        }
         $currencyGuard = new OrderCurrencyGuard();
         if ((int) ($attempt['id_order'] ?? 0) > 0) {
             try {
@@ -71,6 +80,7 @@ final class OrderOrchestrator
                 $currencyGuard->assertOrder($existingOrder);
                 $existingSnapshot = $this->snapshots->findByAttempt($attemptId);
                 if ($existingSnapshot !== null) {
+                    \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($existingSnapshot['cp_origin'] ?? null);
                     $currencyGuard->assertMatchesSnapshot($existingOrder, $existingSnapshot);
                 } elseif ((string) $attempt['state'] === self::CP_CREATED) {
                     throw new \RuntimeException('The financing snapshot is unavailable for the created order.');
@@ -132,6 +142,9 @@ final class OrderOrchestrator
 
         try {
             $snapshot = $this->snapshots->findByAttempt($attemptId);
+            if ($snapshot !== null) {
+                \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($snapshot['cp_origin'] ?? null);
+            }
             if ((int) ($attempt['id_order'] ?? 0) > 0) {
                 $order = $this->orders->load((int) $attempt['id_order']);
                 if ($snapshot === null) {
@@ -256,6 +269,8 @@ final class OrderOrchestrator
         int $idShop,
         array $shop
     ): OrderOrchestrationResult {
+        \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($attempt['cp_origin'] ?? null);
+        \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($snapshot['cp_origin'] ?? null);
         $currencyGuard = new OrderCurrencyGuard();
         $currencyGuard->assertMatchesSnapshot($order, $snapshot);
         $savedPayload = $attempt['cp_payload'] ?? null;

@@ -84,7 +84,7 @@ if (!class_exists('PhpEncryption', false)) {
         }
 
         /** @return string|false */
-        public function decrypt(string $data)
+        public function decrypt(string $data): string|false
         {
             $decoded = base64_decode($data, true);
 
@@ -96,6 +96,8 @@ if (!class_exists('PhpEncryption', false)) {
 if (!defined('_NEW_COOKIE_KEY_')) {
     define('_NEW_COOKIE_KEY_', 'product-p1-snapshot-test-key');
 }
+
+if (!defined('_DB_PREFIX_')) { define('_DB_PREFIX_', 'ps_'); }
 
 function assertProductP1(bool $ok, string $message): void
 {
@@ -138,7 +140,7 @@ final class ProductP1CaptureDb
     }
 
     /** @return array<string, mixed>|false */
-    public function getRow(string $sql)
+    public function getRow(string $sql): array|false|null
     {
         unset($sql);
 
@@ -187,6 +189,7 @@ final class ProductP1Attempts implements OrderAttemptStoreInterface
         }
         $id = $this->nextId++;
         $this->rows[$id] = [
+            'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
             'id_attempt' => $id,
             'id_shop' => $idShop,
             'id_cart' => $idCart,

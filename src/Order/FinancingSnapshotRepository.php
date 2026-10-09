@@ -22,7 +22,7 @@ final class FinancingSnapshotRepository implements FinancingSnapshotStoreInterfa
 
     public function install(): bool
     {
-        return (bool) $this->database->execute('CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . self::TABLE . '` (
+        $created = (bool) $this->database->execute('CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . self::TABLE . '` (
             `id_snapshot` INT UNSIGNED NOT NULL AUTO_INCREMENT, `id_attempt` INT UNSIGNED NOT NULL, `id_order` INT UNSIGNED NOT NULL,
             `order_reference` VARCHAR(13) NOT NULL, `cart_fingerprint` CHAR(64) NOT NULL, `scheme_type` VARCHAR(16) NOT NULL,
             `scheme_key` VARCHAR(64) NOT NULL, `kop_code` VARCHAR(64) NOT NULL, `months` SMALLINT UNSIGNED NOT NULL, `filter_id` INT UNSIGNED NOT NULL,
@@ -30,6 +30,7 @@ final class FinancingSnapshotRepository implements FinancingSnapshotStoreInterfa
             `total_payable` DECIMAL(20,6) NOT NULL, `glp` DECIMAL(20,6) NOT NULL, `gpr` DECIMAL(20,6) NOT NULL, `coefficient` DECIMAL(20,10) NOT NULL,
             `order_total` DECIMAL(20,6) NOT NULL, `currency_iso` CHAR(3) NOT NULL, `id_currency` INT UNSIGNED NOT NULL,
             `module_version` VARCHAR(11) NOT NULL, `submission_source` VARCHAR(32) NOT NULL,
+            `cp_origin` VARCHAR(272) NULL DEFAULT NULL,
             `customer_json` LONGTEXT NOT NULL, `address_json` LONGTEXT NOT NULL, `lines_json` LONGTEXT NOT NULL, `consents_json` LONGTEXT NOT NULL,
             `sensitive_payload` LONGTEXT NULL, `control_panel_order_id` BIGINT UNSIGNED NULL, `lifecycle_status` VARCHAR(32) NOT NULL, `leasing_email_sent` TINYINT(1) UNSIGNED NOT NULL DEFAULT 0,
             `smartucf_state` VARCHAR(32) NOT NULL DEFAULT \'not_started\',
@@ -50,6 +51,11 @@ final class FinancingSnapshotRepository implements FinancingSnapshotStoreInterfa
             KEY `idx_unipayment_snapshot_smartucf_state` (`smartucf_state`, `smartucf_claimed_at`),
             KEY `idx_unipayment_snapshot_cp_status_sync` (`cp_status_sync_state`)
         ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+        if ($created) {
+            \PrestaShop\Module\Unipayment\Infrastructure\ControlPanelOriginColumn::ensure($this->database, _DB_PREFIX_ . self::TABLE);
+        }
+
+        return $created;
     }
 
     public function uninstall(): bool
@@ -59,6 +65,7 @@ final class FinancingSnapshotRepository implements FinancingSnapshotStoreInterfa
 
     public function save(int $attemptId, array $snapshot): void
     {
+        \PrestaShop\Module\Unipayment\Infrastructure\ControlPanelOriginColumn::ensure($this->database, _DB_PREFIX_ . self::TABLE);
         $values = $snapshot;
         $values['id_attempt'] = $attemptId;
         foreach (['customer_json', 'address_json', 'lines_json', 'consents_json'] as $key) {

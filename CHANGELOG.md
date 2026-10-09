@@ -2,6 +2,13 @@
 
 Notable notes for the UniPayment PrestaShop **9** development line.
 
+## Unreleased — 2026-10-09
+
+- Control Panel destination remains solely `config/environment.php`: HTTPS/public DNS/root/443 validation, bounded A/AAAA/CNAME checks, cURL IP pinning, no proxy or redirects, unchanged TLS/timeouts; independent client API-base and environment-file overrides removed.
+- Encrypted CP tokens and CP-derived SmartUCF credentials, shop cache/LKG and local certificate metadata now carry normalized CP-origin provenance. Foreign/legacy ephemeral state is unusable and refreshed lazily; certificate fail-open requires the same origin and transient failure.
+- Durable attempt/snapshot rows gain nullable `cp_origin` through additive lazy migration. Foreign/legacy create, successful replay and pending status PATCH are blocked with history and exactly-once identity preserved; no automatic cross-CP migration.
+- Packaging includes non-ignored new runtime classes without staging; unchanged environment/passphrase bytes and runtime-secret exclusions remain verified. No version bump, external runtime dependency, CP/SmartUCF payload change or inbound HMAC change.
+
 ## Unreleased — 2026-10-08
 
 - Inbound header extraction skips non-string SERVER keys/values before string operations; all three signed API endpoints retain controlled unsigned POST/GET responses.

@@ -106,6 +106,7 @@ final class PostControlPanelLifecycleService
 
             return PostControlPanelLifecycleResult::snapshotMissing();
         }
+        \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($snapshot['cp_origin'] ?? null);
         $this->currencyGuard->assertNativeSnapshot($snapshot);
         if ((int) ($snapshot['id_order'] ?? 0) !== $order->idOrder) {
             throw new \RuntimeException('The financing snapshot does not match the created order.');

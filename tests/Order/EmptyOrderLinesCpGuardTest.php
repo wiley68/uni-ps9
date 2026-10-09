@@ -23,7 +23,7 @@ final class PhpEncryption
         return base64_encode(strrev($value));
     }
 
-    public function decrypt(string $value)
+    public function decrypt(string $value): string|false
     {
         $decoded = base64_decode($value, true);
 
@@ -69,6 +69,7 @@ final class EmptyLinesAttempts implements OrderAttemptStoreInterface
         $key = $shop . ':' . $cart . ':' . $fingerprint;
         if (!isset($this->rows[$key])) {
             $this->rows[$key] = [
+                'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
                 'id_attempt' => 1,
                 'id_shop' => $shop,
                 'id_cart' => $cart,

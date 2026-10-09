@@ -67,7 +67,7 @@ final class PhpEncryption
     }
 
     /** @return string|false */
-    public function decrypt(string $ciphertext)
+    public function decrypt(string $ciphertext): string|false
     {
         $decoded = base64_decode($ciphertext, true);
 
@@ -144,19 +144,13 @@ function assertLive(bool $condition, string $message): void
 $unicid = trim((string) getenv('UNIPAYMENT_LIVE_UNICID'));
 $secret = trim((string) getenv('UNIPAYMENT_LIVE_SECRET'));
 $shopName = rtrim(trim((string) getenv('UNIPAYMENT_LIVE_SHOP_NAME')), '/');
-$liveBase = getenv('UNIPAYMENT_LIVE_BASE_URL');
-$baseUrl = rtrim(trim((string) (
-    (is_string($liveBase) && $liveBase !== '')
-        ? $liveBase
-        : (new ModuleDeploymentEnvironment())->controlPanelApiBaseUrl()
-)), '/');
 assertLive($unicid !== '' && $secret !== '' && $shopName !== '', 'live credentials required');
 
 $configuration = new ConfigurationRepository();
 assertLive($configuration->save(true, $unicid, $secret), 'could not stage credentials');
 $tokens = new TokenRepository();
 $cache = new MemoryShopConfigurationCache();
-$client = new ControlPanelClient($configuration, $tokens, new CurlHttpTransport(), $shopName, $baseUrl);
+$client = new ControlPanelClient($configuration, $tokens, new CurlHttpTransport(), $shopName);
 $service = new ShopConfigurationService($configuration, $cache, $client, $tokens);
 
 $cache->clear();

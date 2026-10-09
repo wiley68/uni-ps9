@@ -15,6 +15,7 @@ function unipayment_valid_shop_snapshot(array $overrides = []): array
     }
 
     $base = array_merge([
+        'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
         'unicid' => '123e4567-e89b-12d3-a456-426614174000',
         'uni_status' => 1,
         'uni_typekop' => 0,

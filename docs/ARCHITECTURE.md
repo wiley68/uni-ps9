@@ -567,6 +567,27 @@ UNIPAYMENT_CP_TOKEN_TYPE
 UNIPAYMENT_CP_TOKEN_EXPIRES_AT
 ```
 
+### Control Panel destination and origin provenance
+
+`config/environment.php` → `control_panel_url` → `ModuleDeploymentEnvironment` / `ControlPanelDestinationPolicy` → canonical origin → centrally derived `/api/v1` → every `ControlPanelClient` operation. The loader has no custom-file parameter and the client has no independent API-base parameter. The origin is immutable for a PHP request/process; later requests use the edited deployment file. A long-running CLI worker must be restarted after a deployment switch (including normal opcode-cache deployment handling).
+
+The canonical identity is lowercase `https://hostname`; omitted port and explicit `:443` are equivalent and a single root slash is removed. It accepts ASCII public DNS hostnames, including punycode, without a CP hostname allowlist. HTTP, credentials, query, fragment, non-root paths, other ports, IP literals and local/special-use names fail closed. DNS resolves A/AAAA and at most eight CNAME links, with query/record bounds; any non-public/special-purpose address rejects the entire answer. cURL pins one validated address on a fresh handle, disables proxies/redirects and keeps TLS peer/hostname verification plus 5/15-second connect/transfer timeouts. Unsupported pinning or option setup failure causes zero HTTP execution.
+
+| CP-bound state | Matching origin | Foreign or missing origin |
+| --- | --- | --- |
+| Access token | Existing refresh/expiry rules | Unusable; normal login before authenticated request |
+| Shop snapshot / LKG | Existing 24h TTL and <=6h transient presentation LKG | Neither fresh nor LKG; normal new-CP refresh, no FO advertising remote call |
+| SmartUCF credentials | Exact shop pair decrypted and hydrated | Both sides unusable; fresh complete pair required |
+| Certificate pair / metadata | Valid pair + matching actual hashes; transient same-origin fail-open | No lease or fail-open; current CP metadata and bundle must establish provenance, even with equal hashes |
+| Durable attempt / frozen create / CP id | Existing idempotency and success proof | Reconciliation required; no create replay, successful `cp_created` interpretation or new PS order |
+| Durable status target / confirmation | Existing CAS admission and PATCH rules | No automatic PATCH, confirmation reuse or history rewrite |
+
+Tokens and both SmartUCF credential envelopes retain `enc:v1:` and encrypt a JSON `{cp_origin, value}` together; origin cannot be separated from the encrypted value. Shop JSON and `.ssl_state.json` store `cp_origin`; certificate metadata is written atomically and bound to the actual PEM hashes. General cache remains credential-free.
+
+`unipayment_order_attempt` and `unipayment_financing_snapshot` gain nullable `cp_origin` columns lazily on first reservation/save or install, with concurrent additive migration handling. New records are stamped locally; existing rows retain NULL and are never backfilled from the current deployment. Existing uniqueness/idempotency keys remain unchanged, and normal update methods cannot rewrite origin. Reads of old schemas remain valid; missing provenance blocks durable operations. Database ALTER permission is required, with no reinstall, reset, destructive migration or automatic reconciliation.
+
+All runtime contexts use the same client: BO/cache and product/cart/checkout factories, order adapter, replay/status synchronization, certificate synchronizer and uninstall logout. SmartUCF bank endpoint policy and inbound HMAC/merchant identity are separate and unchanged. Fresh HMAC-authenticated shop pushes remain trusted under the current deployment; the existing shared-secret contract does not identify the sender's network origin. An old CP retaining the same merchant secret remains an authorized inbound sender, which requires operator credential management when transferring trust.
+
 ### Deployment packaging (ZIP-only)
 
 No SSH / PHP-FPM / environment-variable setup is required for merchants.

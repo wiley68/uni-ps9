@@ -53,7 +53,7 @@ final class PhpEncryption
     /**
      * @return string|false
      */
-    public function decrypt(string $ciphertext)
+    public function decrypt(string $ciphertext): string|false
     {
         $decoded = base64_decode($ciphertext, true);
 
@@ -138,7 +138,6 @@ $client = new ControlPanelClient(
     $tokens,
     $transport,
     'https://shop.example',
-    'https://cp.example/api/v1',
     static function () use (&$now): int {
         return $now;
     }
@@ -151,7 +150,7 @@ $transport->responses[] = successEnvelope([
     'shop' => ['id' => 10, 'name' => 'https://shop.example', 'unicid' => $unicid],
 ]);
 $client->login();
-assertPhase2($transport->requests[0]['url'] === 'https://cp.example/api/v1/auth/login', 'login endpoint mismatch');
+assertPhase2($transport->requests[0]['url'] === (new \PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment())->controlPanelApiBaseUrl() . '/auth/login', 'login endpoint mismatch');
 assertPhase2($transport->requests[0]['payload']['unicid'] === $unicid, 'login unicid mismatch');
 assertPhase2($transport->requests[0]['payload']['name'] === 'https://shop.example', 'login shop name mismatch');
 assertPhase2($transport->requests[0]['payload']['secret'] === 'test-secret', 'login secret mismatch');
@@ -162,7 +161,7 @@ assertPhase2($tokens->getExpiresAt() === $now + 86400, 'token expiration mismatc
 $transport->responses[] = successEnvelope(['unicid' => $unicid]);
 $client->getShop();
 assertPhase2($transport->requests[1]['method'] === 'GET', 'getShop method mismatch');
-assertPhase2($transport->requests[1]['url'] === 'https://cp.example/api/v1/shop', 'getShop endpoint mismatch');
+assertPhase2($transport->requests[1]['url'] === (new \PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment())->controlPanelApiBaseUrl() . '/shop', 'getShop endpoint mismatch');
 assertPhase2($transport->requests[1]['headers']['Authorization'] === 'Bearer token-one', 'Bearer header mismatch');
 
 $now += 86350;
@@ -179,8 +178,8 @@ $transport->responses[] = successEnvelope([
     'created_at' => '2026-01-01T00:00:00Z',
 ], 'created', 201);
 $client->createOrder(['order_id' => '100', 'name' => 'Client']);
-assertPhase2($transport->requests[2]['url'] === 'https://cp.example/api/v1/auth/refresh', 'proactive refresh endpoint mismatch');
-assertPhase2($transport->requests[3]['url'] === 'https://cp.example/api/v1/orders', 'createOrder endpoint mismatch');
+assertPhase2($transport->requests[2]['url'] === (new \PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment())->controlPanelApiBaseUrl() . '/auth/refresh', 'proactive refresh endpoint mismatch');
+assertPhase2($transport->requests[3]['url'] === (new \PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment())->controlPanelApiBaseUrl() . '/orders', 'createOrder endpoint mismatch');
 assertPhase2($transport->requests[3]['headers']['Authorization'] === 'Bearer token-two', 'refreshed token was not used');
 
 $transport->responses[] = jsonResponse(401, [
@@ -206,7 +205,7 @@ $transport->responses[] = successEnvelope([
 $requestCountBefore401 = count($transport->requests);
 $client->updateOrderStatus('100', 'sent', 'cp_sent');
 assertPhase2($transport->requests[$requestCountBefore401]['method'] === 'PATCH', 'status method mismatch');
-assertPhase2($transport->requests[$requestCountBefore401 + 1]['url'] === 'https://cp.example/api/v1/auth/login', '401 did not trigger re-login');
+assertPhase2($transport->requests[$requestCountBefore401 + 1]['url'] === (new \PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment())->controlPanelApiBaseUrl() . '/auth/login', '401 did not trigger re-login');
 assertPhase2($transport->requests[$requestCountBefore401 + 2]['headers']['Authorization'] === 'Bearer token-three', '401 retry did not use new token');
 assertPhase2($transport->requests[$requestCountBefore401 + 2]['payload']['status_id'] === 'cp_sent', 'status_id contract mismatch');
 assertPhase2($transport->requests[$requestCountBefore401 + 2]['payload']['status'] === 'sent', 'status contract mismatch');
@@ -394,7 +393,7 @@ $transport->responses[] = successEnvelope(['unicid' => $unicid]);
 $client->getShop();
 assertPhase2(count($transport->requests) === $requestCountBeforeReuse + 1, 'valid token must not trigger login');
 assertPhase2(
-    $transport->requests[array_key_last($transport->requests)]['url'] === 'https://cp.example/api/v1/shop',
+    $transport->requests[array_key_last($transport->requests)]['url'] === (new \PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment())->controlPanelApiBaseUrl() . '/shop',
     'reuse path must call GET /shop only'
 );
 assertPhase2(

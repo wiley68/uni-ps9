@@ -37,6 +37,7 @@ final class FinancingSnapshotFactory
         }
 
         return [
+            'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
             'id_order' => $order->idOrder,
             'order_reference' => $order->reference,
             'cart_fingerprint' => $request->cartFingerprint,

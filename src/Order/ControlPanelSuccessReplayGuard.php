@@ -30,6 +30,8 @@ final class ControlPanelSuccessReplayGuard
     /** @param array<string, mixed>|null $attempt @param array<string, mixed> $snapshot */
     public function assertSuccessful(?array $attempt, array $snapshot, ?int $expectedCpId = null): void
     {
+        \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($attempt['cp_origin'] ?? null);
+        \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($snapshot['cp_origin'] ?? null);
         $attemptId = (int) ($attempt['id_attempt'] ?? 0);
         $idOrder = (int) ($attempt['id_order'] ?? 0);
         $cpId = (int) ($attempt['control_panel_order_id'] ?? 0);

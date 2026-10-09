@@ -76,7 +76,7 @@ if (!class_exists('PhpEncryption', false)) {
         }
 
         /** @return string|false */
-        public function decrypt(string $ciphertext)
+        public function decrypt(string $ciphertext): string|false
         {
             $decoded = base64_decode($ciphertext, true);
             if ($decoded === false) {
@@ -117,7 +117,7 @@ if (!class_exists('Shop', false)) {
         }
 
         /** @return int|false */
-        public static function getGroupFromShop(int $idShop, bool $asId = true)
+        public static function getGroupFromShop(int $idShop, bool $asId = true): int|false
         {
             unset($asId);
             if (!isset(self::$shops[$idShop])) {
@@ -128,7 +128,7 @@ if (!class_exists('Shop', false)) {
         }
 
         /** @return array<int, array{id_shop:int, id_shop_group:int}> */
-        public static function getShops(bool $active = true)
+        public static function getShops(bool $active = true): array
         {
             unset($active);
 
@@ -136,7 +136,7 @@ if (!class_exists('Shop', false)) {
         }
 
         /** @return null */
-        public static function getContextShopID(bool $null_if_not_exist = false)
+        public static function getContextShopID(bool $null_if_not_exist = false): ?int
         {
             unset($null_if_not_exist);
 
@@ -144,7 +144,7 @@ if (!class_exists('Shop', false)) {
         }
 
         /** @return null */
-        public static function getContextShopGroupID(bool $null_if_not_exist = false)
+        public static function getContextShopGroupID(bool $null_if_not_exist = false): ?int
         {
             unset($null_if_not_exist);
 
@@ -162,7 +162,7 @@ if (!class_exists('Configuration', false)) {
         /**
          * @param mixed $value
          */
-        public static function updateValue(string $key, $value, bool $html = false, $idShopGroup = null, $idShop = null): bool
+        public static function updateValue(string $key, mixed $value, bool $html = false, ?int $idShopGroup = null, ?int $idShop = null): bool
         {
             unset($html, $idShopGroup, $idShop);
             self::$values[$key] = $value;
@@ -171,7 +171,7 @@ if (!class_exists('Configuration', false)) {
         }
 
         /** @return mixed */
-        public static function get(string $key, $idLang = null, $idShopGroup = null, $idShop = null, $default = false)
+        public static function get(string $key, ?int $idLang = null, ?int $idShopGroup = null, ?int $idShop = null, mixed $default = false): mixed
         {
             unset($idLang, $idShopGroup, $idShop);
 
@@ -224,7 +224,7 @@ final class ExactScopeFakeDb
     public $failNextInsert = false;
 
     /** @return list<array<string, mixed>>|false */
-    public function executeS(string $sql)
+    public function executeS(string $sql): array|false
     {
         if (!preg_match('/FROM `?test_configuration`?.*WHERE `name` IN \(\'([^\']+)\', \'([^\']+)\'\)(.*)$/s', $sql, $m)) {
             return [];
@@ -246,7 +246,7 @@ final class ExactScopeFakeDb
     }
 
     /** @return mixed */
-    public function getValue(string $sql)
+    public function getValue(string $sql): mixed
     {
         if (preg_match('/SELECT COUNT\(\*\) FROM `?test_configuration`? WHERE `name` = \'([^\']+)\'(.*)$/s', $sql, $m)) {
             $count = 0;
@@ -688,7 +688,7 @@ assertScope($preSend->isPreSendFailure(), '21: credentials unavailable is pre-se
 $order = new OrderOrchestrationResult(1, 'cp_created', 55, 'ABCD12345', 901);
 $ctx = new PostControlPanelLifecycleContext(1, 'EUR');
 $snap = new ExactScopeSnapStore();
-$snap->rows[1] = ['id_attempt' => 1, 'id_order' => 55, 'order_reference' => 'ABCD12345', 'id_currency' => 1, 'currency_iso' => 'EUR', 'customer_json' => []];
+$snap->rows[1] = ['cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(), 'id_attempt' => 1, 'id_order' => 55, 'order_reference' => 'ABCD12345', 'id_currency' => 1, 'currency_iso' => 'EUR', 'customer_json' => []];
 $bank = new ExactScopeBankSpy();
 $resultPre = (eurTestPostService($snap, new ExactScopeMailNoop(), $bank))->handle(
     $order,

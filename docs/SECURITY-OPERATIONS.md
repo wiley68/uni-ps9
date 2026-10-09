@@ -45,6 +45,18 @@ The builder copies `config/environment.php` unchanged from the source; the stand
 
 ---
 
+### Destination and provenance boundary
+
+The CP root policy has no hostname allowlist. A/AAAA and bounded CNAME resolution must contain only public, non-special-purpose addresses; cURL pins one validated address, disables environment proxies and redirects, and retains TLS hostname/peer verification. Address exclusions follow the [IANA IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/) and [IANA IPv6](https://www.iana.org/assignments/iana-ipv6-special-registry/) registries, conservatively excluding special-purpose blocks even where globally reachable. Review these network ranges when IANA assignments change.
+
+[libcurl DNS pinning](https://curl.se/libcurl/c/CURLOPT_RESOLVE.html) requires >=7.21.3, with bracketed IPv6 >=7.57.0; unsupported versions fail closed. Only one validated address is tried per call, so an unreachable first address fails the call despite other public answers. Pinning removes the second DNS lookup/rebinding window for the HTTP connection; it cannot prove DNS ownership, prevent routing compromise or bound OS resolver latency within cURL's transfer timeout. TLS verification remains the peer-authentication boundary. DNS and destination rejections perform no CP HTTP request.
+
+Origin identity is selected once per PHP request/process. Requests already in flight keep their old origin, and long-lived workers require restart after deployment. No automatic state is carried into a new origin: encrypted token/credential envelopes, cache/LKG and hash-bound certificate metadata are origin checked; durable create/CP id/PATCH state is preserved and blocked on mismatch or missing provenance. See [ARCHITECTURE.md](ARCHITECTURE.md#control-panel-destination-and-origin-provenance).
+
+Inbound HMAC remains independently bound to merchant identity and the shared secret, not CP DNS origin. A newly signed push is authenticated by that unchanged contract; changing only the outbound URL does not revoke an old CP that still holds the merchant secret. Operational transfer of inbound trust requires credential management. SmartUCF `online.ucfin.bg` / `onlinetest.ucfin.bg` endpoint trust remains unchanged.
+
+---
+
 ## 2. CP → module signed request protocol
 
 Implementation: `ModuleRequestSignatureProtocol`, `ModuleRequestSignatureVerifier`, `ModuleRequestAuthenticator`, `BoundedRawBodyReader`, `ApiNonceRepository`.

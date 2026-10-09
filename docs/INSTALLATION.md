@@ -12,7 +12,7 @@ Related: [`../README.md`](../README.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [
 | ------------------------- | ------------------------------------------------------ |
 | PrestaShop                | **9.0.0 – 9.99.99** (`ps_versions_compliancy`)         |
 | PHP                       | **≥ 8.1 and &lt; 8.6** (`composer.json`)               |
-| PHP curl / openssl        | Required for CP HTTP and SmartUCF certificates         |
+| PHP curl / openssl        | Required; CP DNS pinning needs libcurl >=7.21.3 (IPv6 >=7.57.0), otherwise fails closed |
 | Composer                  | Required for development checkout (`vendor/`)          |
 | HTTPS                     | Module API controllers and SmartUCF use TLS            |
 | Control Panel             | Shop registered with matching UNICID and shared secret |
@@ -29,6 +29,12 @@ Themes: Hummingbird 2.0 (primary) and Classic 3.1.1.
 Run `composer package` (or `php bin/build-distribution.php`) from the module root. It creates `dist/CC_PrestaShop_9.x_UNI_v.<MODULE_VERSION>.zip` with production dependencies in an isolated staging tree and verifies the archive before success. See [RELEASE.md](RELEASE.md) for the manifest/parity checks and build prerequisites.
 
 The package copies the current source `config/environment.php` unchanged. Its standard configuration is `control_panel_url = https://uni.avalonbg.com` (API = host + `/api/v1`). Prepare environment-specific CP hosts manually in this file before packaging; the builder performs no configuration substitution or rewriting. It also copies the local, Git-ignored `secrets/smartucf-key.php` unchanged into the ZIP as an explicit deployment-file exception. This file must exist and be readable before building; symlinks are rejected. Certificates/private keys under `keys/` remain excluded and are managed through the established certificate mechanism.
+
+### Switching Control Panel
+
+Change exactly `control_panel_url` in `config/environment.php` to the new public HTTPS CP root (no `/api/v1`, credentials, query, fragment or non-443 port), then build/deploy normally. No second endpoint setting, host allowlist, environment template, database reset or reinstall is required. The new CP still needs valid merchant registration/credentials under the existing contract.
+
+Tokens, cache/LKG, SmartUCF credentials and certificate metadata from another or unproven origin are not reused. They refresh through the configured CP. Legacy durable order attempts/snapshots remain preserved and blocked pending explicit reconciliation; do not relabel them or create replacement orders. The first new reservation/save adds nullable provenance columns using the existing database connection; it needs ALTER permission. See [RECOVERY.md](RECOVERY.md).
 
 ### Git vs ZIP material
 

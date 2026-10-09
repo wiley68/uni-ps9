@@ -31,7 +31,7 @@ final class Configuration
      *
      * @return mixed
      */
-    public static function get(string $key, $idLang = null, $idShopGroup = null, $idShop = null, $default = false)
+    public static function get(string $key, ?int $idLang = null, ?int $idShopGroup = null, ?int $idShop = null, mixed $default = false): mixed
     {
         return self::$values[$key] ?? $default;
     }
@@ -60,7 +60,7 @@ final class PhpEncryption
         return base64_encode($value);
     }
 
-    public function decrypt(string $value)
+    public function decrypt(string $value): string|false
     {
         $decoded = base64_decode($value, true);
 
@@ -125,6 +125,7 @@ final class CompletionSnapStore implements FinancingSnapshotStoreInterface
 function completionSnapshot(string $customerEmail): array
 {
     return [
+        'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
         'order_reference' => 'REFMAIL01',
         'id_order' => 100,
         'id_currency' => 1,
@@ -415,21 +416,21 @@ if (!class_exists('Mail', false)) {
          * @param mixed $replyTo
          */
         public static function Send(
-            $idLang,
-            $template,
-            $subject,
-            $templateVars,
-            $to,
-            $toName = null,
-            $from = null,
-            $fromName = null,
-            $fileAttachment = null,
-            $mode_smtp = null,
-            $templatePath = null,
-            $die = false,
-            $idShop = null,
-            $bcc = null,
-            $replyTo = null
+            mixed $idLang,
+            mixed $template,
+            mixed $subject,
+            mixed $templateVars,
+            mixed $to,
+            mixed $toName = null,
+            mixed $from = null,
+            mixed $fromName = null,
+            mixed $fileAttachment = null,
+            mixed $mode_smtp = null,
+            mixed $templatePath = null,
+            mixed $die = false,
+            mixed $idShop = null,
+            mixed $bcc = null,
+            mixed $replyTo = null
         ): bool {
             ++self::$sendCalls;
             unset(

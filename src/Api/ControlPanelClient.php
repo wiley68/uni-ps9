@@ -39,17 +39,13 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
         TokenRepository $tokens,
         HttpTransportInterface $transport,
         string $shopName,
-        ?string $baseUrl = null,
         ?callable $clock = null
     ) {
         $this->configuration = $configuration;
         $this->tokens = $tokens;
         $this->transport = $transport;
         $this->shopName = rtrim(trim($shopName), '/');
-        $resolved = $baseUrl !== null && trim($baseUrl) !== ''
-            ? $baseUrl
-            : (new ModuleDeploymentEnvironment())->controlPanelApiBaseUrl();
-        $this->baseUrl = rtrim($resolved, '/');
+        $this->baseUrl = (new ModuleDeploymentEnvironment())->controlPanelApiBaseUrl();
         $this->clock = $clock ?? 'time';
     }
 
@@ -298,6 +294,10 @@ final class ControlPanelClient implements ShopConfigurationProviderInterface
      */
     private function send(string $method, string $path, ?array $payload = null, ?string $token = null): array
     {
+        // Every client uses the immutable canonical origin selected for this request.
+        if ($this->baseUrl !== (new ModuleDeploymentEnvironment())->controlPanelApiBaseUrl()) {
+            throw new \PrestaShop\Module\Unipayment\Configuration\ControlPanelOriginMismatchException();
+        }
         $headers = [
             'Accept' => 'application/json',
             'Content-Type' => 'application/json',

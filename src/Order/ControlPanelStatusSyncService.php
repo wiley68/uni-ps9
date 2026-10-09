@@ -72,6 +72,9 @@ final class ControlPanelStatusSyncService
             return ControlPanelStatusSyncStates::NOT_NEEDED;
         }
 
+        $snapshot = $this->store->findByAttempt($attemptId);
+        \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($snapshot['cp_origin'] ?? null);
+
         $decision = $this->admitPendingTarget($attemptId, $statusId, $statusLabel);
         if ($decision === self::CONFLICT) {
             // Local authority already proves process1↔process2 incompatibility — no PATCH.
@@ -170,6 +173,8 @@ final class ControlPanelStatusSyncService
             return ControlPanelStatusSyncStates::NOT_NEEDED;
         }
 
+        \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($snapshot['cp_origin'] ?? null);
+
         $state = (string) ($snapshot['cp_status_sync_state'] ?? ControlPanelStatusSyncStates::NOT_NEEDED);
         if ($state === ControlPanelStatusSyncStates::CONFIRMED) {
             return ControlPanelStatusSyncStates::CONFIRMED;
@@ -190,6 +195,7 @@ final class ControlPanelStatusSyncService
         if ($snapshot === null) {
             return ControlPanelStatusSyncStates::NOT_NEEDED;
         }
+        \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($snapshot['cp_origin'] ?? null);
         $state = (string) ($snapshot['cp_status_sync_state'] ?? ControlPanelStatusSyncStates::NOT_NEEDED);
         if ($state !== ControlPanelStatusSyncStates::PENDING) {
             return $state !== '' ? $state : ControlPanelStatusSyncStates::NOT_NEEDED;

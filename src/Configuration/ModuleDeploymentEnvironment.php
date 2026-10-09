@@ -16,9 +16,12 @@ final class ModuleDeploymentEnvironment
     /** @var string */
     private $configFilePath;
 
-    public function __construct(?string $configFilePath = null)
+    /** One immutable deployment origin per request/process. */
+    private static ?string $origin = null;
+
+    public function __construct()
     {
-        $this->configFilePath = $configFilePath ?? (dirname(__DIR__, 2) . '/' . self::RELATIVE_PATH);
+        $this->configFilePath = dirname(__DIR__, 2) . '/' . self::RELATIVE_PATH;
     }
 
     /**
@@ -26,17 +29,15 @@ final class ModuleDeploymentEnvironment
      */
     public function controlPanelUrl(): string
     {
+        if (self::$origin !== null) {
+            return self::$origin;
+        }
         $loaded = $this->load();
         $url = $loaded[self::CONTROL_PANEL_URL_KEY] ?? null;
         if (!is_string($url)) {
             throw new \RuntimeException('Control Panel URL is not configured in config/environment.php.');
         }
-        $url = rtrim(trim($url), '/');
-        if ($url === '' || !preg_match('#^https?://#i', $url)) {
-            throw new \RuntimeException('Control Panel URL is invalid in config/environment.php.');
-        }
-
-        return $url;
+        return self::$origin = \PrestaShop\Module\Unipayment\Api\ControlPanelDestinationPolicy::canonicalOrigin($url);
     }
 
     /**

@@ -11,6 +11,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
+\PrestaShop\Module\Unipayment\Tests\Support\DeploymentEnvironmentFixture::activate();
 
 use PrestaShop\Module\Unipayment\Api\Exception\AuthenticationException;
 use PrestaShop\Module\Unipayment\Api\Exception\ConnectionException;
@@ -228,6 +229,7 @@ function f01Http(int $status, string $error): HttpException
 
 $store = new F01MemorySnapshots();
 $store->save(11, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 11,
     'order_reference' => 'REFPROCESS001',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -245,6 +247,7 @@ assertF01($store->rows[11]['cp_status_sync_state'] === ControlPanelStatusSyncSta
 
 // P1 transport failure → pending, business evidence preserved (no createOrder)
 $store->save(12, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 12,
     'order_reference' => 'REFPROCESS002',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -267,6 +270,7 @@ assertF01($cpFail->patches[1]['status_id'] === BankStatus::SENT_PROCESS1, 'P1 re
 // P2 success → confirmed
 $p2 = BankStatus::successfulSend(true);
 $store->save(21, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 21,
     'order_reference' => 'REFPROCESS021',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -281,6 +285,7 @@ assertF01($cp2->patches[0]['status_id'] === BankStatus::SENT_PROCESS2, 'P2 targe
 
 // P2 transport failure → pending, no second create
 $store->save(22, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 22,
     'order_reference' => 'REFPROCESS022',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -310,6 +315,7 @@ foreach (
 ) {
     $id = 30 + strlen($label);
     $store->save($id, [
+        'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
         'id_attempt' => $id,
         'order_reference' => 'REFECHO' . $id,
         'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -334,6 +340,7 @@ foreach (
 ) {
     $id = 40 + strlen($code);
     $store->save($id, [
+        'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
         'id_attempt' => $id,
         'order_reference' => 'REFTERM' . $id,
         'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -366,6 +373,7 @@ foreach (
     [$code, $http] = $pair;
     $id = 60 + $idx;
     $store->save($id, [
+        'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
         'id_attempt' => $id,
         'order_reference' => 'REFPEND' . $id,
         'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -381,6 +389,7 @@ foreach (
 
 $authExId = 70;
 $store->save($authExId, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => $authExId,
     'order_reference' => 'REFAUTH070',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -395,6 +404,7 @@ assertF01(
 
 // confirmed process2 + process1 → conflict (no replacement, no PATCH)
 $store->save(50, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 50,
     'order_reference' => 'REFNEWER050',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::CONFIRMED,
@@ -413,6 +423,7 @@ assertF01(count($cpStale->patches) === 0, 'process2→process1 conflict must not
 
 // pending process2 + process1 → conflict
 $store->save(51, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 51,
     'order_reference' => 'REFNEWER051',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::PENDING,
@@ -431,6 +442,7 @@ assertF01(count($cpOlder->patches) === 0, 'pending process2→process1 conflict 
 
 // pending process1 + process2 → conflict
 $store->save(52, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 52,
     'order_reference' => 'REFNEWER052',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::PENDING,
@@ -449,6 +461,7 @@ assertF01(count($cpPendConflict->patches) === 0, 'pending process1→process2 co
 
 // confirmed process1 + process2 → conflict
 $store->save(53, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 53,
     'order_reference' => 'REFNEWER053',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::CONFIRMED,
@@ -467,6 +480,7 @@ assertF01(count($cpConfConflict->patches) === 0, 'confirmed process1→process2 
 
 // terminal_failed process1 + process2 → same incompatibility (target still authority)
 $store->save(54, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 54,
     'order_reference' => 'REFNEWER054',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::TERMINAL_FAILED,
@@ -489,6 +503,7 @@ assertF01(count($cpTermConflict->patches) === 0, 'terminal_failed process confli
 
 // same-target pending retry via synchronizeAfterHandoff remains idempotent
 $store->save(55, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 55,
     'order_reference' => 'REFSAME055',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::PENDING,
@@ -509,6 +524,7 @@ assertF01(
 assertF01(count($cpSameTarget->patches) === 1, 'confirmed same-target must not re-PATCH');
 
 $store->save(56, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 56,
     'order_reference' => 'REFSAME056',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::PENDING,
@@ -529,6 +545,7 @@ assertF01(count($cpSameP2->patches) === 1, 'confirmed same-target process2 must 
 
 // F01-B stale confirmation rejected (store CAS: concurrent target mutation)
 $store->save(80, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 80,
     'order_reference' => 'REFCAS080',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::PENDING,
@@ -561,6 +578,7 @@ assertF01(
 
 // F01-B stale failure rejected after alternate target confirmed
 $store->save(81, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 81,
     'order_reference' => 'REFCAS081',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::PENDING,
@@ -600,6 +618,7 @@ assertF01(
 
 // F01-B stale retry must not send old status — persistence is authority
 $store->save(82, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 82,
     'order_reference' => 'REFCAS082',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::PENDING,
@@ -624,6 +643,7 @@ assertF01(
 
 // concurrent same-target retry ends confirmed without corruption
 $store->save(83, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 83,
     'order_reference' => 'REFCAS083',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::PENDING,
@@ -644,6 +664,7 @@ assertF01(
 
 // service-level: confirm in-flight for process1 after concurrent store mutation → preserve other target
 $store->save(84, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 84,
     'order_reference' => 'REFCAS084',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::PENDING,
@@ -691,6 +712,7 @@ assertF01(count($cp->patches) === $before, 'confirmed retry must not re-PATCH');
 
 // --- empty-string persistence (production PrestaShop insert shape) ---
 $store->save(1001, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 1001,
     'order_reference' => 'REFEMPTY1001',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -708,6 +730,7 @@ assertF01(count($cpEmpty1->patches) === 1, 'empty-string P1 admit triggers PATCH
 assertF01($store->rows[1001]['cp_status_sync_status_id'] === BankStatus::SENT_PROCESS1, 'empty-string P1 target persisted');
 
 $store->save(1002, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 1002,
     'order_reference' => 'REFEMPTY1002',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -747,4 +770,22 @@ assertF01(
     'no local process2 > process1 ranking remains'
 );
 
+
+$originA = \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current();
+\PrestaShop\Module\Unipayment\Tests\Support\DeploymentEnvironmentFixture::configure('https://cp-switch.example');
+foreach ([$originA, null] as $provenance) {
+    foreach ([ControlPanelStatusSyncStates::PENDING, ControlPanelStatusSyncStates::CONFIRMED, ControlPanelStatusSyncStates::NOT_NEEDED] as $state) {
+        $store->rows[1001] = array_replace($store->rows[1001], ['cp_origin' => $provenance, 'cp_status_sync_state' => $state]);
+        foreach (['retry', 'admit'] as $operation) {
+            $before = $store->rows;
+            $httpBefore = count($cpEmpty1->patches);
+            try {
+                if ($operation === 'retry') { $syncEmpty1->retryPending(1001, 'REFEMPTY1001'); }
+                else { $syncEmpty1->synchronizeAfterHandoff(1001, 'REFEMPTY1001', $p1); }
+                assertF01(false, 'foreign/legacy PATCH or confirmed state accepted');
+            } catch (\PrestaShop\Module\Unipayment\Configuration\ControlPanelOriginMismatchException $exception) {}
+            assertF01($before === $store->rows && $httpBefore === count($cpEmpty1->patches), 'origin mismatch changed pending history or sent PATCH');
+        }
+    }
+}
 fwrite(STDOUT, "OK (F01 durable CP status synchronization + lifecycle alignment)\n");

@@ -75,6 +75,7 @@ final class SmartUcfCredentialPersistence
         }
 
         $sanitized = SmartUcfCredentialPairClassifier::stripFromSnapshot($shopData);
+        $sanitized['cp_origin'] = \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current();
         $rotatePair = $state === SmartUcfCredentialPairClassifier::COMPLETE;
 
         $encryptedUser = null;
@@ -94,6 +95,7 @@ final class SmartUcfCredentialPersistence
             $encryptedUser,
             $encryptedPassword
         ) {
+            \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($sanitized['cp_origin']);
             if ($rotatePair) {
                 $this->credentials->replaceEncryptedPair(
                     (string) $encryptedUser,

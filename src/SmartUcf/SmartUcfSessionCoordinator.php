@@ -120,6 +120,7 @@ final class SmartUcfSessionCoordinator implements \PrestaShop\Module\Unipayment\
             return SmartUcfCoordinationResult::failed(self::CUSTOMER_FAILED, true, SmartUcfFailureClassification::CLASS_PRE_SEND);
         }
         try {
+            \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($snapshot['cp_origin'] ?? null);
             $this->currencyGuard->assertNativeSnapshot($snapshot);
             ($this->cpSuccessVerifier)($attemptId, $snapshot);
         } catch (\Throwable $exception) {

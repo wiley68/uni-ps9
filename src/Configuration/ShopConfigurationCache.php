@@ -80,7 +80,7 @@ final class ShopConfigurationCache implements ShopConfigurationCacheInterface, S
             return null;
         }
 
-        return $decoded;
+        return ControlPanelOrigin::matches($decoded['cp_origin'] ?? null) ? $decoded : null;
     }
 
     public function getRetained(string $unicid): ?array
@@ -108,6 +108,9 @@ final class ShopConfigurationCache implements ShopConfigurationCacheInterface, S
         if (!is_array($decoded) || $decoded === [] || $expiresAt === false) {
             return null;
         }
+        if (!ControlPanelOrigin::matches($decoded['cp_origin'] ?? null)) {
+            return null;
+        }
 
         return [
             'data' => $decoded,
@@ -119,6 +122,8 @@ final class ShopConfigurationCache implements ShopConfigurationCacheInterface, S
 
     public function replace(string $unicid, array $shopData): bool
     {
+        // Provenance is assigned by the authenticated pull/push persistence boundary.
+        ControlPanelOrigin::assertMatches($shopData['cp_origin'] ?? null);
         $unicid = trim($unicid);
         if ($unicid === '' || $shopData === []) {
             throw new InvalidPayloadException('The shop configuration snapshot is empty or has no UNICID.');
@@ -198,11 +203,16 @@ final class ShopConfigurationCache implements ShopConfigurationCacheInterface, S
         }
 
         $row = $this->database->getRow(sprintf(
-            "SELECT `fetched_at`, `expires_at` FROM `%s` WHERE `unicid` = '%s'",
+            "SELECT `shop_data`, `fetched_at`, `expires_at` FROM `%s` WHERE `unicid` = '%s'",
             $this->tableName(),
             pSQL(trim($unicid))
         ));
         if (!is_array($row) || !isset($row['fetched_at'], $row['expires_at'])) {
+            return null;
+        }
+
+        $data = json_decode((string) ($row['shop_data'] ?? ''), true);
+        if (!is_array($data) || !ControlPanelOrigin::matches($data['cp_origin'] ?? null)) {
             return null;
         }
 

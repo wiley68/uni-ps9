@@ -22,24 +22,17 @@ function assertEnv(bool $ok, string $message): void
     }
 }
 
-$root = dirname(__DIR__, 2);
+use PrestaShop\Module\Unipayment\Tests\Support\DeploymentEnvironmentFixture;
+DeploymentEnvironmentFixture::activate();
+$source = include dirname(__DIR__, 2) . '/config/environment.php';
 $packaged = new ModuleDeploymentEnvironment();
-assertEnv($packaged->controlPanelUrl() === 'https://uni.avalonbg.com', 'packaged host');
-assertEnv($packaged->controlPanelApiBaseUrl() === 'https://uni.avalonbg.com/api/v1', 'packaged API base');
-
-$tmp = sys_get_temp_dir() . '/unipayment-env-' . bin2hex(random_bytes(4)) . '.php';
-file_put_contents($tmp, "<?php\nreturn ['control_panel_url' => 'https://test.example'];\n");
-$switched = new ModuleDeploymentEnvironment($tmp);
-assertEnv($switched->controlPanelApiBaseUrl() === 'https://test.example/api/v1', 'switch via one file');
-
+assertEnv($packaged->controlPanelUrl() === \PrestaShop\Module\Unipayment\Api\ControlPanelDestinationPolicy::canonicalOrigin($source['control_panel_url']), 'source authority');
+assertEnv($packaged->controlPanelApiBaseUrl() === $packaged->controlPanelUrl() . '/api/v1', 'derived API base');
+DeploymentEnvironmentFixture::configure('https://future-public.example/');
+assertEnv((new ModuleDeploymentEnvironment())->controlPanelApiBaseUrl() === 'https://future-public.example/api/v1', 'isolated deployment switch');
+DeploymentEnvironmentFixture::remove();
 $threw = false;
-try {
-    (new ModuleDeploymentEnvironment($tmp . '.missing'))->controlPanelUrl();
-} catch (RuntimeException $exception) {
-    $threw = strpos($exception->getMessage(), 'missing or unreadable') !== false;
-}
-assertEnv($threw, 'missing environment file fails closed');
-
-@unlink($tmp);
-
+try { (new ModuleDeploymentEnvironment())->controlPanelUrl(); }
+catch (RuntimeException $exception) { $threw = strpos($exception->getMessage(), 'missing or unreadable') !== false; }
+assertEnv($threw, 'missing environment fails closed');
 fwrite(STDOUT, "OK (module deployment environment)\n");

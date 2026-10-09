@@ -59,7 +59,7 @@ final class Aud002bFakeSessionGateway implements SmartUcfSessionGatewayInterface
         'raw_response' => '{"ok":1}',
     ];
 
-    public function createSession(array $shop, array $snapshot, $certificateLease = null): array
+    public function createSession(array $shop, array $snapshot, ?\PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateConsumerLease $certificateLease = null): array
     {
         ++$this->createCalls;
         if ($this->throwOnCreate !== null) {
@@ -203,6 +203,7 @@ function aud002bCoordinatorWith(Aud002bMemoryLifecycle $lifecycle, Aud002bFakeSe
 }
 
 $snapshot = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 42,
     'id_order' => 42,
     'order_reference' => 'POSTSUCC42',
@@ -224,6 +225,7 @@ $shop = [
 ];
 
 $baseRow = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 42,
     'smartucf_state' => SmartUcfLifecycleStates::NOT_STARTED,
     'smartucf_retryable' => 0,
@@ -352,6 +354,7 @@ $cpPayload = [
 ];
 $cpSnapshot = array_replace($snapshot, ['control_panel_order_id' => 901, 'lifecycle_status' => 'cp_created']);
 $cpAttempt = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 42, 'id_order' => 42, 'state' => 'cp_created',
     'control_panel_order_id' => 901,
     'cp_payload' => json_encode($cpPayload, JSON_THROW_ON_ERROR),

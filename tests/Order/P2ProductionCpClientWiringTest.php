@@ -173,6 +173,7 @@ final class P2WireSmartUcf implements PostControlPanelSmartUcfPort
 
 $store = new P2WireSnapshotStore();
 $store->save(42, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 42,
     'order_reference' => 'REF42',
     'id_order' => 42,
@@ -219,6 +220,7 @@ assertP2Wire($bank->updates !== [] && $bank->updates[0]['statusId'] === BankStat
 // Transient PATCH failure → pending
 $store2 = new P2WireSnapshotStore();
 $store2->save(43, [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 43,
     'order_reference' => 'REF43',
     'id_order' => 43,

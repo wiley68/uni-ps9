@@ -54,7 +54,7 @@ if (!class_exists('PhpEncryption', false)) {
         }
 
         /** @return string|false */
-        public function decrypt(string $ciphertext)
+        public function decrypt(string $ciphertext): string|false
         {
             $decoded = base64_decode($ciphertext, true);
             if (!is_string($decoded)) {
@@ -80,7 +80,7 @@ if (!class_exists('Configuration', false)) {
         /**
          * @param mixed $value
          */
-        public static function updateValue(string $key, $value, bool $html = false, $idShopGroup = null, $idShop = null): bool
+        public static function updateValue(string $key, mixed $value, bool $html = false, ?int $idShopGroup = null, ?int $idShop = null): bool
         {
             self::$values[$key] = $value;
 
@@ -88,7 +88,7 @@ if (!class_exists('Configuration', false)) {
         }
 
         /** @return mixed */
-        public static function get(string $key, $idLang = null, $idShopGroup = null, $idShop = null, $default = false)
+        public static function get(string $key, ?int $idLang = null, ?int $idShopGroup = null, ?int $idShop = null, mixed $default = false): mixed
         {
             return self::$values[$key] ?? $default;
         }
@@ -127,7 +127,7 @@ final class CredentialGuardSmartUcfClient implements SmartUcfSessionGatewayInter
     /** @var bool */
     public $succeed = false;
 
-    public function createSession(array $shop, array $snapshot, $certificateLease = null): array
+    public function createSession(array $shop, array $snapshot, ?\PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateConsumerLease $certificateLease = null): array
     {
         ++$this->calls;
         if (!$this->succeed) {
@@ -440,6 +440,7 @@ assertCred(!array_key_exists('uni_user', $neither) && !array_key_exists('uni_pas
 // Process 1 fail-before-network
 $client = new CredentialGuardSmartUcfClient();
 $lifecycle = new CredentialMemoryLifecycle([
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 1,
     'order_reference' => 'REF-1',
     'smartucf_state' => SmartUcfLifecycleStates::NOT_STARTED,
@@ -447,6 +448,7 @@ $lifecycle = new CredentialMemoryLifecycle([
     'smartucf_session_id' => '',
 ]);
 $snapshotRow = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 1,
     'id_order' => 9,
     'order_reference' => 'REF-1',

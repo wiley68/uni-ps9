@@ -171,6 +171,7 @@ assertDbl((int) $resolvedC['id_order'] === 0, 'C: no fabricated order');
 
 // D. lock loser after PS order
 $attempts->row = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 7,
     'id_order' => 55,
     'order_reference' => 'DBLCLKORDER1',
@@ -205,6 +206,7 @@ $attempts->row['cp_payload'] = json_encode([
 $snapshots->byOrder = [
     'order_reference' => 'DBLCLKORDER1',
     'order_total' => 100.0,
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 7,
     'id_order' => 55,
     'id_currency' => 1,
@@ -222,6 +224,7 @@ assertDbl((int) $resolvedE['control_panel_order_id'] === 901, 'E: reuses CP id')
 $snapshots->byOrder = [
     'order_reference' => 'DBLCLKORDER1',
     'order_total' => 100.0,
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 7,
     'id_order' => 55,
     'id_currency' => 1,
@@ -301,6 +304,7 @@ assertDbl($attempts->row === $validCpAttempt, 'recovery mutated attempt state');
 $snapshots->byOrder = [
     'order_reference' => 'DBLCLKORDER1',
     'order_total' => 100.0,
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 7,
     'id_order' => 55,
     'id_currency' => 1,

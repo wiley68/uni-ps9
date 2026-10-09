@@ -65,7 +65,7 @@ final class CertificateSynchronizer
             );
         }
 
-        $local = $this->store->validateLocalPair();
+        $local = $this->store->validateOriginBoundPair();
         if (
             $local !== null
             && hash_equals((string) $metadata['certificate_sha256'], $local['certificate_sha256'])
@@ -85,7 +85,7 @@ final class CertificateSynchronizer
 
         return $this->store->withExclusiveLock(function () use ($metadata) {
             // Recheck under lock — another request may have refreshed already.
-            $local = $this->store->validateLocalPair();
+            $local = $this->store->validateOriginBoundPair();
             if (
                 $local !== null
                 && hash_equals((string) $metadata['certificate_sha256'], $local['certificate_sha256'])
@@ -139,7 +139,9 @@ final class CertificateSynchronizer
 
     private function failOpenOrThrow(\Throwable $exception): CertificateConsumerLease
     {
-        $local = $this->store->validateLocalPair();
+        $transient = $exception instanceof ConnectionException || $exception instanceof TimeoutException
+            || ($exception instanceof HttpException && (in_array($exception->getStatusCode(), [408, 429], true) || $exception->getStatusCode() >= 500));
+        $local = $transient ? $this->store->validateOriginBoundPair() : null;
         if ($local !== null) {
             \PrestaShopLogger::addLog(
                 'UniPayment SSL cert sync: CP metadata unavailable, fail-open with valid local pair'

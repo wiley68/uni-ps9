@@ -21,7 +21,7 @@ final class EurReplayDb
     /** @var array<string, mixed> */
     public array $snapshot = [];
     /** @return array<string, mixed>|false */
-    public function getRow(string $sql)
+    public function getRow(string $sql): array|false|null
     {
         return strpos($sql, 'unipayment_order_attempt') !== false ? $this->attempt : $this->snapshot;
     }
@@ -52,10 +52,12 @@ $payload = [
     'currency' => 'EUR', 'version' => '2.0.3',
 ];
 $db->attempt = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 7, 'id_order' => 55, 'id_shop' => 1, 'control_panel_order_id' => 901,
     'state' => OrderOrchestrator::CP_CREATED, 'cp_payload' => json_encode($payload, JSON_THROW_ON_ERROR),
 ];
 $db->snapshot = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 7, 'id_order' => 55, 'id_currency' => 1, 'currency_iso' => 'EUR',
     'control_panel_order_id' => 901, 'lifecycle_status' => OrderOrchestrator::CP_CREATED,
     'order_reference' => 'EURORDER1', 'order_total' => 100,

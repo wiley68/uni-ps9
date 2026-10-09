@@ -11,6 +11,22 @@ UniPayment CLI tests run against the module checkout in the PrestaShop test shop
 | Production PHP baseline | **8.1**            |
 | Supported CLI matrix    | PHP **8.1–8.5**    |
 
+## Control Panel destination / origin remediation gate
+
+- `Api/ControlPanelDestinationTest`: four configurable origins with synthetic public DNS, invalid URL matrix, mixed unsafe A/AAAA, safe/unsafe/cyclic CNAME, pinning/proxy/TLS/timeouts and unsupported/failed cURL security options; rejection means zero HTTP.
+- `Api/ControlPanelAuthorityTest`: every CP method under four deployment fixtures, no independent constructor/file authority or embedded deployment hostname; BO/cache/product/cart/checkout/create/replay/status/certificate/logout wiring.
+- `Configuration/ControlPanelOriginSwitchTest`: real token/cipher/cache/service paths across A → B; new login precedes GET, no old Bearer, no foreign fresh/LKG/credential hydration, same-origin TTL/LKG preserved and legacy ephemeral replacement.
+- `SmartUcf/CertificateOriginSwitchTest`: synthetic encrypted PEMs only in a private temporary directory; transient same-origin reuse, auth/protocol denial, foreign/legacy denial and required B bundle even with equal A hashes.
+- `Order/OrderOrchestratorTest` and `Order/ControlPanelStatusSyncServiceTest`: foreign/legacy attempt/snapshot, frozen create, `cp_created`, pending/confirmed PATCH; zero extra HTTP/native orders and identical stored history on block.
+- `Infrastructure/ControlPanelOriginMigrationTest`: additive nullable migration, existing/concurrent/failure paths and no provenance backfill or history mutation.
+- `Api/NativeInboundCompatibilityTest`: fifteen isolated cases with actual native PS controller inheritance, bypassing constructors/bootstrap. Default uses local PS core; pass an external official core-controller directory to repeat against another line, and an optional extracted module directory to test the production ZIP.
+
+`DeploymentEnvironmentFixture` copies the actual loader and deployment file to `/tmp`, then simulates separate requests by resetting only that isolated loader's private process cache. It never edits the live environment file and is excluded from the ZIP. Fake DNS/transport never contact CP.
+
+On PHP 8.4, native inheritance was checked against local PS 9.1.0 and the official 9.2.0 `Controller`/`FrontController`/`ModuleFrontController` sources fetched only to `/tmp`. This verifies inheritance and controlled inbound responses; it does not certify a complete PS 9.2 Apache/FPM/browser lifecycle.
+
+The remediation validation passed the full safe suite on the available PHP 8.1, 8.2, 8.3 and 8.4 runtimes. The installed PHP 8.5 CLI has no curl, zip or SimpleXML extension binaries; its destination and packaging tests therefore fail at prerequisite checks. The missing-zip packaging prerequisite predates this remediation; the new transport-options test also requires curl. All other safe files pass there. This is an environment limitation, not evidence of completed PHP 8.5 network/package validation. Live financing/destructive database tests remain opt-in/skipped, as do database adapter tests when their native PS configuration fixture is unavailable.
+
 ## EUR-only regression gate
 
 `tests/Calculator/EurCurrencyGuardsTest.php` covers ISO normalization and cart/context currency ID and ISO coherence. Snapshot validation tests confirm `uni_eur` is optional and opaque. `tests/Order/OrderOrchestratorTest.php` exercises new EUR CP create and rejects incomplete, malformed, non-EUR or mismatched frozen CP payloads without another HTTP call. `tests/Order/EurPopupReplayTest.php` exercises durable provenance for both product and cart popup replay. The SmartUCF boundary tests cover invalid snapshot replay and Process 2; the checkout lock-loser test rejects old non-EUR or missing durable evidence before exposing a stored redirect.

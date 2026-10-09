@@ -14,7 +14,6 @@ declare(strict_types=1);
  *   php tests/Api/LiveControlPanelSmokeTest.php
  *
  * Optional:
- *   UNIPAYMENT_LIVE_BASE_URL='https://cp.example/api/v1'  (optional override; default: config/environment.php)
  *
  * Uses in-memory Configuration stubs (does not mutate the live shop DB).
  * Never prints secrets or tokens.
@@ -74,7 +73,7 @@ final class PhpEncryption
     /**
      * @return string|false
      */
-    public function decrypt(string $ciphertext)
+    public function decrypt(string $ciphertext): string|false
     {
         $decoded = base64_decode($ciphertext, true);
 
@@ -101,13 +100,6 @@ function assertLive(bool $condition, string $message): void
 $unicid = trim((string) getenv('UNIPAYMENT_LIVE_UNICID'));
 $secret = trim((string) getenv('UNIPAYMENT_LIVE_SECRET'));
 $shopName = rtrim(trim((string) getenv('UNIPAYMENT_LIVE_SHOP_NAME')), '/');
-$liveBase = getenv('UNIPAYMENT_LIVE_BASE_URL');
-$baseUrl = rtrim(trim((string) (
-    (is_string($liveBase) && $liveBase !== '')
-        ? $liveBase
-        : (new ModuleDeploymentEnvironment())->controlPanelApiBaseUrl()
-)), '/');
-
 assertLive($unicid !== '' && $secret !== '' && $shopName !== '', 'live credentials env vars are required');
 
 $configuration = new ConfigurationRepository();
@@ -118,8 +110,7 @@ $client = new ControlPanelClient(
     $configuration,
     $tokens,
     new CurlHttpTransport(),
-    $shopName,
-    $baseUrl
+    $shopName
 );
 
 $client->login();

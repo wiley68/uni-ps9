@@ -40,7 +40,7 @@ if (!function_exists('pSQL')) {
     /**
      * @param mixed $string
      */
-    function pSQL($string, $htmlOK = false)
+    function pSQL(mixed $string, bool $htmlOK = false): string
     {
         return addslashes((string) $string);
     }
@@ -63,7 +63,7 @@ if (!class_exists('PhpEncryption', false)) {
         }
 
         /** @return string|false */
-        public function decrypt(string $ciphertext)
+        public function decrypt(string $ciphertext): string|false
         {
             $decoded = base64_decode($ciphertext, true);
             if (!is_string($decoded)) {
@@ -89,7 +89,7 @@ if (!class_exists('Configuration', false)) {
         /**
          * @param mixed $value
          */
-        public static function updateValue(string $key, $value, bool $html = false, $idShopGroup = null, $idShop = null): bool
+        public static function updateValue(string $key, mixed $value, bool $html = false, ?int $idShopGroup = null, ?int $idShop = null): bool
         {
             self::$values[$key] = $value;
 
@@ -97,7 +97,7 @@ if (!class_exists('Configuration', false)) {
         }
 
         /** @return mixed */
-        public static function get(string $key, $idLang = null, $idShopGroup = null, $idShop = null, $default = false)
+        public static function get(string $key, ?int $idLang = null, ?int $idShopGroup = null, ?int $idShop = null, mixed $default = false): mixed
         {
             return self::$values[$key] ?? $default;
         }
@@ -256,7 +256,7 @@ final class FakeDbForBoundary
     public $releaseValue = 1;
     public $releaseThrows = false;
 
-    public function getValue(string $sql)
+    public function getValue(string $sql): mixed
     {
         $this->queries[] = $sql;
         if (stripos($sql, 'GET_LOCK') !== false) {
@@ -356,7 +356,7 @@ assertRem($repoBMissing->hasCompleteReadablePair() === false, 'missing B does no
 assertRem($exactStore->pairQueryCount === 1, 'pair fetched in one exact-context query for decrypt');
 // hydrate uses one captureRawPair / getPair
 $exactStore->pairQueryCount = 0;
-$hydratedMissing = $repoBMissing->hydrateShopSnapshot(['x' => 1]);
+$hydratedMissing = $repoBMissing->hydrateShopSnapshot(['cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(), 'x' => 1]);
 assertRem(!isset($hydratedMissing['uni_user']) && !isset($hydratedMissing['uni_password']), 'missing exact → neither hydrated');
 assertRem($exactStore->pairQueryCount === 1, 'hydrate uses single pair query');
 

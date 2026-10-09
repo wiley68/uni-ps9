@@ -140,8 +140,11 @@ final class SmartUcfCredentialRepository
      */
     public function hydrateShopSnapshot(array $shopData): array
     {
-        $pair = $this->decryptPair();
         $shopData = SmartUcfCredentialPairClassifier::stripFromSnapshot($shopData);
+        if (!\PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::matches($shopData['cp_origin'] ?? null)) {
+            return $shopData;
+        }
+        $pair = $this->decryptPair();
 
         if ($pair['user'] === null || $pair['password'] === null) {
             return $shopData;

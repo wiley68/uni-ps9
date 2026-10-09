@@ -163,6 +163,9 @@ final class ShopConfigurationService
             return null;
         }
         $retained = $this->cache->getRetained($unicid);
+        if ($retained !== null && !ControlPanelOrigin::matches($retained['data']['cp_origin'] ?? null)) {
+            return null;
+        }
         $now = (int) call_user_func($this->clock);
         if ($retained === null || $retained['expires_at_timestamp'] > $now
             || $now > $retained['expires_at_timestamp'] + ShopConfigurationCache::LKG_SECONDS
@@ -228,7 +231,7 @@ final class ShopConfigurationService
 
         return $this->mutationBoundary->runExclusive($lockName, function () use ($unicid) {
             $cached = $this->cache->getFresh($unicid);
-            if ($cached === null) {
+            if ($cached === null || !ControlPanelOrigin::matches($cached['cp_origin'] ?? null)) {
                 return null;
             }
 

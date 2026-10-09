@@ -118,6 +118,7 @@ final class Phase11SmartPort implements PostControlPanelSmartUcfPort
 $order = new OrderOrchestrationResult(1, 'cp_created', 55, 'ABCD12345', 901);
 $ctx = new PostControlPanelLifecycleContext(1, 'EUR');
 $snapshot = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 1,
     'id_order' => 55,
     'id_currency' => 1,

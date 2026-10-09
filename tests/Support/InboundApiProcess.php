@@ -7,8 +7,18 @@ if (PHP_SAPI !== 'cli') {
     exit(1);
 }
 
-class ModuleFrontController
-{
+$nativeControllerRoot = $argv[4] ?? null;
+if ($nativeControllerRoot === null) {
+    class ModuleFrontController {}
+} else {
+    // Load actual PS inheritance without constructors, shop bootstrap or persistence.
+    final class Country { public const GEOLOC_ALLOWED = 0; }
+    require $nativeControllerRoot . '/Controller.php';
+    class_alias(ControllerCore::class, 'Controller');
+    require $nativeControllerRoot . '/FrontController.php';
+    class_alias(FrontControllerCore::class, 'FrontController');
+    require $nativeControllerRoot . '/ModuleFrontController.php';
+    class_alias(ModuleFrontControllerCore::class, 'ModuleFrontController');
 }
 
 final class Configuration
@@ -138,7 +148,7 @@ stream_wrapper_register('php', InboundApiInputStream::class);
 ob_start();
 
 $class = 'Unipayment' . ucfirst($endpoint) . 'ModuleFrontController';
-$controller = new $class();
+$controller = $nativeControllerRoot === null ? new $class() : (new ReflectionClass($class))->newInstanceWithoutConstructor();
 $extract = new ReflectionMethod($controller, 'extractRequestHeaders');
 $headers = $extract->invoke($controller);
 register_shutdown_function(static function () use ($headers): void {

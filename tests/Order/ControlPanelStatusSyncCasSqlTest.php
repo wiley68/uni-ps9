@@ -71,7 +71,7 @@ final class CasSqlFakeDb
     public $inserts = [];
 
     /** @return array<string, mixed>|false|null */
-    public function getRow(string $sql)
+    public function getRow(string $sql): array|false|null
     {
         unset($sql);
 
@@ -151,6 +151,7 @@ $repo = new FinancingSnapshotRepository($db);
 
 // --- A: empty-string row + semantic-null expected → CAS SQL matches NULL or '' ---
 $db->row = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 91001,
     'order_reference' => 'CASEMPTY001',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -378,6 +379,7 @@ $trackingStore = new CasSqlTrackingStore($serviceRepo, $serviceDb);
 $cp = new CasSqlFakeCp();
 
 $serviceDb->row = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 92001,
     'order_reference' => 'CASSVC001',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -408,6 +410,7 @@ assertCasSql(
 
 // --- B: empty-string P2 ---
 $serviceDb->row = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 92002,
     'order_reference' => 'CASSVC002',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -427,6 +430,7 @@ assertCasSql(count($cp2->patches) === 1 && $cp2->patches[0]['status_id'] === Ban
 
 // --- C service: SQL NULL row also works ---
 $serviceDb->row = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 92003,
     'order_reference' => 'CASSVC003',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::NOT_NEEDED,
@@ -444,6 +448,7 @@ assertCasSql(
 
 // --- F: P1/P2 conflict unchanged ---
 $serviceDb->row = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 92004,
     'order_reference' => 'CASSVC004',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::CONFIRMED,
@@ -464,6 +469,7 @@ assertCasSql(
 );
 
 $serviceDb->row = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 92005,
     'order_reference' => 'CASSVC005',
     'cp_status_sync_state' => ControlPanelStatusSyncStates::CONFIRMED,

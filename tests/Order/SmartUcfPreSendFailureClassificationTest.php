@@ -134,7 +134,7 @@ final class PreSendFakeSessionGateway implements SmartUcfSessionGatewayInterface
         'raw_response' => '{"ok":1}',
     ];
 
-    public function createSession(array $shop, array $snapshot, $certificateLease = null): array
+    public function createSession(array $shop, array $snapshot, ?\PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateConsumerLease $certificateLease = null): array
     {
         ++$this->createCalls;
         unset($shop, $snapshot, $certificateLease);
@@ -238,6 +238,7 @@ function preSendLifecycleHandle(
     $order = new OrderOrchestrationResult(1, 'cp_created', 55, 'ABCD12345', 901);
     $ctx = new PostControlPanelLifecycleContext(1, 'EUR');
     $snapshot = [
+        'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
         'id_attempt' => 1,
         'id_order' => 55,
         'id_currency' => 1,
@@ -261,6 +262,7 @@ function preSendLifecycleHandle(
 $order = new OrderOrchestrationResult(1, 'cp_created', 55, 'ABCD12345', 901);
 $ctx = new PostControlPanelLifecycleContext(1, 'EUR');
 $snapshot = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 1,
     'id_order' => 55,
     'order_reference' => 'ABCD12345',
@@ -279,6 +281,7 @@ $trusted = 'https://online.ucfin.bg/sucf-online/Request/Start/sess-retry';
 
 // 1) smartucf_credentials_unavailable — coordinator + lifecycle, no client call, not_started preserved
 $life1 = new PreSendMemoryLifecycle([
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 1,
     'order_reference' => 'ABCD12345',
     'smartucf_state' => SmartUcfLifecycleStates::NOT_STARTED,
@@ -322,6 +325,7 @@ assertPreSend($bank2->updates === [], '2: no bank failure persisted');
 
 // 3) certificate pre-send failure through coordinator + lifecycle
 $life3 = new PreSendMemoryLifecycle([
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 1,
     'order_reference' => 'ABCD12345',
     'smartucf_state' => SmartUcfLifecycleStates::NOT_STARTED,
@@ -398,6 +402,7 @@ assertPreSend($bank7->updates === [], '7: created path does not persist via fail
 
 // 8) repaired credentials can retry from preserved local state
 $life8 = new PreSendMemoryLifecycle([
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 1,
     'order_reference' => 'ABCD12345',
     'smartucf_state' => SmartUcfLifecycleStates::NOT_STARTED,

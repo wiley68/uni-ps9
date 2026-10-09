@@ -15,16 +15,34 @@ final class CurlHttpTransport implements HttpTransportInterface
     /** @var int */
     private $timeout;
 
-    public function __construct(int $connectTimeout = 5, int $timeout = 15)
+    private ControlPanelDnsResolver $dns;
+
+    public function __construct(int $connectTimeout = 5, int $timeout = 15, ?ControlPanelDnsResolver $dns = null)
     {
         $this->connectTimeout = $connectTimeout;
         $this->timeout = $timeout;
+        $this->dns = $dns ?? new ControlPanelDnsResolver();
     }
 
     public function request(string $method, string $url, array $headers, ?array $payload): HttpResponse
     {
+        $environment = new \PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment();
+        $origin = $environment->controlPanelUrl();
+        $prefix = $environment->controlPanelApiBaseUrl() . '/';
+        if (!str_starts_with($url, $prefix) || preg_match('/[\x00-\x20\x7f?#\\\\]/', $url)) {
+            throw new ConnectionException('Control Panel request destination does not match deployment configuration.');
+        }
+        $host = substr($origin, strlen('https://'));
+        $addresses = $this->dns->resolve($host);
         if (!function_exists('curl_init')) {
             throw new ConnectionException('The cURL PHP extension is not available.');
+        }
+
+        if (!defined('CURLOPT_RESOLVE') || curl_version()['version_number'] < 0x071503) {
+            throw new ConnectionException('Control Panel transport requires cURL DNS pinning support.');
+        }
+        if (str_contains($addresses[0], ':') && curl_version()['version_number'] < 0x073900) {
+            throw new ConnectionException('Control Panel IPv6 pinning requires cURL 7.57.0 or newer.');
         }
 
         $handle = curl_init($url);
@@ -38,6 +56,11 @@ final class CurlHttpTransport implements HttpTransportInterface
         }
 
         $options = [
+            // One validated address per fresh handle works on older libcurl too.
+            CURLOPT_RESOLVE => [$host . ':443:' . (str_contains($addresses[0], ':') ? '[' . $addresses[0] . ']' : $addresses[0])],
+            CURLOPT_PROXY => '',
+            CURLOPT_NOPROXY => '*',
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_CUSTOMREQUEST => strtoupper($method),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => false,
@@ -57,7 +80,10 @@ final class CurlHttpTransport implements HttpTransportInterface
             }
         }
 
-        curl_setopt_array($handle, $options);
+        if (!curl_setopt_array($handle, $options)) {
+            curl_close($handle);
+            throw new ConnectionException('Control Panel transport security options could not be applied.');
+        }
         $body = curl_exec($handle);
 
         if ($body === false) {

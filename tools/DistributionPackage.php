@@ -105,7 +105,7 @@ final class DistributionPackage
     public function sourceFiles(): array
     {
         $files = [];
-        foreach (explode("\0", $this->run(['git', 'ls-files', '--cached', '-z'], $this->sourceRoot)) as $path) {
+        foreach (explode("\0", $this->run(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], $this->sourceRoot)) as $path) {
             if (!self::isRuntimePath($path)) {
                 continue;
             }
@@ -193,7 +193,7 @@ final class DistributionPackage
             }
             $manifest = [
                 'module' => 'unipayment', 'version' => $version, 'source_git_sha' => $sha,
-                'source_dirty' => trim($this->run(['git', 'status', '--porcelain', '--untracked-files=no'], $this->sourceRoot)) !== '',
+                'source_dirty' => trim($this->run(['git', 'status', '--porcelain', '--untracked-files=normal'], $this->sourceRoot)) !== '',
                 'source_date_epoch' => (int) $epoch, 'files' => $hashes,
             ];
             $this->write($module . '/' . self::MANIFEST, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");

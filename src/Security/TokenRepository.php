@@ -36,7 +36,7 @@ final class TokenRepository
             return null;
         }
 
-        return is_string($token) && $token !== '' ? $token : null;
+        return is_string($token) ? OriginBoundSecret::decode($token) : null;
     }
 
     public function getTokenType(): string
@@ -68,7 +68,7 @@ final class TokenRepository
 
     private function encrypt(string $token): string
     {
-        return self::ENCRYPTED_PREFIX . $this->getCipher()->encrypt($token);
+        return self::ENCRYPTED_PREFIX . $this->getCipher()->encrypt(OriginBoundSecret::encode($token));
     }
 
     private function getCipher(): \PhpEncryption

@@ -112,6 +112,24 @@ final class CertificateLocalStore
         ];
     }
 
+    /** A valid key pair alone cannot prove which CP supplied it. */
+    public function validateOriginBoundPair(): ?array
+    {
+        $path = $this->keysDir . '/' . self::STATE_FILENAME;
+        $bytes = is_file($path) && is_readable($path) ? file_get_contents($path) : false;
+        $state = is_string($bytes) ? json_decode($bytes, true) : null;
+        if (!is_array($state) || !\PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::matches($state['cp_origin'] ?? null)) {
+            return null;
+        }
+        $pair = $this->validateLocalPair();
+        if ($pair === null || !hash_equals($pair['certificate_sha256'], (string) ($state['certificate_sha256'] ?? ''))
+            || !hash_equals($pair['private_key_sha256'], (string) ($state['private_key_sha256'] ?? ''))) {
+            return null;
+        }
+
+        return $pair;
+    }
+
     /**
      * @param array{ssl_revision?: string, certificate_sha256: string, private_key_sha256: string} $meta
      */
@@ -185,6 +203,7 @@ final class CertificateLocalStore
             }
 
             $this->writeState([
+                'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
                 'ssl_revision' => (string) ($meta['ssl_revision'] ?? ''),
                 'certificate_sha256' => (string) $meta['certificate_sha256'],
                 'private_key_sha256' => (string) $meta['private_key_sha256'],
@@ -214,6 +233,9 @@ final class CertificateLocalStore
 
     public function createConsumerPairLease(): CertificateConsumerLease
     {
+        if ($this->validateOriginBoundPair() === null) {
+            throw new CertificateSyncException('Certificate origin provenance is unproven.', CertificateSyncException::REASON_CP_UNAVAILABLE);
+        }
         $pair = $this->readPairBytes();
         if ($pair === null) {
             throw new CertificateSyncException(
@@ -438,10 +460,15 @@ final class CertificateLocalStore
     private function writeState(array $state): void
     {
         $path = $this->keysDir . '/' . self::STATE_FILENAME;
-        @file_put_contents(
-            $path,
-            (string) json_encode($state, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)
-        );
-        @chmod($path, 0640);
+        $staged = $path . '.' . bin2hex(random_bytes(8)) . '.tmp';
+        try {
+            $bytes = json_encode($state, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            if (@file_put_contents($staged, $bytes) !== strlen($bytes)
+                || !@chmod($staged, 0640) || !@rename($staged, $path)) {
+                throw new CertificateSyncException('Certificate provenance could not be stored.', CertificateSyncException::REASON_LOCAL_FS);
+            }
+        } finally {
+            @unlink($staged);
+        }
     }
 }

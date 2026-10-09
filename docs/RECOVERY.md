@@ -32,6 +32,14 @@ Once `id_order` exists on the attempt, **never** start a fresh financing attempt
 
 `checkout_lock` TTL **45s**. Expired row may be taken over only after checking durable attempt state — expiry alone does not imply no PS order was created.
 
+## CP origin switch / legacy provenance
+
+An origin mismatch raises `ControlPanelOriginMismatchException` (order-aware orchestration wraps it with the existing order/attempt identity). This is an operational reconciliation block, not a new public bank-status label. Do not reset/delete attempts, replace native orders, relabel provenance, replay a frozen create or PATCH into the newly configured CP.
+
+Foreign or pre-provenance tokens/cache/credential state is lazily replaced by normal login/GET; old LKG cannot hide a new-CP failure. Certificate files remain preserved but cannot be leased or used for transient fail-open until the current CP supplies a verified bundle. Returning to an original matching origin can use its still-valid proven state; legacy durable NULL origins remain unproven even then.
+
+Resolve durable history only against the CP that actually owns the operation with explicit operator evidence and an approved reconciliation procedure. This remediation provides no migration/rebind UI or automated cross-CP contract. Normal new carts can proceed after ephemeral refresh and lazy additive schema checks. A failed ALTER leaves operations blocked and history intact; restore the deployment's schema permissions rather than reinstalling/resetting shop data.
+
 ## CP ambiguous timeout
 
 Connection/timeout/malformed success/echo mismatch/auth/rate-limit/unknown 4xx → `cp_outcome_unknown` (or `cp_failed_retryable` for 5xx), **without** definitive local `bank_send_failed_cp`. Automatic replay must **not** issue a blind second POST `/orders` after an ambiguous create outcome. Frozen `cp_payload` / attempt identity remain authoritative for later proven reconciliation (operator/CP). Definitive CP machine-code rejection may still map to `bank_send_failed_cp`.

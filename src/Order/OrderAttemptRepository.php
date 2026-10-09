@@ -21,14 +21,20 @@ final class OrderAttemptRepository implements OrderAttemptStoreInterface
 
     public function install(): bool
     {
-        return (bool) $this->database->execute('CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . self::TABLE . '` (
+        $created = (bool) $this->database->execute('CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . self::TABLE . '` (
             `id_attempt` INT UNSIGNED NOT NULL AUTO_INCREMENT, `id_shop` INT UNSIGNED NOT NULL, `id_cart` INT UNSIGNED NOT NULL,
             `cart_fingerprint` CHAR(64) NOT NULL, `state` VARCHAR(32) NOT NULL, `id_order` INT UNSIGNED NULL,
             `order_reference` VARCHAR(13) NULL, `control_panel_order_id` BIGINT UNSIGNED NULL, `cp_payload` LONGTEXT NULL,
+            `cp_origin` VARCHAR(272) NULL DEFAULT NULL,
             `last_error_class` VARCHAR(255) NULL, `created_at` DATETIME NOT NULL, `updated_at` DATETIME NOT NULL,
             PRIMARY KEY (`id_attempt`), UNIQUE KEY `uniq_unipayment_attempt` (`id_shop`,`id_cart`,`cart_fingerprint`),
             KEY `idx_unipayment_attempt_order` (`id_order`)
         ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+        if ($created) {
+            \PrestaShop\Module\Unipayment\Infrastructure\ControlPanelOriginColumn::ensure($this->database, _DB_PREFIX_ . self::TABLE);
+        }
+
+        return $created;
     }
 
     public function uninstall(): bool
@@ -38,16 +44,18 @@ final class OrderAttemptRepository implements OrderAttemptStoreInterface
 
     public function reserve(int $idShop, int $idCart, string $cartFingerprint): array
     {
+        \PrestaShop\Module\Unipayment\Infrastructure\ControlPanelOriginColumn::ensure($this->database, _DB_PREFIX_ . self::TABLE);
         $now = gmdate('Y-m-d H:i:s');
         $sql = sprintf(
-            "INSERT IGNORE INTO `%s%s` (`id_shop`,`id_cart`,`cart_fingerprint`,`state`,`created_at`,`updated_at`) VALUES (%d,%d,'%s','reserved','%s','%s')",
+            "INSERT IGNORE INTO `%s%s` (`id_shop`,`id_cart`,`cart_fingerprint`,`state`,`created_at`,`updated_at`,`cp_origin`) VALUES (%d,%d,'%s','reserved','%s','%s','%s')",
             _DB_PREFIX_,
             self::TABLE,
             $idShop,
             $idCart,
             pSQL($cartFingerprint),
             $now,
-            $now
+            $now,
+            pSQL(\PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current())
         );
         if (!$this->database->execute($sql)) {
             throw new \RuntimeException('The financing attempt could not be reserved.');

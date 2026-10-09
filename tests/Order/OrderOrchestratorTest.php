@@ -13,13 +13,14 @@ final class PhpEncryption
     {
         return base64_encode(strrev($value));
     }
-    public function decrypt(string $value)
+    public function decrypt(string $value): string|false
     {
         $decoded = base64_decode($value, true);
         return is_string($decoded) ? strrev($decoded) : false;
     }
 }
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
+\PrestaShop\Module\Unipayment\Tests\Support\DeploymentEnvironmentFixture::activate();
 require dirname(__DIR__) . '/Calculator/fixtures.php';
 
 use PrestaShop\Module\Unipayment\Api\Exception\ConnectionException;
@@ -61,6 +62,7 @@ final class MemoryAttempts implements OrderAttemptStoreInterface
         $created = !isset($this->rows[$key]);
         if ($created) {
             $this->rows[$key] = [
+                'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
                 'id_attempt' => count($this->rows) + 1,
                 'id_shop' => $shop,
                 'id_cart' => $cart,
@@ -250,6 +252,7 @@ assertOrder($orders->validateOrderCalls === 1, 'fresh flow must call validateOrd
 // A successful historical CP replay needs the frozen, complete EUR payload.
 $replayKey = '1:9:' . $request->cartFingerprint;
 $validReplayRow = $attempts->rows[$replayKey];
+$validReplaySnapshot = $snapshots->rows[1];
 $validPayload = json_decode((string) $validReplayRow['cp_payload'], true, 512, JSON_THROW_ON_ERROR);
 assertOrder($validPayload['currency'] === 'EUR', 'new CP payload must be EUR');
 (new \PrestaShop\Module\Unipayment\Order\OrderCurrencyGuard())->assertSavedCpPayload(
@@ -327,6 +330,7 @@ $orders->order = $created;
 $crashAttempts = new MemoryAttempts();
 $crashKey = '1:88:' . $request->cartFingerprint;
 $crashAttempts->rows[$crashKey] = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 77,
     'id_shop' => 1,
     'id_cart' => 88,
@@ -370,6 +374,7 @@ assertOrder(count($crashCp->calls) === 1, 'second recovery must not POST CP agai
 $staleAttempts = new MemoryAttempts();
 $staleKey = '1:89:' . $request->cartFingerprint;
 $staleAttempts->rows[$staleKey] = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 78,
     'id_shop' => 1,
     'id_cart' => 89,
@@ -400,6 +405,7 @@ assertOrder((int) $staleAttempts->rows[$staleKey]['id_order'] === 55, 'stale res
 $attachedAttempts = new MemoryAttempts();
 $attachedKey = '1:90:' . $request->cartFingerprint;
 $attachedAttempts->rows[$attachedKey] = [
+    'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
     'id_attempt' => 79,
     'id_shop' => 1,
     'id_cart' => 90,
@@ -638,5 +644,30 @@ foreach ([['BGN', 2], ['', 1], ['EUR', 0]] as [$iso, $currencyId]) {
         assertOrder($e->isPostOrder() && $e->idOrder() === 57, 'native currency failure lost order identity');
     }
     assertOrder($nonEurCp->calls === [] && $nonEurOrders->created === 1, 'invalid native order triggered CP or duplicate order');
+}
+
+\PrestaShop\Module\Unipayment\Tests\Support\DeploymentEnvironmentFixture::configure('https://cp-switch.example');
+foreach ([OrderOrchestrator::CP_CREATED, OrderOrchestrator::CP_FAILED_RETRYABLE, OrderOrchestrator::PS_ORDER_CREATED, OrderOrchestrator::CP_OUTCOME_UNKNOWN] as $state) {
+    foreach (['attempt', 'snapshot'] as $unproven) {
+        foreach ([$validReplayRow['cp_origin'], null] as $provenance) {
+            $attempts->rows[$replayKey] = array_replace($validReplayRow, ['state' => $state, 'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current()]);
+            $snapshots->rows[1] = array_replace($validReplaySnapshot, ['cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current()]);
+            if ($unproven === 'attempt') { $attempts->rows[$replayKey]['cp_origin'] = $provenance; }
+            else { $snapshots->rows[1]['cp_origin'] = $provenance; }
+            $beforeAttempt = $attempts->rows;
+            $beforeSnapshots = $snapshots->rows;
+            $beforeHttp = count($cp->calls);
+            $beforeOrders = $orders->created;
+            try {
+                $orchestrator->orchestrate(1, 9, $request, $shop);
+                assertOrder(false, 'foreign/legacy durable state accepted');
+            } catch (OrderOrchestrationException $e) {
+                assertOrder($e->isPostOrder() && !$e->isRetryable(), 'blocked provenance must preserve order identity and require reconciliation');
+                assertOrder($e->getPrevious() instanceof \PrestaShop\Module\Unipayment\Configuration\ControlPanelOriginMismatchException, 'typed reconciliation reason');
+            }
+            assertOrder($beforeAttempt === $attempts->rows && $beforeSnapshots === $snapshots->rows, 'foreign/legacy durable history changed');
+            assertOrder($beforeHttp === count($cp->calls) && $beforeOrders === $orders->created, 'foreign/legacy state reached CP or duplicated PS order');
+        }
+    }
 }
 fwrite(STDOUT, "OK (Phase 10 order orchestration)\n");

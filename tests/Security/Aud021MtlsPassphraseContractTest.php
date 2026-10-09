@@ -75,14 +75,17 @@ assertAud021(strpos($cpClientSrc, 'DEFAULT_BASE_URL') === false, 'L: DEFAULT_BAS
 assertAud021(strpos($cpClientSrc, 'ModuleDeploymentEnvironment') !== false, 'L: client uses deployment environment');
 assertAud021(strpos($envSrc, 'config/environment.php') !== false, 'L: resolver path');
 
+\PrestaShop\Module\Unipayment\Tests\Support\DeploymentEnvironmentFixture::activate();
 $envTmp = $tmp . '/environment.php';
 file_put_contents($envTmp, "<?php\nreturn ['control_panel_url' => 'https://cp-switch.example'];\n");
-$deployment = new ModuleDeploymentEnvironment($envTmp);
+\PrestaShop\Module\Unipayment\Tests\Support\DeploymentEnvironmentFixture::configure('https://cp-switch.example');
+$deployment = new ModuleDeploymentEnvironment();
 assertAud021($deployment->controlPanelUrl() === 'https://cp-switch.example', 'M: host from one file');
 assertAud021($deployment->controlPanelApiBaseUrl() === 'https://cp-switch.example/api/v1', 'M: API base derived');
 
 file_put_contents($envTmp, "<?php\nreturn ['control_panel_url' => 'https://other.example'];\n");
-$deployment2 = new ModuleDeploymentEnvironment($envTmp);
+\PrestaShop\Module\Unipayment\Tests\Support\DeploymentEnvironmentFixture::configure('https://other.example');
+$deployment2 = new ModuleDeploymentEnvironment();
 assertAud021($deployment2->controlPanelApiBaseUrl() === 'https://other.example/api/v1', 'M: switch requires only that file');
 
 // Production src scan: no duplicated host outside config/environment.php

@@ -85,6 +85,7 @@ final class CheckoutCpStatusAttempts implements OrderAttemptStoreInterface
         $id = 1;
         if (!isset($this->rows[$id])) {
             $this->rows[$id] = [
+                'cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(),
                 'id_attempt' => $id,
                 'id_shop' => $idShop,
                 'id_cart' => $idCart,
@@ -102,14 +103,14 @@ final class CheckoutCpStatusAttempts implements OrderAttemptStoreInterface
 
     public function update(int $attemptId, array $changes): array
     {
-        $this->rows[$attemptId] = array_merge($this->rows[$attemptId] ?? ['id_attempt' => $attemptId], $changes);
+        $this->rows[$attemptId] = array_merge($this->rows[$attemptId] ?? ['cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(), 'id_attempt' => $attemptId], $changes);
 
         return $this->rows[$attemptId];
     }
 
     public function attachOrderIfReserved(int $attemptId, int $idOrder, string $orderReference): array
     {
-        $row = $this->rows[$attemptId] ?? ['id_attempt' => $attemptId];
+        $row = $this->rows[$attemptId] ?? ['cp_origin' => \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::current(), 'id_attempt' => $attemptId];
         if ((string) ($row['state'] ?? '') === OrderOrchestrator::RESERVED && (int) ($row['id_order'] ?? 0) <= 0) {
             $this->rows[$attemptId] = array_merge($row, [
                 'state' => OrderOrchestrator::PS_ORDER_CREATED,

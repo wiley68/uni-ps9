@@ -7,6 +7,9 @@ namespace PrestaShop\Module\Unipayment\SmartUcf;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
 use PrestaShop\Module\Unipayment\Security\MtlsPrivateKeyPassphraseProvider;
 use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateConsumerLease;
+use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateLocalStore;
+use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificatePairValidator;
+use PrestaShop\Module\Unipayment\SmartUcf\Certificate\CertificateSyncException;
 
 /**
  * HTTP client for SmartUCF sucfOnlineSessionStart.
@@ -98,9 +101,16 @@ final class SmartUcfSessionClient implements SmartUcfSessionGatewayInterface
                 $certPath = $certificateLease->certificatePath();
                 $certPassword = $certificateLease->password();
             } else {
-                $keyPath = $this->keysDir . '/avalon_private_key.pem';
-                $certPath = $this->keysDir . '/avalon_cert.pem';
-                $certPassword = $this->passphrases->require();
+                $store = new CertificateLocalStore($this->keysDir, new CertificatePairValidator($this->passphrases));
+                try {
+                    // Owned by this call; the lease destructor releases it on every exit.
+                    $certificateLease = $store->withSharedLock(static fn (): CertificateConsumerLease => $store->createConsumerPairLease());
+                } catch (CertificateSyncException $exception) {
+                    throw new SmartUcfSessionException('Certificate origin provenance is unproven.', true, '', 0, SmartUcfSessionException::KIND_PRE_SEND);
+                }
+                $keyPath = $certificateLease->privateKeyPath();
+                $certPath = $certificateLease->certificatePath();
+                $certPassword = $certificateLease->password();
             }
             if ($keyPath === '' || $certPath === '' || !is_readable($keyPath) || !is_readable($certPath)) {
                 throw new SmartUcfSessionException(
