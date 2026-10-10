@@ -50,7 +50,7 @@ composer package
 
 Requires CLI PHP 8.1–8.5 with zip/SimpleXML, Composer and Git, plus the local deployment file `secrets/smartucf-key.php`. The command uses current contents of tracked runtime files and non-ignored untracked runtime files selected by the existing runtime-path policy, and explicitly includes this Git-ignored deployment file. New runtime classes can therefore be reviewed and packaged without staging. Tests, documentation, temporary files and other paths outside that policy remain excluded. Never add `secrets/smartucf-key.php` to Git. The build never installs dependencies into the working module.
 
-Output naming is exactly `dist/CC_PrestaShop_9.x_UNI_v.<MODULE_VERSION>.zip`. The version comes from the single literal `$this->version` assignment in `unipayment.php`; an absent, dynamic or ambiguous declaration fails the build. The ZIP contains the top-level `unipayment/` directory, and its filename version is checked against both packaged PHP and XML metadata.
+Output naming is exactly `dist/ps9_uni_<MODULE_VERSION>.zip`, preserving all three version components (for example, `ps9_uni_2.0.3.zip`). The version comes from the single literal `$this->version` assignment in `unipayment.php`; an absent, dynamic or ambiguous declaration fails the build. The ZIP contains the top-level `unipayment/` directory, and its filename version is checked against both packaged PHP and XML metadata.
 
 The builder creates a private temporary staging tree under ignored `dist/`, copies runtime paths selected by the build policy, and runs:
 
@@ -67,7 +67,7 @@ Before reporting success, the builder reopens the ZIP and checks required runtim
 Standalone verification against the current source:
 
 ```bash
-php bin/verify-distribution.php dist/CC_PrestaShop_9.x_UNI_v.2.0.3.zip
+php bin/verify-distribution.php dist/ps9_uni_2.0.3.zip
 php tests/Infrastructure/DistributionPackageTest.php
 ```
 
@@ -92,4 +92,4 @@ Uninstall removes module-owned data only. Historical PS orders remain. Reinstall
 1. Confirm this commit is the intended release HEAD
 2. Confirm safe suite + manual smoke
 3. Create annotated local tag only when explicitly approved: `git tag -a v2.0.3 -m "UniPayment 2.0.3"`
-4. Push tag / attach `CC_PrestaShop_9.x_UNI_v.2.0.3.zip` only when distribution is approved
+4. Push tag / attach `ps9_uni_2.0.3.zip` only when distribution is approved

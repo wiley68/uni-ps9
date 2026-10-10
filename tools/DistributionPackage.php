@@ -98,7 +98,7 @@ final class DistributionPackage
 
     public static function artifactName(string $version): string
     {
-        return 'CC_PrestaShop_9.x_UNI_v.' . $version . '.zip';
+        return 'ps9_uni_' . $version . '.zip';
     }
 
     /** @return array<string, string> archive relative path => source path */

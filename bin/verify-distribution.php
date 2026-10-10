@@ -11,7 +11,7 @@ require dirname(__DIR__) . '/tools/DistributionPackage.php';
 
 try {
     if ($argc !== 2) {
-        throw new RuntimeException('Usage: php bin/verify-distribution.php dist/CC_PrestaShop_9.x_UNI_v.<version>.zip');
+        throw new RuntimeException('Usage: php bin/verify-distribution.php dist/ps9_uni_<version>.zip');
     }
     $count = (new PrestaShop\Module\Unipayment\Build\DistributionPackage(dirname(__DIR__)))->verify($argv[1]);
     fwrite(STDOUT, "OK (distribution verified; $count files)\n");
