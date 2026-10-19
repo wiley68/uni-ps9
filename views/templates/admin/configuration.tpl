@@ -25,7 +25,7 @@
     <div class="form-group">
       <label class="control-label col-lg-3 required" for="UNIPAYMENT_SECRET">{l s='Секретен код на магазина Ви' d='Modules.Unipayment.Admin'}</label>
       <div class="col-lg-9">
-        <input type="password" name="UNIPAYMENT_SECRET" id="UNIPAYMENT_SECRET" value="" maxlength="64" autocomplete="off"{if !$unipayment_has_secret} required{/if}>
+        <input type="password" name="UNIPAYMENT_SECRET" id="UNIPAYMENT_SECRET" value="" placeholder="{if $unipayment_has_secret}{l s='Токенът е въведен ✓' d='Modules.Unipayment.Admin'}{else}{l s='Въведете токен' d='Modules.Unipayment.Admin'}{/if}" maxlength="64" autocomplete="off"{if !$unipayment_has_secret} required{/if}>
         <p class="help-block">{l s='Вашият секретен код на магазина в системата на УниКредит.' d='Modules.Unipayment.Admin'} {if $unipayment_has_secret}{l s='Оставете празно, за да запазите текущия секрет.' d='Modules.Unipayment.Admin'}{/if}</p>
       </div>
     </div>
