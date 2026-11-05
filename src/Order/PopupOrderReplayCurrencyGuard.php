@@ -22,7 +22,7 @@ final class PopupOrderReplayCurrencyGuard
     }
 
     /** @param array<string, mixed> $submission */
-    public function assertReplay(array $submission, int $idShop): void
+    public function assertReplay(array $submission, int $idShop): array
     {
         $idOrder = (int) ($submission['id_order'] ?? 0);
         $attemptId = (int) ($submission['id_attempt'] ?? 0);
@@ -50,5 +50,7 @@ final class PopupOrderReplayCurrencyGuard
             // Failed or ambiguous CP attempts may have a frozen payload, but cannot become success.
             $this->currencyGuard->decodeSavedCpPayload($attempt['cp_payload'], $snapshot);
         }
+
+        return $snapshot;
     }
 }

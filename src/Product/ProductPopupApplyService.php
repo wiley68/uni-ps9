@@ -124,11 +124,19 @@ final class ProductPopupApplyService
         $requireEgn = ((int) ($shop['uni_proces'] ?? 0)) === 1;
         $customerData = $this->customerValidator->validate($posted, $requireEgn);
 
+        $consentSelection = $this->consents->selection($calcResult);
+        if ($reuseCartId > 0) {
+            $consentSelection = $this->orchestrator->consentSelection(
+                (int) $context->shop->id, $reuseCartId,
+                md5($reuseCartId . ':' . $product->price . ':' . $schemeKey), $consentSelection
+            );
+        }
+
         try {
-            $accepted = $this->consents->validate($shop, $posted['consent'] ?? []);
+            $accepted = OrderOrchestrator::validateConsentSelection($shop, $posted['consent'] ?? [], $consentSelection);
         } catch (CheckoutValidationException $exception) {
             throw new ProductPopupValidationException([
-                'consents' => 'Моля, приемете всички задължителни съгласия.',
+                'consents' => $exception->getMessage(),
             ]);
         }
         $acceptedConsents = array_values(array_filter(
@@ -153,7 +161,7 @@ final class ProductPopupApplyService
         }
         $cartFingerprint = md5((int) $cart->id . ':' . $product->price . ':' . $schemeKey);
 
-        $request = new ValidatedPaymentRequest($calcResult, $customerData, $accepted, $cartFingerprint, $acceptedConsents);
+        $request = new ValidatedPaymentRequest($calcResult, $customerData, $accepted, $cartFingerprint, $acceptedConsents, $this->consents->parseAcceptedIds($posted['consent'] ?? []));
 
         return $this->orchestrator->orchestrate(
             (int) $context->shop->id,

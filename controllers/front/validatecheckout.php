@@ -72,6 +72,17 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
             $module = $this->module;
             $shop = $module->getShopConfigurationService()->getForSubmission();
             $cart = (new CartContextFactory())->createForCheckout($this->context->cart);
+            $cpApi = $module->getControlPanelClient();
+            $cpClient = new ControlPanelOrderClientAdapter($cpApi);
+            $orchestrator = new OrderOrchestrator(
+                new OrderAttemptRepository(),
+                new FinancingSnapshotRepository(),
+                new NativePrestaShopOrderGateway($module, $this->context),
+                $cpClient,
+                new FinancingSnapshotFactory(new SensitiveDataCipher()),
+                new ControlPanelOrderPayloadBuilder(),
+                new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository()
+            );
             $calculator = new Calculator();
             $validator = new CheckoutPaymentValidator(
                 $calculator,
@@ -87,20 +98,10 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
                 $cart,
                 (string) $this->context->currency->iso_code,
                 $this->postedSelection(),
-                $module->getCheckoutCustomerData()
+                $module->getCheckoutCustomerData(),
+                $orchestrator->consentSelection($idShop, $idCart, (new CartSnapshot())->fingerprint($cart, (string) $this->context->currency->iso_code), []) ?: null
             );
             $shop['_is_mobile'] = $this->context->isMobile();
-            $cpApi = $module->getControlPanelClient();
-            $cpClient = new ControlPanelOrderClientAdapter($cpApi);
-            $orchestrator = new OrderOrchestrator(
-                new OrderAttemptRepository(),
-                new FinancingSnapshotRepository(),
-                new NativePrestaShopOrderGateway($module, $this->context),
-                $cpClient,
-                new FinancingSnapshotFactory(new SensitiveDataCipher()),
-                new ControlPanelOrderPayloadBuilder(),
-                new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository()
-            );
 
             $result = $orchestrator->orchestrate($idShop, $idCart, $request, $shop, 'checkout');
             (new CheckoutPreferenceStore())->clear($this->context->cookie);
@@ -183,6 +184,18 @@ final class UnipaymentValidateCheckoutModuleFrontController extends ModuleFrontC
             $lock->release($idShop, $idCart, $lockToken);
             $this->showPreOrderError($exception->getMessage());
         } catch (OrderOrchestrationException $exception) {
+            if ($exception->isPostOrder() && $exception->getPrevious() instanceof CheckoutValidationException) {
+                $lock->release($idShop, $idCart, $lockToken);
+                (new CheckoutPreferenceStore())->clear($this->context->cookie);
+                $this->context->smarty->assign([
+                    'unipayment_order_result' => ['id_order' => $exception->idOrder(), 'order_reference' => $exception->orderReference()],
+                    'unipayment_smartucf_processing' => true,
+                    'unipayment_smartucf_message' => 'Поръчката е създадена. Финансирането не може да продължи без приложимите съгласия. Не изпращайте нова поръчка. Свържете се с търговеца.',
+                ]);
+                $this->setTemplate('module:unipayment/views/templates/front/checkout_validated.tpl');
+
+                return;
+            }
             if ($exception->isRetryable()) {
                 $lock->release($idShop, $idCart, $lockToken);
             }

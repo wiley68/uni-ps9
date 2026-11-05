@@ -14,17 +14,20 @@ final class ValidatedPaymentRequest
     public $customer;
     /** @var int[] */
     public $acceptedConsentIds;
-    /** @var array<int, array{id:int,name:string,url:string,mandatory:bool}> */
+    /** @var int[] Submitted candidates; revalidated against the recovered operation, never persisted directly. */
+    public $submittedConsentIds;
+    /** @var array<int, array{id:int,name:string,url:string,mandatory:bool,has_checkbox:bool,interest_scope:string}> */
     public $acceptedConsents;
     /** @var string */
     public $cartFingerprint;
 
-    /** @param array<string, string> $customer @param int[] $acceptedConsentIds @param array<int, array{id:int,name:string,url:string,mandatory:bool}> $acceptedConsents */
-    public function __construct(CalculationResult $calculation, array $customer, array $acceptedConsentIds, string $cartFingerprint, array $acceptedConsents = [])
+    /** @param array<string, string> $customer @param int[] $acceptedConsentIds @param array<int, array{id:int,name:string,url:string,mandatory:bool,has_checkbox:bool,interest_scope:string}> $acceptedConsents */
+    public function __construct(CalculationResult $calculation, array $customer, array $acceptedConsentIds, string $cartFingerprint, array $acceptedConsents = [], ?array $submittedConsentIds = null)
     {
         $this->calculation = $calculation;
         $this->customer = $customer;
         $this->acceptedConsentIds = $acceptedConsentIds;
+        $this->submittedConsentIds = $submittedConsentIds ?? $acceptedConsentIds;
         $this->acceptedConsents = $acceptedConsents;
         $this->cartFingerprint = $cartFingerprint;
     }

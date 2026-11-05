@@ -835,3 +835,7 @@ body.unipayment-modal-open {
     margin-left: auto;
   }
 }
+
+[data-unipayment-consent-row][hidden] {
+    display: none !important;
+}

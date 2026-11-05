@@ -7,6 +7,7 @@ namespace PrestaShop\Module\Unipayment\Cart;
 use PrestaShop\Module\Unipayment\Calculator\AmountDisplayFormatter;
 use PrestaShop\Module\Unipayment\Calculator\AvailableScheme;
 use PrestaShop\Module\Unipayment\Calculator\CalculationResult;
+use PrestaShop\Module\Unipayment\Checkout\ConsentResolver;
 use PrestaShop\Module\Unipayment\Calculator\Calculator;
 use PrestaShop\Module\Unipayment\Calculator\CurrencyGate;
 use PrestaShop\Module\Unipayment\Calculator\UnavailableSchemeException;
@@ -106,6 +107,7 @@ final class CartPopupCalculator
     /** @param array<string, mixed> $shop @return array<string, mixed> */
     private function present(array $shop, CalculationResult $result): array
     {
+        $consents = new ConsentResolver();
         $scheme = $result->scheme;
 
         return [
@@ -121,6 +123,7 @@ final class CartPopupCalculator
             'financed_amount' => $result->financedAmount,
             'monthly_installment' => $result->monthlyInstallment,
             'total_payable' => $result->totalPayable,
+            'consent_context' => $consents->context($shop, $consents->selection($result)),
             'glp' => $result->glp,
             'gpr' => $result->gpr,
             'price_display' => $this->amountDisplay($result->price, $shop),

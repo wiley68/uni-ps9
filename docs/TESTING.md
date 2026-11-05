@@ -38,6 +38,71 @@ Run `composer test`, `node tests/Product/ProductCalculatorJsTest.js`, PHP syntax
 
 ## Automated checks
 
+### UNI-CONSENT-001 / Phase 4B
+
+`php tests/run.php safe` (also `composer test`) clears inherited `UNIPAYMENT_*` opt-ins,
+sets the safe suite explicitly, and excludes the six known live/runtime/destructive files
+before execution. It runs PHP tests and JS `*Test.js` files and reports PASS/SKIP/PARTIAL
+separately. `runtime`, `destructive` and `all` are explicit CLI choices; their existing
+individual opt-ins still apply. They are not authorized by a normal safe run.
+
+The packaging test runs static version/path contracts in safe mode, then reports a partial
+result. ZIP generation invokes Composer install and publishes artifacts, so that section
+requires a separately authorized packaging task. Phase 4B generates no ZIP or dependencies.
+
+Consent regressions:
+
+- `Checkout/ConsentScopeTest.php`: normalization, strict IDs, epsilon/non-finite matrix,
+  informational/mandatory rules, default/schema KOP, raw versus rounded GLP, and checkout.
+- `Configuration/ConsentCachePersistenceTest.php`: real cache JSON/SQL serialization with
+  a fake Db, array/JSON-string consents, all scopes and apostrophe round-trip.
+- `Product/ConsentSubmissionTest.php`: Product/Cart rejection before fake customer mutation.
+- `Order/ConsentRetryTest.php`: persisted A versus POST B, concurrent recovery, immutable
+  historical calculations/payloads and order-aware refusal, using in-memory stores.
+- `Order/ConsentCompletedReplayTest.php`: executes both actual private completed-replay
+  controller paths with fake persistence/native currency and an unusable CP adapter; missing
+  acceptance must return the existing order before any external continuation. EUR/origin
+  denial remains authoritative.
+- `Frontend/CheckoutSubmitBoundaryTest.js`: the chosen own-form method strategy was executed
+  before checkout integration; native events, async confirmation, direct final submit,
+  duplicate, generation change, disposal and unrelated forms.
+- `Frontend/ConsentLifecycleTest.js`: production helper/controllers with fake DOM, timers and
+  fetch. Includes H1 for both popups, stale calculation/error/token, early combination/cart
+  invalidation, same-scheme acceptance retention, missing HTML IDs, disposed forms and the
+  actual async orderability -> synthetic handlers -> direct form submit model. The model
+  preserves core's disabled-data guard after rejected final submission: refresh/remount,
+  rather than bypassing that guard, restores the flow with fresh acceptance.
+
+Existing static lifecycle contracts now allow a mount-filtered observer and assert the final
+submit boundary. The AUD-020 fake journal fixtures use recent timestamps so the three-month
+retention policy cannot silently expire their isolation evidence. No journal production code changed.
+
+Manual acceptance remains necessary on Classic and Hummingbird: Product combinations/quantity,
+Cart quantity/voucher/empty-cart refresh, Checkout delivery/payment replacement, scope switches
+and first-installment-only edits. Test slow orderability plus context changes and refresh guidance,
+double clicks, Process 1/2 and exactly one authoritative Guest Cart order only in a separately
+authorized runtime session. CLI doubles do not certify a live Apache/FPM/browser lifecycle.
+
+### UNI-CONSENT-001 / Phase 4D remediation
+
+- `Checkout/ConsentRecoverySelectionTest.php`: executable F1 reproduction and 42 assertions with
+  typed in-memory order/CP adapters. Absent snapshot recovery, missing mandatory consent,
+  persisted A versus POST B, missing/invalid A coefficient, malformed/empty present snapshots,
+  authoritative reserve recovery, order-aware errors, no duplicate native/CP create or history
+  rewrite, and unchanged EUR/CP-origin denial. No shop bootstrap/network/SmartUCF session.
+- `Frontend/CheckoutSubmitBoundaryTest.js`: 31 assertions, including F2 before/after reproduction,
+  both same-form ownership orders, retained callbacks, invalid/current context, asynchronous
+  generation change, native events, duplicates/reentrancy and unrelated payment forms.
+- `Frontend/ConsentLifecycleTest.js`: 114 assertions against production controllers; both
+  same-form remount orders also retire the old live-root document handler and input callbacks.
+- `Order/ConsentCompletedReplayTest.php`: independent forbidden-field assertions exercised by
+  actual Product/Cart replay refusals and three negative fixtures (redirect alone, CP error alone,
+  both). Production replay behavior is unchanged by F3.
+
+Phase 4D safe results on PHP 8.1 and 8.4: **146 PASS / 6 SKIP / 1 PARTIAL / 0 FAIL** on each.
+The six runtime exclusions and partial static-only packaging check described above remain in force.
+See `CONSENT-PHASE4D-REPORT.md` for reproduction evidence and the manual acceptance STOP gate.
+
 Safe default:
 
 ```bash
@@ -109,4 +174,4 @@ Do not treat internal lifecycle/machine ids as public bank-status copy during ma
 ## Deferred product behavior
 
 - Bank-rejection → native PS order-state sync remains dormant (AUD-009)
-- Non-blocking test-quality follow-ups (DOM JS transition tests, forged-selection validator coverage, SKIP accounting in the runner)
+- Additional browser/runtime acceptance beyond isolated DOM/submit and validator coverage

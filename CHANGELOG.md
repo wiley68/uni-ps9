@@ -2,6 +2,14 @@
 
 Notable notes for the UniPayment PrestaShop **9** development line.
 
+## Unreleased — 2026-11-05
+
+- UNI-CONSENT-001 Phase 4B: Product/Cart/Checkout consent applicability follows trusted raw KOP/month coefficient interest, with PS8 scope fallback and finite epsilon classification. Mandatory and informational behavior stays independent of scope.
+- Shared vanilla consent context handling, stale response/token protection and H1 debounce/apply regression coverage. The PS9 own-form final submit guard covers asynchronous core orderability and direct submit without a jQuery dependency or global prototype changes.
+- Effective persisted scheme validation covers recovery and both completed popup token replay paths; missing consent on an existing order remains order-aware and starts no external continuation. Historical snapshots and CP payloads remain frozen.
+- Safe runner excludes live tests before execution, clears inherited opt-ins, runs JS harnesses and reports skips/partial results accurately. ZIP build/dependency installation is excluded from safe regression.
+- Module version remains 2.0.3. No schema, financial formula, offer priority, cache TTL, EUR-only, CP/SmartUCF contract or lifecycle-state change.
+
 ## Unreleased — 2026-10-09
 
 - Installation fix: CP-origin column probes use uncached `Db::executeS()` and exact `SHOW COLUMNS ... LIKE 'cp_origin'`, avoiding the `LIMIT 1` automatically appended by `getRow()`. Both attempt/snapshot migrations remain additive, nullable and idempotent; tests cover native schema installation and preserved legacy rows.

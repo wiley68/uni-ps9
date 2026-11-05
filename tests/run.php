@@ -19,12 +19,30 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $suite = $argv[1] ?? 'safe';
-$validSuites = ['safe', 'all'];
+$validSuites = ['safe', 'runtime', 'destructive', 'all'];
 
 if (!in_array($suite, $validSuites, true)) {
     fwrite(STDERR, "FAIL: unknown suite \"{$suite}\"" . PHP_EOL);
     exit(1);
 }
+
+// The suite argument owns safety; inherited opt-ins cannot turn a safe run live.
+if ($suite === 'safe') {
+    foreach (array_keys(getenv()) as $key) {
+        if (str_starts_with($key, 'UNIPAYMENT_')) {
+            putenv($key);
+        }
+    }
+}
+putenv('UNIPAYMENT_TEST_SUITE=' . $suite);
+$runtimeFiles = [
+    'Api/LiveControlPanelSmokeTest.php',
+    'Configuration/LiveShopCacheSmokeTest.php',
+    'Infrastructure/ControlPanelOriginSchemaRuntimeTest.php',
+    'Order/ControlPanelStatusSyncCasEmptyStringRuntimeTest.php',
+    'SmartUcf/Aud002bLifecycleRepositoryTest.php',
+    'Uninstall/Aud006ModuleDataPurgerDbTest.php',
+];
 
 /** @var list<string> $files */
 $files = [];
@@ -38,7 +56,7 @@ foreach ($iterator as $fileInfo) {
     }
 
     $path = $fileInfo->getPathname();
-    if (!str_ends_with($path, 'Test.php')) {
+    if (!str_ends_with($path, 'Test.php') && !str_ends_with($path, 'Test.js')) {
         continue;
     }
 
@@ -48,11 +66,20 @@ foreach ($iterator as $fileInfo) {
 sort($files);
 
 $passed = 0;
+$skipped = 0;
+$partial = 0;
 $failed = 0;
 $failures = [];
 
 foreach ($files as $file) {
-    $command = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($file);
+    $relative = str_replace(__DIR__ . DIRECTORY_SEPARATOR, '', $file);
+    if ($suite === 'safe' && in_array($relative, $runtimeFiles, true)) {
+        ++$skipped;
+        fwrite(STDOUT, 'SKIP ' . $relative . ' (runtime; excluded before execution)' . PHP_EOL);
+        continue;
+    }
+    $binary = str_ends_with($file, '.js') ? 'node' : PHP_BINARY;
+    $command = escapeshellarg($binary) . ' ' . escapeshellarg($file);
     $output = [];
     $exitCode = 0;
     exec($command . ' 2>&1', $output, $exitCode);
@@ -65,7 +92,18 @@ foreach ($files as $file) {
     $lastLine = $filtered !== [] ? (string) $filtered[array_key_last($filtered)] : '';
 
     if ($exitCode === 0 && ($lastLine === '' || str_starts_with($lastLine, 'OK') || str_starts_with($lastLine, 'SKIP'))) {
-        ++$passed;
+        $skipLines = array_values(array_filter($filtered, static fn (string $line): bool => str_starts_with($line, 'SKIP')));
+        $okLines = array_values(array_filter($filtered, static fn (string $line): bool => str_starts_with($line, 'OK')));
+        if ($skipLines !== [] && $okLines !== []) {
+            ++$partial;
+        } elseif ($skipLines !== []) {
+            ++$skipped;
+        } else {
+            ++$passed;
+        }
+        foreach ($skipLines as $line) {
+            fwrite(STDOUT, $relative . ': ' . $line . PHP_EOL);
+        }
         continue;
     }
 
@@ -74,7 +112,7 @@ foreach ($files as $file) {
     $failures[] = $relative . ': ' . ($lastLine !== '' ? $lastLine : 'exit ' . $exitCode);
 }
 
-fwrite(STDOUT, strtoupper($suite) . " suite: {$passed} passed, {$failed} failed" . PHP_EOL);
+fwrite(STDOUT, strtoupper($suite) . " suite: {$passed} passed, {$skipped} skipped, {$partial} partial, {$failed} failed" . PHP_EOL);
 
 if ($failures !== []) {
     foreach ($failures as $failure) {

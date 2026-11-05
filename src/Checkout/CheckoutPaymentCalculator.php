@@ -61,6 +61,8 @@ final class CheckoutPaymentCalculator
         }
         $result = $this->calculator->calculateScheme($shop, $cart->total, $scheme, $selection->firstInstallment);
 
+        $consents = new ConsentResolver();
+
         return [
             'scheme_key' => SchemeSelection::key($scheme->type, $scheme->months, $scheme->filterId),
             'scheme_type' => $scheme->type,
@@ -74,6 +76,7 @@ final class CheckoutPaymentCalculator
             'financed_amount' => $result->financedAmount,
             'monthly_installment' => $result->monthlyInstallment,
             'total_payable' => $result->totalPayable,
+            'consent_context' => $consents->context($shop, $consents->selection($result)),
             'glp' => $result->glp,
             'gpr' => $result->gpr,
             'price_display' => $this->amounts->format($result->price),

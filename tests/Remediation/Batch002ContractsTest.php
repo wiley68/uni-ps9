@@ -45,7 +45,7 @@ final class Rem002Cookie
     /** @var array<string, mixed> */
     public array $data = [];
 
-    public function __get(string $name)
+    public function __get(string $name): mixed
     {
         return $this->data[$name] ?? '';
     }
@@ -167,7 +167,7 @@ assertRem002(
         && strpos($js, 'dispatchEvent') !== false,
     '5: selecting UniPayment triggers click/change lifecycle'
 );
-assertRem002(strpos($js, 'new MutationObserver') === false, '9: no MutationObserver reselect loop');
+assertRem002(strpos($js, 'change.addedNodes') !== false && strpos($js, 'change.removedNodes') !== false, '9: observer limited to form mounts/disposal');
 assertRem002(strpos($js, 'unipaymentCheckoutHandoff') !== false, 'handoff JS def consumed');
 assertRem002(strpos($js, 'unipaymentPaymentPreselectAborted') !== false, '8: manual switch aborts');
 assertRem002(strpos($js, 'applyHandoffScheme') !== false, '6: exact scheme applied after payment select');

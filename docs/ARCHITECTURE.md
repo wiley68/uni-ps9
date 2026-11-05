@@ -39,6 +39,52 @@ Infrastructure
 
 ---
 
+## Consent applicability (UNI-CONSENT-001, Phase 4B)
+
+CP/cache retains every consent definition. `ConsentResolver` normalizes missing/invalid/non-string
+`interest_scope` to `all`; `mandatory` independently controls the checkbox. The resolved scheme's
+KOP/months locate the trusted raw coefficient, requiring positive finite `coeff` and finite numeric
+`interestPercent`. `abs(interestPercent) <= 0.00001` means zero. Rounded display/historical GLP,
+scheme type and promo labels never determine applicability. Unknown interest blocks scoped
+consents, including informational ones; empty/all-only lists add no classification requirement.
+
+Product/Cart calculations and Checkout scheme presentation supply `consent_context`. A shared
+vanilla helper owns each form's visibility, required IDs and context generation. Inapplicable
+checkboxes are cleared/disabled; pending previews disable acceptance without losing same-scheme
+checks. Effective scheme changes clear scoped checks; first-installment-only changes preserve
+them. Product preference handoff carries no acceptance. Popup previews and sent submissions use
+separate generations, so obsolete debounce/refresh responses cannot discard a sent order result.
+
+Checkout protects only its own form instance's `submit()` and native submit event. Core's async
+orderability -> synthetic submit -> direct method call reaches this final synchronous boundary.
+The confirmation generation must still match and current consent/calculation readiness is checked
+again. A module-local WeakMap preserves the underlying native method and current guard owner
+per form, independently of temporary wrappers. Same-form remount retires the old controller;
+retained callbacks/destroy calls cannot submit or disable its replacement. A sent form remains
+protected against duplicate submission across remounts. No global form prototype, core code or
+jQuery dependency is introduced. An ownerless disposed form cannot submit.
+Core may already have set its own form-disabled data when a final call is rejected;
+the displayed refresh instruction deliberately preserves that core behavior. A fresh form requires
+fresh acceptance. A mount-only observer removes old handlers without payment reselection loops.
+
+Submission services validate before customer/cart mutations. Read-only attempt preflight uses the
+existing shop/cart/fingerprint identity; authoritative reservation/recovery revalidates submitted
+candidate IDs against persisted KOP/months and current trusted coefficients. The final snapshot is
+checked before CP work, including a snapshot that won INSERT IGNORE. Completed Product **and**
+PS9 Cart token shortcuts validate after durable EUR/origin proof and before external continuation.
+Consent refusal on an existing order preserves its identity and returns order-aware messaging,
+without a new bank status, automatic restart or CP/SmartUCF work. Lock-loser observation stays read-only.
+
+Phase 4D distinguishes absent financing snapshots from present malformed snapshots in read-only
+preflight. Only proven absence uses the validator's already calculated server selection for consent
+classification, retaining attempt/order metadata for order-aware errors. A present snapshot,
+including an empty one, never falls back to the submitted alternative scheme. This distinction is
+in-memory only; it does not repair history, change fingerprints or alter recovery lifecycle.
+
+Only applicable accepted records, including normalized scope, enter the existing `consents_json`
+for a new snapshot. Historical snapshots, frozen CP payloads, cache TTL/push, locks, atomic claims,
+financial formulas, EUR eligibility and external contracts are unchanged. No schema migration.
+
 ## Implemented capabilities (Phases 0–13 + final audit remediations)
 
 | Area                        | State                                                                                           |

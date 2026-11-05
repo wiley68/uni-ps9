@@ -92,6 +92,7 @@ final class CheckoutPaymentPresenter
                 'financed_amount' => $result->financedAmount,
                 'monthly_installment' => $result->monthlyInstallment,
                 'total_payable' => $result->totalPayable,
+                'consent_context' => $this->consents->context($shop, $this->consents->selection($result)),
                 'glp' => $result->glp,
                 'gpr' => $result->gpr,
                 'financed_amount_display' => $this->amounts->format($result->financedAmount),

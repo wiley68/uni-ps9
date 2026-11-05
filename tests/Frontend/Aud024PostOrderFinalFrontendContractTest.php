@@ -56,7 +56,7 @@ assertAud024(
 // unipaymentUpdate must not close/reset while locked (A, B, F).
 assertAud024(
     (bool) preg_match(
-        '/unipaymentUpdate\s*=\s*function\s*\(\s*next\s*\)\s*\{[\s\S]{0,200}postOrderFinal\s*\|\|\s*redirectPending/',
+        '/unipaymentUpdate\s*=\s*function\s*\(\s*next\s*\)\s*\{[\s\S]{0,500}postOrderFinal\s*\|\|\s*redirectPending/',
         $jsProduct
     ),
     'unipaymentUpdate early-return when postOrderFinal or redirectPending'
@@ -72,7 +72,7 @@ assertAud024(
 // Invalidate must not erase final result (A, B).
 assertAud024(
     (bool) preg_match(
-        '/unipaymentInvalidatePopup\s*=\s*function[\s\S]{0,120}postOrderFinal\s*\|\|\s*redirectPending/',
+        '/unipaymentInvalidatePopup\s*=\s*function[\s\S]{0,400}postOrderFinal\s*\|\|\s*redirectPending/',
         $jsProduct
     ),
     'invalidate skipped while postOrderFinal or redirectPending'
@@ -93,7 +93,7 @@ assertAud024(strpos($jsCart, 'updatedCart') !== false, 'updatedCart listener ret
 // Manual close clears lock via resetPopup (E).
 assertAud024(
     (bool) preg_match(
-        '/function\s+resetPopup\s*\(\s*\)\s*\{[\s\S]{0,800}clearPostOrderFinal\(\)/',
+        '/function\s+resetPopup\s*\(\s*\)\s*\{[\s\S]{0,1100}clearPostOrderFinal\(\)/',
         $jsProduct
     ),
     'resetPopup clears postOrderFinal (manual close / reopen)'

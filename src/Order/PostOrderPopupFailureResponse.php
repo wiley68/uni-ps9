@@ -13,6 +13,23 @@ namespace PrestaShop\Module\Unipayment\Order;
  */
 final class PostOrderPopupFailureResponse
 {
+    /** No new external work and no invented bank failure status. */
+    public static function consentRequired(int $idOrder, string $reference, ?int $controlPanelOrderId = null): array
+    {
+        $order = ['id_order' => $idOrder, 'order_reference' => $reference];
+        if ($controlPanelOrderId !== null) {
+            $order['control_panel_order_id'] = $controlPanelOrderId;
+        }
+
+        return [
+            'success' => true,
+            'step' => 'order_created',
+            'final' => true,
+            'order' => $order,
+            'post_order_error' => 'Поръчката е създадена. Финансирането не може да продължи без приложимите съгласия. Не изпращайте нова поръчка. Свържете се с търговеца.',
+        ];
+    }
+
     public const CUSTOMER_CP_FAILED =
     "Поръчката е създадена\n\n"
         . "Поръчката Ви е регистрирана успешно в магазина, но заявката за финансиране не беше регистрирана успешно в системата на УниКредит.\n\n"

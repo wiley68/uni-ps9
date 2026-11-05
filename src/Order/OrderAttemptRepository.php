@@ -149,6 +149,13 @@ final class OrderAttemptRepository implements OrderAttemptStoreInterface
         return is_array($row) ? $row : null;
     }
 
+    public function findByIdentity(int $idShop, int $idCart, string $cartFingerprint): ?array
+    {
+        $row = $this->database->getRow(sprintf("SELECT * FROM `%s%s` WHERE `id_shop`=%d AND `id_cart`=%d AND `cart_fingerprint`='%s'", _DB_PREFIX_, self::TABLE, $idShop, $idCart, pSQL($cartFingerprint)));
+
+        return is_array($row) ? $row : null;
+    }
+
     public function findById(int $attemptId): ?array
     {
         if ($attemptId <= 0) {

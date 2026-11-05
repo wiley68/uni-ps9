@@ -34,7 +34,7 @@ assertCheckoutUi(strpos($js, 'dataset.unipaymentReady') !== false, 'idempotent s
 assertCheckoutUi(strpos($js, 'tryPreselectPayment') !== false, 'Product Купи payment preselect helper');
 assertCheckoutUi(strpos($js, 'unipaymentCheckoutHandoff') !== false, 'Media handoff consumed by checkout JS');
 assertCheckoutUi(strpos($js, 'unipaymentPaymentPreselectAborted') !== false, 'manual payment switch must abort reselection');
-assertCheckoutUi(strpos($js, 'new MutationObserver') === false, 'no MutationObserver payment loops');
+assertCheckoutUi(strpos($js, 'change.addedNodes') !== false && strpos($js, 'change.removedNodes') !== false, 'observer limited to form mounts/disposal');
 assertCheckoutUi(strpos($js, 'submitState') !== false, 'checkout submit state machine');
 assertCheckoutUi(strpos($js, 'click_accepted') !== false, 'first-click accepted before form submit');
 assertCheckoutUi(strpos($js, 'acceptFirstClick') !== false, 'immediate confirmation click guard');

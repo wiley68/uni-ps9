@@ -276,3 +276,7 @@
     background-position: right 0 center;
   }
 }
+
+[data-unipayment-consent-row][hidden] {
+    display: none !important;
+}

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use PrestaShop\Module\Unipayment\Calculator\Calculator;
+use PrestaShop\Module\Unipayment\Checkout\CheckoutValidationException;
+use PrestaShop\Module\Unipayment\Checkout\ConsentResolver;
 use PrestaShop\Module\Unipayment\Calculator\UnavailableSchemeException;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
 use PrestaShop\Module\Unipayment\Order\BankStatus;
@@ -336,6 +338,9 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
 
             return ['success' => false, 'message' => 'The financing selection is unavailable.'];
         } catch (OrderOrchestrationException $exception) {
+            if ($exception->isPostOrder() && $exception->getPrevious() instanceof CheckoutValidationException) {
+                return PostOrderPopupFailureResponse::consentRequired($exception->idOrder(), $exception->orderReference());
+            }
             $previous = $exception->getPrevious();
             PrestaShopLogger::addLog(
                 'UniPayment popup apply orchestration failed: ' . get_class($exception)
@@ -543,7 +548,12 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
         Unipayment $module,
         ControlPanelOrderClientAdapter $cpClient
     ): array {
-        (new PopupOrderReplayCurrencyGuard())->assertReplay($row, (int) $this->context->shop->id);
+        $snapshot = (new PopupOrderReplayCurrencyGuard())->assertReplay($row, (int) $this->context->shop->id);
+        try {
+            (new ConsentResolver())->validate($shop, Tools::getValue('unipayment_consent', []), $snapshot);
+        } catch (CheckoutValidationException $exception) {
+            return PostOrderPopupFailureResponse::consentRequired((int) $row['id_order'], (string) $row['order_reference'], (int) ($row['control_panel_order_id'] ?? 0));
+        }
         $response = [
             'success' => true,
             'step' => 'order_created',

@@ -55,6 +55,13 @@ foreach (['src/Security/SystemClock.php', 'controllers/front/shopcache.php', 'vi
     assertPackage(DistributionPackage::isRuntimePath($path), 'Runtime file excluded: ' . $path);
 }
 
+// Build invokes Composer install and publishes dist artifacts: outside safe consent regression.
+if (getenv('UNIPAYMENT_TEST_SUITE') === 'safe') {
+    fwrite(STDOUT, "OK (distribution static path/version contracts)\n");
+    fwrite(STDOUT, "SKIP (ZIP build requires separate packaging authorization; no dependency install in safe suite)\n");
+    exit(0);
+}
+
 $root = dirname(__DIR__, 2);
 $builder = new DistributionPackage($root);
 $before = [];

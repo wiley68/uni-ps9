@@ -6,6 +6,12 @@
     var refreshRequest = null;
     var refreshSequence = 0;
 
+    function invalidate() {
+        refreshSequence += 1;
+        var root = document.querySelector(selector);
+        if (root && root.unipaymentInvalidatePopup) root.unipaymentInvalidatePopup();
+    }
+
     function refresh() {
         var root = document.querySelector(selector);
         if (!root || !root.isConnected) {
@@ -69,6 +75,7 @@
     // Core: emit updateCart → AJAX cart refresh → emit updatedCart.
     // Hummingbird 2.0 + Classic 3.1.1 both use themes/core.js + theme cart handlers.
     if (window.prestashop && typeof window.prestashop.on === "function") {
+        window.prestashop.on("updateCart", invalidate);
         window.prestashop.on("updatedCart", refresh);
     }
 })();

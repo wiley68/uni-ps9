@@ -226,6 +226,10 @@
             root.getAttribute("data-unipayment-source") === "cart" ||
             root.getAttribute("data-hide-secondary") === "1";
         var activeType = "";
+        var consents = window.createUnipaymentShopConsents(root);
+        var consentGeneration = 0;
+        var submissionSequence = 0;
+        var applyInFlight = false;
 
         function setSecondaryDisabled(disabled) {
             if (secondaryButton) secondaryButton.disabled = !!disabled;
@@ -598,12 +602,7 @@
         }
 
         function areMandatoryConsentsChecked() {
-            var boxes = consentCheckboxes();
-            if (!boxes.length) return true;
-            for (var i = 0; i < boxes.length; i += 1) {
-                if (!boxes[i].checked) return false;
-            }
-            return true;
+            return consents.ready();
         }
 
         function resetConsents() {
@@ -613,9 +612,8 @@
         }
 
         function appendAcceptedConsents(payload) {
-            consentCheckboxes().forEach(function (input) {
-                if (input.checked && input.value)
-                    payload.append("unipayment_consent[]", input.value);
+            consents.acceptedIds().forEach(function (id) {
+                payload.append("unipayment_consent[]", id);
             });
         }
 
@@ -744,6 +742,7 @@
             var errors = customerErrors();
             if (showErrors) showCustomerErrors(errors);
             var valid =
+                !redirectPending &&
                 Object.keys(errors).length === 0 &&
                 !!lastCalculation &&
                 areMandatoryConsentsChecked();
@@ -768,6 +767,9 @@
         }
 
         function resetPopup() {
+            submissionSequence += 1;
+            applyInFlight = false;
+            consentGeneration = consents.begin(null);
             window.clearTimeout(calculateTimer);
             calculateTimer = null;
             if (
@@ -884,6 +886,10 @@
         }
 
         function applyCalculation(calculation) {
+            if (!consents.apply(consentGeneration, calculation.consent_context)) {
+                lastCalculation = null;
+                throw new Error("consent_context");
+            }
             lastCalculation = calculation;
             displayAmount("price", calculation.price_display);
             displayAmount(
@@ -911,6 +917,7 @@
             errorBox.textContent = "";
             applyButton.disabled = false;
             setSecondaryDisabled(false);
+            updateSubmitState(false);
         }
 
         function calculationPayload(action) {
@@ -962,11 +969,30 @@
             return payload;
         }
 
+        function invalidateCalculation() {
+            window.clearTimeout(calculateTimer);
+            calculateTimer = null;
+            var scheme = selectedScheme() || {};
+            calculateSequence += 1;
+            lastCalculation = null;
+            consentGeneration = consents.begin(JSON.stringify([scheme.kop_code, scheme.months, scheme.filter_id, scheme.scheme_type]));
+            applyButton.disabled = true;
+            setSecondaryDisabled(true);
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.setAttribute("aria-disabled", "true");
+            }
+        }
+
         function requestCalculation(action) {
+            window.clearTimeout(calculateTimer);
+            calculateTimer = null;
+            if (applyInFlight || modal.hidden || !root.isConnected) return Promise.reject(new Error("submission"));
             var payload = calculationPayload(action);
             var endpoint = root.getAttribute("data-popup-endpoint");
             if (!payload || !endpoint)
                 return Promise.reject(new Error("selection"));
+            invalidateCalculation();
             if (
                 calculateRequest &&
                 typeof calculateRequest.abort === "function"
@@ -995,7 +1021,7 @@
                     return response.json().then(function (body) {
                         if (!response.ok || !body.success)
                             throw new Error(body.message || "calculation");
-                        if (sequence !== calculateSequence)
+                        if (sequence !== calculateSequence || applyInFlight || root.isConnected === false || modal.hidden)
                             throw new Error("stale");
                         applyCalculation(body.calculation);
                         return body;
@@ -1003,11 +1029,11 @@
                 })
                 .catch(function (error) {
                     if (
-                        sequence === calculateSequence &&
+                        sequence === calculateSequence && !applyInFlight && root.isConnected !== false && !modal.hidden &&
                         error.name !== "AbortError" &&
                         error.message !== "stale"
                     )
-                        errorBox.textContent = t(
+                        errorBox.textContent = error.message === "consent_context" ? t("data-consent-context-invalid-message", "Обновете страницата и изберете схема отново.") : t(
                             "data-calculate-failed-message",
                             "Неуспешно изчисление. Моля, опитайте отново.",
                         );
@@ -1020,6 +1046,7 @@
         }
 
         function open(type, trigger) {
+            if (redirectPending) return;
             resetPopup();
             activeType = type;
             lastOpenTrigger = trigger || null;
@@ -1115,6 +1142,7 @@
         }
 
         function transitionToStep2() {
+            if (redirectPending || !consents.resolved()) return;
             if (!lastCalculation) return;
             if (!customerForm || !submitButton || !step3) {
                 errorBox.textContent = t(
@@ -1151,11 +1179,13 @@
                 updateSubmitState(false);
             }
 
+            var transitionSequence = calculateSequence;
             ensurePopupSubmissionToken(true)
                 .then(function () {
-                    enterStep2();
+                    if (transitionSequence === calculateSequence && !modal.hidden && root.isConnected && consents.resolved()) enterStep2();
                 })
                 .catch(function () {
+                    if (transitionSequence !== calculateSequence || modal.hidden || !root.isConnected) return;
                     errorBox.textContent = t(
                         "data-validation-failed-message",
                         "Данните не могат да бъдат валидирани.",
@@ -1176,6 +1206,7 @@
                 payload.set("popup_submission_token", popupSubmissionToken);
             }
             if (applyButton) applyButton.disabled = true;
+            var sequence = calculateSequence;
             return fetch(endpoint, {
                 method: "POST",
                 credentials: "same-origin",
@@ -1195,6 +1226,8 @@
                         ) {
                             throw new Error((body && body.message) || "token");
                         }
+                        if (sequence !== calculateSequence || root.isConnected === false || modal.hidden) throw new Error("stale");
+                        applyCalculation(body.calculation);
                         popupSubmissionToken = body.popup_submission_token;
                         root.unipaymentPopupSubmissionToken =
                             popupSubmissionToken;
@@ -1202,18 +1235,19 @@
                     });
                 })
                 .then(function (token) {
-                    if (applyButton && lastCalculation)
+                    if (applyButton && lastCalculation && sequence === calculateSequence && consents.resolved())
                         applyButton.disabled = false;
                     return token;
                 })
                 .catch(function (error) {
-                    if (applyButton && lastCalculation)
+                    if (applyButton && lastCalculation && sequence === calculateSequence && consents.resolved())
                         applyButton.disabled = false;
                     throw error;
                 });
         }
 
         function requestStep2Validation() {
+            if (redirectPending) return;
             if (!customerForm || !submitButton || !step3) return;
             if (!updateSubmitState(true)) return;
             var endpoint = root.getAttribute("data-popup-endpoint");
@@ -1222,6 +1256,13 @@
                 submitButton.disabled = true;
                 submitButton.setAttribute("aria-disabled", "true");
             }
+            window.clearTimeout(calculateTimer);
+            calculateTimer = null;
+            window.clearTimeout(refreshTimer);
+            refreshTimer = null;
+            refreshSequence += 1;
+            var submitSequence = calculateSequence;
+            var operation = ++submissionSequence;
             submitError.textContent = "";
             redirectPending = true;
             setProcessingState(true);
@@ -1230,6 +1271,7 @@
 
             ensurePopupSubmissionToken(false)
                 .then(function (token) {
+                    if (submitSequence !== calculateSequence || modal.hidden || !root.isConnected || !consents.ready()) throw new Error("stale");
                     var payload = calculationPayload("apply");
                     if (!payload) throw new Error("selection");
                     if (!token && !popupSubmissionToken) {
@@ -1254,6 +1296,7 @@
                     if (phone2Field)
                         payload.set("phone2", phone2Field.value.trim());
                     appendAcceptedConsents(payload);
+                    applyInFlight = true;
                     return fetch(endpoint, {
                         method: "POST",
                         credentials: "same-origin",
@@ -1267,6 +1310,8 @@
                 })
                 .then(function (response) {
                     return response.json().then(function (body) {
+                        if (operation !== submissionSequence || modal.hidden || !root.isConnected) throw new Error("stale");
+                        applyInFlight = false;
                         if (body && body.popup_submission_token)
                             popupSubmissionToken = body.popup_submission_token;
                         if (!response.ok || !body.success) {
@@ -1358,6 +1403,8 @@
                     });
                 })
                 .catch(function () {
+                    if (operation !== submissionSequence || modal.hidden || !root.isConnected) return;
+                    applyInFlight = false;
                     if (postOrderFinal) {
                         setProcessingState(false);
                         return;
@@ -1365,6 +1412,7 @@
                     redirectPending = false;
                     setProcessingState(false);
                     setStep(2);
+                    if (!lastCalculation) submitError.textContent = t("data-consent-context-invalid-message", "Обновете страницата и изберете схема отново.");
                     if (!step2.hidden) updateSubmitState(false);
                 });
         }
@@ -1552,6 +1600,8 @@
             });
         }
         select.addEventListener("change", function () {
+            invalidateCalculation();
+            if (applyInFlight) return;
             first.value = "0";
             first.readOnly = false;
             lastCalculation = null;
@@ -1569,6 +1619,8 @@
         first.addEventListener("input", function () {
             if (first.readOnly) return;
             first.value = first.value.replace(/\D/g, "");
+            invalidateCalculation();
+            if (applyInFlight) return;
             lastCalculation = null;
             popupSubmissionToken = "";
             preselectOperationToken = "";
@@ -1584,6 +1636,8 @@
         });
         first.addEventListener("change", function () {
             if (first.readOnly) return;
+            invalidateCalculation();
+            if (applyInFlight) return;
             window.clearTimeout(calculateTimer);
             calculateNow();
         });
@@ -1597,6 +1651,9 @@
         });
 
         root.unipaymentUpdate = function (next) {
+            if (postOrderFinal) return;
+            invalidateCalculation();
+            if (applyInFlight) return;
             // AUD-024: post-order final result must survive cart refresh / empty cart.
             if (postOrderFinal || redirectPending) {
                 return;
@@ -1635,6 +1692,9 @@
         };
 
         root.unipaymentInvalidatePopup = function () {
+            refreshSequence += 1;
+            if (!postOrderFinal && !modal.hidden) invalidateCalculation();
+            if (applyInFlight) return;
             if (postOrderFinal || redirectPending) return;
             if (modal.hidden) return;
             lastCalculation = null;
@@ -1650,8 +1710,10 @@
         };
 
         root.unipaymentRefresh = function () {
+            if (applyInFlight || postOrderFinal || !root.isConnected) return;
             window.clearTimeout(refreshTimer);
             refreshTimer = window.setTimeout(function () {
+                if (applyInFlight || postOrderFinal || !root.isConnected) return;
                 if (!root.isConnected) return;
                 var endpoint = root.getAttribute("data-endpoint");
                 var productId =
@@ -1665,7 +1727,10 @@
                     currentAttributeId +
                     ":" +
                     currentQuantity;
-                if (requestKey === lastRequestKey) return;
+                if (requestKey === lastRequestKey) {
+                    if (!modal.hidden && activeType) calculateNow();
+                    return;
+                }
                 lastRequestKey = requestKey;
                 if (
                     refreshRequest &&
@@ -1739,6 +1804,7 @@
         }
     }
     function scheduleDomRefresh(payload) {
+        document.querySelectorAll(selector).forEach(function (root) { if (root.unipaymentInvalidatePopup) root.unipaymentInvalidatePopup(); });
         captureProductUpdateHint(payload);
         window.clearTimeout(domRefreshTimer);
         // Defer one task so core replaceWith(.js-product-details / additional-info) can settle.
@@ -1775,6 +1841,11 @@
     // Core emits updatedProduct AFTER product_details / additional_info replaceWith.
     // updatedProductCombination is only an updateProduct eventType, not a separate emit.
     if (window.prestashop && typeof window.prestashop.on === "function") {
+        window.prestashop.on("updateProduct", function () {
+            document.querySelectorAll(selector).forEach(function (root) {
+                if (root.unipaymentInvalidatePopup) root.unipaymentInvalidatePopup();
+            });
+        });
         window.prestashop.on("updatedProduct", scheduleDomRefresh);
     }
     document.addEventListener("updatedProduct", function (event) {

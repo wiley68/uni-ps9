@@ -85,7 +85,7 @@ final class FakeSmartUcfDb
         return true;
     }
 
-    public function getRow(string $sql)
+    public function getRow(string $sql): array|false
     {
         $this->sql[] = $sql;
         if (!preg_match("/id_shop` = (\d+).*order_id` = '([^']+)'/s", $sql, $m)
@@ -111,7 +111,7 @@ final class FakeSmartUcfDb
         return $matches[0];
     }
 
-    public function executeS(string $sql)
+    public function executeS(string $sql): array
     {
         $this->sql[] = $sql;
         if (stripos($sql, 'SHOW TABLES') !== false) {
@@ -138,7 +138,7 @@ assertAud020($repo->insert([
     'http_code' => 200,
     'request' => ['shop' => 'A'],
     'response' => ['log' => 'A'],
-    'created_at_gmt' => '2026-08-01 10:00:00',
+    'created_at_gmt' => gmdate('Y-m-d H:i:s', time() - 3600),
 ]), 'insert LOG_A');
 assertAud020($repo->insert([
     'id_shop' => 20,
@@ -147,7 +147,7 @@ assertAud020($repo->insert([
     'http_code' => 200,
     'request' => ['shop' => 'B'],
     'response' => ['log' => 'B'],
-    'created_at_gmt' => '2026-08-01 11:00:00',
+    'created_at_gmt' => gmdate('Y-m-d H:i:s', time() - 1800),
 ]), 'insert newer LOG_B');
 
 // A: shop A → LOG_A only
@@ -173,7 +173,7 @@ $repo2->insert([
     'http_code' => 200,
     'request' => [],
     'response' => [],
-    'created_at_gmt' => '2026-08-01 11:00:00',
+    'created_at_gmt' => gmdate('Y-m-d H:i:s', time() - 1800),
 ]);
 assertAud020($repo2->findLatestByOrderIdAndShop($sameRef, 10) === null, 'shop A must not see shop B-only row');
 

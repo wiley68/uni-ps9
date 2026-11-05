@@ -1,9 +1,79 @@
 (function () {
     "use strict";
 
+    // Own-form boundary: core's synthetic submit eventually calls this instance's submit().
+    // Native submit events and direct calls share the same final, synchronous check.
+    var checkoutForms = new WeakMap();
+    function protectCheckoutForm(form, valid, generation, submitted, blocked, retired) {
+        var state = checkoutForms.get(form);
+        if (!state) {
+            state = { nativeSubmit: form.submit, owner: null, sent: false };
+            checkoutForms.set(form, state);
+        }
+        if (state.owner) state.owner.destroy();
+        var disposed = false;
+        var intent = null;
+        var pending = false;
+        function currentReady() {
+            return !disposed && state.owner === guard && !state.sent && form.isConnected !== false && valid();
+        }
+        function allowed() {
+            return (intent === null || intent === generation()) && currentReady();
+        }
+        function commit() {
+            if (!allowed()) {
+                if (!disposed && state.owner === guard && !state.sent && blocked) blocked();
+                return false;
+            }
+            state.sent = true;
+            submitted();
+            return true;
+        }
+        function onSubmit(event) {
+            if (disposed || state.owner !== guard) return;
+            if (!commit()) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            }
+        }
+        function guardedSubmit() {
+            if (!commit()) return false;
+            state.nativeSubmit.call(form);
+            return true;
+        }
+        var guard = {
+            claim: function () {
+                if (pending || !currentReady()) return false;
+                intent = generation();
+                pending = true;
+                return true;
+            },
+            // Unlock a new click, but never erase the generation of an older async check.
+            release: function () { if (!disposed && state.owner === guard && !state.sent) pending = false; },
+            destroy: function () {
+                if (disposed) return;
+                disposed = true;
+                form.removeEventListener("submit", onSubmit);
+                if (state.owner === guard) {
+                    state.owner = null;
+                    // Retained form references stay blocked until a new owner mounts.
+                    if (form.submit === guardedSubmit) form.submit = function () { return false; };
+                }
+                if (retired) retired();
+            }
+        };
+        state.owner = guard;
+        form.submit = guardedSubmit;
+        form.addEventListener("submit", onSubmit);
+        return guard;
+    }
+    if (typeof module === "object" && module.exports) {
+        module.exports.protectCheckoutForm = protectCheckoutForm;
+        return;
+    }
+
     var CALCULATE_DELAY = 900;
-    /** @type {"idle"|"click_accepted"|"submitting"} */
-    var submitState = "idle";
+    var mounted = [];
 
     function parseConfig(root) {
         try {
@@ -66,6 +136,12 @@
         var lastCalculation = null;
 
         var previousFirstLocked = null;
+        var submitState = "idle";
+        var consents = window.createUnipaymentShopConsents(root);
+        var consentGeneration = 0;
+        var disposed = false;
+        var clickTimer = null;
+        mounted.push(root);
 
         function showError(message) {
             if (!errorBox) return;
@@ -135,11 +211,13 @@
             var gpr = root.querySelector('[data-unipayment-display="gpr"]');
             if (glp) glp.textContent = (scheme.glp_display || "0.00") + "%";
             if (gpr) gpr.textContent = (scheme.gpr_display || "0.00") + "%";
-            lastCalculation = scheme;
-            showError("");
+            consentGeneration = consents.begin(selectionIdentity());
+            lastCalculation = consents.apply(consentGeneration, scheme.consent_context) ? scheme : null;
+            showError(lastCalculation ? "" : t(root, "data-consent-context-invalid-message", "Обновете страницата и изберете схема отново."));
         }
 
         function applyCalculation(calculation) {
+            if (!consents.apply(consentGeneration, calculation.consent_context)) throw new Error("consent_context");
             lastCalculation = calculation;
             setDisplay(root, "price", calculation.price_display);
             setDisplay(
@@ -177,7 +255,22 @@
             showError("");
         }
 
+        function selectionIdentity() {
+            var scheme = selectedScheme() || {};
+            return JSON.stringify([scheme.kop_code, scheme.months, scheme.filter_id, scheme.scheme_type]);
+        }
+
+        function invalidateCalculation() {
+            calculateSequence += 1;
+            lastCalculation = null;
+            consentGeneration = consents.begin(selectionIdentity());
+        }
+
         function requestCalculation() {
+            if (disposed) return Promise.reject(new Error("stale"));
+            window.clearTimeout(calculateTimer);
+            calculateTimer = null;
+            invalidateCalculation();
             var endpoint = root.getAttribute("data-calculate-endpoint");
             var scheme = selectedScheme();
             if (!endpoint || !scheme || !root.isConnected)
@@ -218,10 +311,9 @@
             return fetch(endpoint, options)
                 .then(function (response) {
                     return response.json().then(function (body) {
+                        if (disposed || sequence !== calculateSequence || !root.isConnected) throw new Error("stale");
                         if (!response.ok || !body.success)
                             throw new Error(body.message || "calculation");
-                        if (sequence !== calculateSequence || !root.isConnected)
-                            throw new Error("stale");
                         if (body.cart_snapshot && snap)
                             snap.value = body.cart_snapshot;
                         applyCalculation(body.calculation);
@@ -231,11 +323,12 @@
                 .catch(function (error) {
                     if (
                         error.name === "AbortError" ||
-                        error.message === "stale"
+                        error.message === "stale" || disposed || sequence !== calculateSequence || !root.isConnected
                     )
                         throw error;
+                    lastCalculation = null;
                     showError(
-                        t(
+                        error.message === "consent_context" ? t(root, "data-consent-context-invalid-message", "Обновете страницата и изберете схема отново.") : t(
                             root,
                             "data-calculate-failed-message",
                             "Неуспешно изчисление. Моля, опитайте отново.",
@@ -246,6 +339,7 @@
         }
 
         function scheduleCalculate() {
+            invalidateCalculation();
             window.clearTimeout(calculateTimer);
             calculateTimer = window.setTimeout(function () {
                 requestCalculation().catch(function () {});
@@ -253,14 +347,7 @@
         }
 
         function consentsOk() {
-            var boxes = root.querySelectorAll(
-                "[data-unipayment-consent-checkbox]",
-            );
-            if (!boxes.length) return true;
-            for (var i = 0; i < boxes.length; i += 1) {
-                if (!boxes[i].checked) return false;
-            }
-            return true;
+            return consents.ready();
         }
 
         function process2Ok() {
@@ -310,6 +397,10 @@
         }
 
         function validateFormFields() {
+            if (disposed || !root.isConnected || calculateTimer !== null || !lastCalculation || !consents.resolved()) {
+                showError(t(root, "data-consent-context-invalid-message", "Изчакайте изчислението или обновете страницата."));
+                return false;
+            }
             if (!consentsOk()) {
                 showError(
                     t(
@@ -358,32 +449,42 @@
             }
         }
 
-        /**
-         * First valid confirmation click: claim the client guard without disabling
-         * the submitter. Disabling here (capture phase) would cancel the browser's
-         * native default action and leave the shopper stuck with no request.
-         */
+        function resetClick() {
+            if (disposed || submitState === "submitting") return;
+            submitState = "idle";
+            root.classList.remove("unipayment-checkout--click-accepted");
+            var payment = document.querySelector('input[name="payment-option"][data-module-name="unipayment"]');
+            var button = payment && payment.checked ? confirmationButton() : null;
+            if (button) button.removeAttribute("aria-busy");
+            if (submitGuard) submitGuard.release();
+        }
+
+        var submitGuard = form ? protectCheckoutForm(
+            form,
+            function () {
+                var payment = document.querySelector('input[name="payment-option"][data-module-name="unipayment"]');
+                if (!payment || !payment.checked) return false;
+                syncHidden();
+                return validateFormFields();
+            },
+            function () { return consentGeneration; },
+            markSubmitting,
+            function () {
+                resetClick();
+                showError(t(root, "data-consent-context-invalid-message", "Обновете страницата и потвърдете избраната схема отново."));
+            },
+            destroyCheckout
+        ) : null;
+
         function acceptFirstClick() {
+            if (!submitGuard || !submitGuard.claim()) return false;
             submitState = "click_accepted";
             root.classList.add("unipayment-checkout--click-accepted");
-            var confirmBtn = confirmationButton();
-            if (confirmBtn) {
-                confirmBtn.setAttribute("aria-busy", "true");
-            }
-            // If native submit never begins (exception / intercepted default), unlock.
-            // Do not reset once markSubmitting() has run (request in flight / navigating).
-            window.setTimeout(function () {
-                if (submitState !== "click_accepted") {
-                    return;
-                }
-                submitState = "idle";
-                root.classList.remove("unipayment-checkout--click-accepted");
-                root.classList.remove("unipayment-checkout--submitting");
-                var btn = confirmationButton();
-                if (btn) {
-                    btn.removeAttribute("aria-busy");
-                }
-            }, 0);
+            var button = confirmationButton();
+            if (button) button.setAttribute("aria-busy", "true");
+            window.clearTimeout(clickTimer);
+            clickTimer = window.setTimeout(resetClick, 30000);
+            return true;
         }
 
         if (select) {
@@ -422,65 +523,38 @@
             });
         }
 
-        if (form) {
-            form.addEventListener("submit", function (event) {
-                if (submitState === "submitting") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    return false;
-                }
-                if (submitState === "click_accepted") {
-                    // First valid click already validated; disable only now.
-                    syncHidden();
-                    markSubmitting();
-                    return true;
-                }
-                // Keyboard / direct submit without a prior confirmation click.
-                if (!validateBeforeSubmit()) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    return false;
-                }
-                syncHidden();
-                markSubmitting();
-                return true;
-            });
+        function confirmClick(event) {
+            var button = event.target.closest("#payment-confirmation button");
+            if (!button || disposed || !root.isConnected) return;
+            var payment = document.querySelector('input[name="payment-option"][data-module-name="unipayment"]');
+            if (!payment || !payment.checked) return;
+            if (submitState !== "idle" || !validateBeforeSubmit() || !acceptFirstClick()) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+            }
         }
-
-        document.addEventListener(
-            "click",
-            function (event) {
-                var button = event.target.closest(
-                    "#payment-confirmation button",
-                );
-                if (!button) return;
-                var payment = document.querySelector(
-                    'input[name="payment-option"][data-module-name="unipayment"]',
-                );
-                if (!payment || !payment.checked) return;
-                if (!root.offsetParent && root.hidden) return;
-                if (
-                    submitState === "click_accepted" ||
-                    submitState === "submitting"
-                ) {
-                    // Suppress rapid second click; leave the first native submit alone.
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (typeof event.stopImmediatePropagation === "function") {
-                        event.stopImmediatePropagation();
-                    }
-                    return;
-                }
-                if (!validateBeforeSubmit()) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    return;
-                }
-                // Claim guard; keep submitter enabled so native default action can fire.
-                acceptFirstClick();
-            },
-            true,
-        );
+        document.addEventListener("click", confirmClick, true);
+        root.unipaymentCheckoutInvalidate = function () {
+            window.clearTimeout(calculateTimer);
+            calculateTimer = null;
+            invalidateCalculation();
+        };
+        root.unipaymentCheckoutRecalculate = function () {
+            if (!disposed && submitState !== "submitting") requestCalculation().catch(function () {});
+        };
+        root.unipaymentCheckoutRelease = resetClick;
+        function destroyCheckout() {
+            if (disposed) return;
+            disposed = true;
+            root.unipaymentCheckoutInvalidate();
+            window.clearTimeout(clickTimer);
+            consents.destroy();
+            if (calculateRequest) calculateRequest.abort();
+            if (submitGuard) submitGuard.destroy();
+            document.removeEventListener("click", confirmClick, true);
+        }
+        root.unipaymentCheckoutDestroy = destroyCheckout;
 
         tryPreselectPayment(handoffFrom(config));
         applyLocalScheme();
@@ -622,8 +696,35 @@
     }
 
     function initialize() {
+        mounted = mounted.filter(function (root) {
+            if (root.isConnected) return true;
+            root.unipaymentCheckoutDestroy();
+            return false;
+        });
         document.querySelectorAll("[data-unipayment-checkout]").forEach(setup);
         scheduleHandoffRetry();
+    }
+
+    function invalidateForms() {
+        mounted.forEach(function (root) { root.unipaymentCheckoutInvalidate(); });
+    }
+    function refreshForms() {
+        invalidateForms();
+        initialize();
+        mounted.forEach(function (root) { root.unipaymentCheckoutRecalculate(); });
+    }
+    document.addEventListener("change", function (event) {
+        if (event.target.closest && event.target.closest("#js-delivery, .js-delivery-form, #checkout-addresses-step")) invalidateForms();
+    }, true);
+    // Observe form mounts only; consent visibility/text changes do not trigger reinitialization loops.
+    if (typeof MutationObserver === "function") {
+        new MutationObserver(function (changes) {
+            if (changes.some(function (change) {
+                return Array.from(change.addedNodes).concat(Array.from(change.removedNodes)).some(function (node) {
+                    return node.nodeType === 1 && (node.matches("[data-unipayment-checkout], [data-unipayment-checkout-form]") || node.querySelector("[data-unipayment-checkout]"));
+                });
+            })) initialize();
+        }).observe(document.body, {childList: true, subtree: true});
     }
 
     if (document.readyState === "loading") {
@@ -633,11 +734,13 @@
     }
     if (window.prestashop && typeof window.prestashop.on === "function") {
         // Hummingbird 2.0 / Classic: delivery update re-renders payment options.
-        window.prestashop.on("updatedDeliveryForm", initialize);
+        window.prestashop.on("updateCart", invalidateForms);
+        window.prestashop.on("updatedDeliveryForm", refreshForms);
         // Core checkout step changes (Classic + shared) may remount payment HTML.
         window.prestashop.on("changedCheckoutStep", initialize);
         // Voucher/cart mutations on checkout trigger updatedCart after AJAX refresh.
-        window.prestashop.on("updatedCart", initialize);
+        window.prestashop.on("updatedCart", refreshForms);
+        window.prestashop.on("orderConfirmationErrors", function () { mounted.forEach(function (root) { root.unipaymentCheckoutRelease(); }); });
     }
 
     // If the customer manually chooses another payment method after handoff, never force UniCredit again.

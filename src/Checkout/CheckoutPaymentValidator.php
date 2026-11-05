@@ -40,7 +40,7 @@ final class CheckoutPaymentValidator
     }
 
     /** @param array<string, mixed> $shop @param array<string, mixed> $posted @param array<string, mixed> $customer */
-    public function validate(array $shop, CartContext $cart, string $currencyIso, array $posted, array $customer): ValidatedPaymentRequest
+    public function validate(array $shop, CartContext $cart, string $currencyIso, array $posted, array $customer, ?array $effectiveConsentSelection = null): ValidatedPaymentRequest
     {
         if (!$this->currencyGate->supports($currencyIso)) {
             throw new CheckoutValidationException('This payment method is unavailable for the selected currency.');
@@ -65,12 +65,19 @@ final class CheckoutPaymentValidator
             throw new CheckoutValidationException('The selected financing scheme cannot be calculated.', 0, $exception);
         }
         $validatedCustomer = $this->customers->validate($shop, $customer, $posted);
-        $accepted = $this->consents->validate($shop, $posted['consent'] ?? []);
+        $consentSelection = $effectiveConsentSelection ?? $this->consents->selection($calculation);
+        if (($consentSelection['_consent_snapshot_missing'] ?? false) === true) {
+            // Only proven absence permits the validated server calculation; retain order-aware errors.
+            $consentSelection = array_replace($consentSelection, $this->consents->selection($calculation));
+        }
+        $accepted = \PrestaShop\Module\Unipayment\Order\OrderOrchestrator::validateConsentSelection(
+            $shop, $posted['consent'] ?? [], $consentSelection
+        );
         $acceptedConsents = array_values(array_filter($this->consents->normalize($shop), static function (array $consent) use ($accepted): bool {
             return in_array($consent['id'], $accepted, true);
         }));
 
-        return new ValidatedPaymentRequest($calculation, $validatedCustomer, $accepted, $fingerprint, $acceptedConsents);
+        return new ValidatedPaymentRequest($calculation, $validatedCustomer, $accepted, $fingerprint, $acceptedConsents, $this->consents->parseAcceptedIds($posted['consent'] ?? []));
     }
 
     /** @param AvailableScheme[] $schemes */

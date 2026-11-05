@@ -892,6 +892,14 @@ class Unipayment extends PaymentModule
             return;
         }
 
+        if (in_array($this->context->controller->php_self, ['product', 'cart', 'order'], true)) {
+            $this->context->controller->registerJavascript(
+                'module-unipayment-shop-consents',
+                'modules/' . $this->name . '/views/js/shop-consents.js',
+                ['position' => 'bottom', 'priority' => 149, 'version' => $this->assetVersion('views/js/shop-consents.js')]
+            );
+        }
+
         if ($this->context->controller->php_self === 'index') {
             if ($this->homepageAdvertisingContext() === null) {
                 return;

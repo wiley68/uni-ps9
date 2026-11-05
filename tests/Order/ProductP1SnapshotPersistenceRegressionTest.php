@@ -189,6 +189,18 @@ final class ProductP1Attempts implements OrderAttemptStoreInterface
     /** @var int */
     private $nextId = 1;
 
+    public function findByIdentity(int $shop, int $cart, string $fingerprint): ?array
+    {
+        foreach ($this->rows as $row) {
+            if ((int) ($row['id_shop'] ?? 0) === $shop && (int) ($row['id_cart'] ?? 0) === $cart
+                && ($row['cart_fingerprint'] ?? '') === $fingerprint) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
     public function reserve(int $idShop, int $idCart, string $cartFingerprint): array
     {
         foreach ($this->rows as $row) {

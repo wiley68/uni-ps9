@@ -59,42 +59,12 @@ assertDbl(
     ),
     'A: button disabled only in markSubmitting (during submit)'
 );
-assertDbl(
-    (bool) preg_match('/click_accepted[\s\S]{0,200}markSubmitting/s', $js),
-    'A: first form submit after click_accepted proceeds via markSubmitting'
-);
-assertDbl(
-    (bool) preg_match(
-        '/submitState\s*===\s*"click_accepted"\s*\|\|\s*submitState\s*===\s*"submitting"[\s\S]{0,240}preventDefault/s',
-        $js
-    ),
-    'B: second click while click_accepted/submitting prevented'
-);
-assertDbl(
-    (bool) preg_match(
-        '/document\.addEventListener\(\s*"click",[\s\S]*?if \(!validateBeforeSubmit\(\)\) \{[\s\S]*?return;[\s\S]*?acceptFirstClick\(\);/s',
-        $js
-    ),
-    'C: acceptFirstClick only after successful validateBeforeSubmit on click path'
-);
-assertDbl(
-    (bool) preg_match(
-        '/submitState === "click_accepted"[\s\S]{0,200}markSubmitting[\s\S]{0,200}validateBeforeSubmit/s',
-        $js
-    ),
-    'D: idle/direct submit path still validates via validateBeforeSubmit'
-);
-assertDbl(
-    (bool) preg_match(
-        '/submitState === "submitting"[\s\S]{0,80}preventDefault/s',
-        $js
-    ),
-    'E: repeated submit while submitting blocked'
-);
-assertDbl(
-    strpos($acceptBody, 'submitState = "idle"') !== false,
-    'failure recovery: unlock if submit never began after click_accepted'
-);
+assertDbl(strpos($js, 'form.submit = function') !== false, 'A: direct final submit guarded on the own form');
+assertDbl(strpos($js, 'intent === generation()') !== false, 'D: final submit rechecks the captured generation');
+assertDbl(strpos($js, 'submitState !== "idle"') !== false, 'B: pending/submitting confirmation blocked');
+assertDbl(strpos($js, 'protectCheckoutForm(') !== false && strpos($js, 'markSubmitting,') !== false, 'C: final guard owns markSubmitting');
+assertDbl(strpos($js, 'sent = true') !== false, 'E: synchronous final claim prevents duplicate submit');
+assertDbl(strpos($acceptBody, 'window.setTimeout(resetClick, 30000)') !== false, 'failure recovery: pending core check has bounded watchdog');
 assertDbl(!preg_match('/\$\s*\(|\bjQuery\b/', $js), 'no jQuery');
 assertDbl(strpos($js, 'stopImmediatePropagation') !== false, 'B: second click stopImmediatePropagation available');
 

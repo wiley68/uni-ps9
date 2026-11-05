@@ -64,6 +64,18 @@ final class EmptyLinesAttempts implements OrderAttemptStoreInterface
     /** @var array<string, array<string, mixed>> */
     public $rows = [];
 
+    public function findByIdentity(int $shop, int $cart, string $fingerprint): ?array
+    {
+        foreach ($this->rows as $row) {
+            if ((int) ($row['id_shop'] ?? 0) === $shop && (int) ($row['id_cart'] ?? 0) === $cart
+                && ($row['cart_fingerprint'] ?? '') === $fingerprint) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
     public function reserve(int $shop, int $cart, string $fingerprint): array
     {
         $key = $shop . ':' . $cart . ':' . $fingerprint;

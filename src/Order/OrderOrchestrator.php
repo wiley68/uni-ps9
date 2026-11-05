@@ -8,6 +8,8 @@ use PrestaShop\Module\Unipayment\Api\Exception\ConnectionException;
 use PrestaShop\Module\Unipayment\Api\Exception\ControlPanelException;
 use PrestaShop\Module\Unipayment\Api\Exception\HttpException;
 use PrestaShop\Module\Unipayment\Checkout\ValidatedPaymentRequest;
+use PrestaShop\Module\Unipayment\Checkout\ConsentResolver;
+use PrestaShop\Module\Unipayment\Checkout\CheckoutValidationException;
 use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
 
 final class OrderOrchestrator
@@ -59,9 +61,60 @@ final class OrderOrchestrator
         $this->mailDispatcher = $mailDispatcher;
     }
 
+    /** Read-only preflight; reserve/recovery remains authoritative. */
+    public function consentSelection(int $idShop, int $idCart, string $fingerprint, array $fallback): array
+    {
+        $attempt = $this->attempts->findByIdentity($idShop, $idCart, $fingerprint);
+        $snapshot = $attempt !== null ? $this->snapshots->findByAttempt((int) $attempt['id_attempt']) : null;
+        $identity = (int) ($attempt['id_order'] ?? 0) > 0 ? [
+            'id_order' => (int) $attempt['id_order'], 'id_attempt' => (int) $attempt['id_attempt'],
+            'order_reference' => (string) ($attempt['order_reference'] ?? ''),
+            'lifecycle_status' => (string) ($attempt['state'] ?? ''),
+        ] : [];
+
+        if ($snapshot !== null) {
+            // Even an empty persisted snapshot is present: never replace its financing selection.
+            return array_replace($snapshot, $identity, ['_consent_snapshot_missing' => false]);
+        }
+        if ($identity !== []) {
+            return array_replace($fallback, $identity, ['_consent_snapshot_missing' => true]);
+        }
+
+        return $fallback;
+    }
+
+    /** Keep consent failures order-aware without changing any durable lifecycle state. */
+    public static function validateConsentSelection(array $shop, mixed $accepted, array $selection): array
+    {
+        try {
+            return (new ConsentResolver())->validate($shop, $accepted, $selection);
+        } catch (CheckoutValidationException $exception) {
+            if ((int) ($selection['id_order'] ?? 0) > 0) {
+                throw new OrderOrchestrationException(
+                    $exception->getMessage(), false, $exception,
+                    (int) $selection['id_order'], (int) ($selection['id_attempt'] ?? 0),
+                    (string) ($selection['lifecycle_status'] ?? ''), false,
+                    (string) ($selection['order_reference'] ?? '')
+                );
+            }
+            throw $exception;
+        }
+    }
+
+    private function validateConsents(ValidatedPaymentRequest $request, array $shop, array $selection): void
+    {
+        $consents = new ConsentResolver();
+        $request->acceptedConsentIds = self::validateConsentSelection($shop, $request->submittedConsentIds, $selection);
+        $request->acceptedConsents = array_values(array_filter($consents->normalize($shop), static function (array $consent) use ($request): bool {
+            return in_array($consent['id'], $request->acceptedConsentIds, true);
+        }));
+    }
+
     /** @param array<string, mixed> $shop */
     public function orchestrate(int $idShop, int $idCart, ValidatedPaymentRequest $request, array $shop, string $submissionSource = 'checkout'): OrderOrchestrationResult
     {
+        $selection = (new ConsentResolver())->selection($request->calculation);
+        $this->validateConsents($request, $shop, $this->consentSelection($idShop, $idCart, $request->cartFingerprint, $selection));
         $attempt = $this->attempts->reserve($idShop, $idCart, $request->cartFingerprint);
         $attemptId = (int) $attempt['id_attempt'];
         if (!\PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::matches($attempt['cp_origin'] ?? null)) {
@@ -94,6 +147,9 @@ final class OrderOrchestrator
                     (int) $attempt['id_order'], $attemptId, (string) $attempt['state'], false,
                     (string) ($attempt['order_reference'] ?? '')
                 );
+            }
+            if ($existingSnapshot !== null) {
+                $this->validateConsents($request, $shop, $existingSnapshot);
             }
         } elseif ((string) $attempt['state'] === self::CP_CREATED) {
             throw new OrderOrchestrationException('The created financing order is unavailable.', false, null, 0, $attemptId, self::CP_CREATED);
@@ -145,6 +201,7 @@ final class OrderOrchestrator
             if ($snapshot !== null) {
                 \PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin::assertMatches($snapshot['cp_origin'] ?? null);
             }
+            $this->validateConsents($request, $shop, $snapshot ?? $selection);
             if ((int) ($attempt['id_order'] ?? 0) > 0) {
                 $order = $this->orders->load((int) $attempt['id_order']);
                 if ($snapshot === null) {
@@ -243,6 +300,9 @@ final class OrderOrchestrator
             }
 
             $currencyGuard->assertMatchesSnapshot($order, $snapshot);
+            // Another worker may have won INSERT IGNORE; its frozen selection is effective.
+            $snapshot = $this->snapshots->findByAttempt($attemptId) ?? $snapshot;
+            $this->validateConsents($request, $shop, $snapshot);
             return $this->submitToControlPanel($attempt, $attemptId, $order, $snapshot, $idShop, $shop);
         } catch (OrderOrchestrationException $exception) {
             throw $exception;
