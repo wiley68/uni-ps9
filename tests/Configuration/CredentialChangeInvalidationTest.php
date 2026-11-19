@@ -17,7 +17,7 @@ final class Configuration
     /** @var bool */
     public static $failTokenDeletes = false;
 
-    public static function updateValue(string $key, mixed $value, bool $html = false, $idShopGroup = null, $idShop = null): bool
+    public static function updateValue(string $key, mixed $value, bool $html = false, ?int $idShopGroup = null, ?int $idShop = null): bool
     {
         unset($html, $idShopGroup, $idShop);
         self::$values[$key] = $value;
@@ -61,7 +61,7 @@ final class PhpEncryption
     }
 
     /** @return string|false */
-    public function decrypt(string $ciphertext)
+    public function decrypt(string $ciphertext): string|false
     {
         $decoded = base64_decode($ciphertext, true);
 
@@ -206,7 +206,7 @@ $cache->replace($unicid, $snapshot);
 $tokens->save('keep-token', 'Bearer', 2000000000);
 $clearBeforeBlank = $cache->clearCount;
 assertCred(credentialsChanged($unicid, $unicid, '') === false, 'blank secret alone must not count as credential change');
-assertCred($configuration->save(true, $unicid, null, false, true), 'blank-secret save of other flags must succeed');
+assertCred($configuration->save(true, $unicid, null, true), 'blank-secret save of other flags must succeed');
 assertCred($tokens->hasToken(), 'blank secret must preserve token');
 assertCred(isset($cache->rows[$unicid]), 'blank secret must preserve cache');
 assertCred($cache->clearCount === $clearBeforeBlank, 'blank secret must not clear cache');

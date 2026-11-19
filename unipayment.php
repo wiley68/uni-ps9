@@ -18,7 +18,7 @@ class Unipayment extends PaymentModule
     {
         $this->name = 'unipayment';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.3';
+        $this->version = '2.0.4';
         $this->author = 'Avalon Ltd';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -194,9 +194,6 @@ class Unipayment extends PaymentModule
             'unipayment_unicid' => $configurationSubmitted
                 ? $requestReader->getUnicid()
                 : $repository->getUnicid(),
-            'unipayment_advertising_enabled' => $configurationSubmitted
-                ? (bool) $requestReader->getField('UNIPAYMENT_ADVERTISING_ENABLED', false)
-                : $repository->isAdvertisingEnabled(),
             'unipayment_debug_enabled' => $configurationSubmitted
                 ? (bool) $requestReader->getField('UNIPAYMENT_DEBUG_ENABLED', false)
                 : $repository->isDebugEnabled(),
@@ -294,7 +291,6 @@ class Unipayment extends PaymentModule
             (bool) $requestReader->getField('UNIPAYMENT_ENABLED', false),
             $unicid,
             $secretNonEmpty ? $secret : null,
-            (bool) $requestReader->getField('UNIPAYMENT_ADVERTISING_ENABLED', false),
             (bool) $requestReader->getField('UNIPAYMENT_DEBUG_ENABLED', false),
             $buttonAction,
             (int) $buttonTopSpacing,
@@ -860,7 +856,6 @@ class Unipayment extends PaymentModule
                 $phpSelf,
                 (bool) $this->active,
                 $repository->isEnabled(),
-                $repository->isAdvertisingEnabled(),
                 $repository->getUnicid()
             )
         ) {

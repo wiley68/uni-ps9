@@ -27,6 +27,17 @@ $module = (string) file_get_contents($modulePath);
 $handler = (string) file_get_contents($handlerPath);
 
 assertAdminConfiguration(
+    strpos($template, 'UNIPAYMENT_ADVERTISING_ENABLED') === false
+        && strpos($template, 'unipayment_advertising_enabled') === false
+        && strpos($module, 'UNIPAYMENT_ADVERTISING_ENABLED') === false
+        && strpos($module, 'isAdvertisingEnabled') === false,
+    'legacy advertising switch must not be displayed, loaded, saved or used for homepage eligibility'
+);
+foreach (['UNIPAYMENT_ENABLED', 'UNIPAYMENT_UNICID', 'UNIPAYMENT_SECRET', 'UNIPAYMENT_DEBUG_ENABLED', 'UNIPAYMENT_PRODUCT_BUTTON_ACTION', 'UNIPAYMENT_BUTTON_TOP_SPACING'] as $field) {
+    assertAdminConfiguration(strpos($template, 'name="' . $field . '"') !== false, 'other setting must remain: ' . $field);
+}
+
+assertAdminConfiguration(
     strpos($template, 'name="UNIPAYMENT_SECRET" id="UNIPAYMENT_SECRET" value=""') !== false,
     'secret input must not render a stored secret value'
 );

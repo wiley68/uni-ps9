@@ -38,6 +38,20 @@ Run `composer test`, `node tests/Product/ProductCalculatorJsTest.js`, PHP syntax
 
 ## Automated checks
 
+### UNI-PS9-ADS-001
+
+`Advertising/HomepageAdvertisingGateTest.php` checks CP ON/OFF with legacy local values 0, 1 and missing on desktop/mobile, without reading the legacy key. The admin contract checks switch removal and preservation of other fields. `ConfigurationRepositoryTest.php` checks unchanged install/uninstall compatibility, preservation of legacy values (including absence) on save and other settings. `ShopConfigurationCacheTest.php` checks advertising after fresh-cache access, stale refresh, manual refresh, transient LKG and CP push; existing TTL, invalid/too-old fallback and shop isolation checks remain in force. Advertising presenter/template/JS contracts remain unchanged. Browser acceptance on Classic and Hummingbird is owner-run; do not clear live caches or mutate shop configuration from CLI tests.
+
+### UNI-PS9-ADS-003 / release 2.0.4 — 2026-11-19
+
+Owner acceptance for UNI-PS9-ADS-001, PS9-01 through PS9-09: **9/9 PASS**. CP `uni_container_status` is central; legacy local values are ignored during normal operation. Install defaults/uninstall cleanup, CP push, 24-hour TTL, transient fallback up to 6 hours after expiry and manual refresh remain unchanged. The shared presentation resolver can refresh synchronously on a cache miss/stale snapshot. No new migration or payment/financing change.
+
+Release validation runs advertising/configuration and six current-version assertion tests, the full safe suite, PHP syntax, JS tests/syntax, Composer validation, XML/version consistency and `git diff --check`. Preserve historical version fixtures. Missing test-support autoload may be supplied by an isolated CLI bootstrap under `/tmp`; remove it afterward without changing the installed `vendor/`.
+
+Keep PASS, SKIP, PARTIAL and FAIL separate. Six runtime/destructive files remain excluded from the safe suite; the packaging test is PARTIAL there because only static contracts execute. PHP 8.5 lacks cURL, zip and SimpleXML; its transport failure is an environment limitation, not grounds to change production code or install dependencies. Packaging is separately authorized for this release: use the approved builder under PHP 8.4, verify a provisional archive before commit/push, then regenerate and verify the final protected ZIP from the published commit. Never run live financing or destructive DB tests as part of release validation.
+
+Release validation results: PHP 8.1–8.4 each **146 PASS / 6 SKIP / 1 PARTIAL / 0 FAIL**; PHP 8.5 **145 PASS / 6 SKIP / 1 PARTIAL / 1 FAIL** (missing cURL). The focused run has **16 PASS / 1 PARTIAL / 0 FAIL**, including all six current-version assertions and the static packaging contracts. Syntax checks passed for all 17 modified PHP files on PHP 8.1–8.5 and five production JS files; all three JS test harnesses run in the safe suite. Composer validation, five-place PHP/XML/runtime version consistency and `git diff --check` passed. The separate PHP 8.4 packaging test passed two repeatable provisional builds, production source/deployment-file parity, nine packaged inbound cases and ten archive rejection cases. Temporary CLI bootstrap was removed; installed `vendor/`, deployment inputs and live shop state were not modified by validation.
+
 ### UNI-CONSENT-001 / Phase 4B
 
 `php tests/run.php safe` (also `composer test`) clears inherited `UNIPAYMENT_*` opt-ins,

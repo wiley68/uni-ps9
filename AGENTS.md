@@ -277,17 +277,18 @@ Deleted files трябва да бъдат изрично обяснени.
 
 # Текущо състояние
 
-Модул **2.0.3** — definitive CP/SmartUCF failure Thank You + Satrudnik failure mail; върху одобрената 2.0.2 scheme presentation / Cart / Checkout parity. Phase 0–13 и final audit remediations (AUD-019…AUD-023) остават в сила.
+Модул **2.0.4** — UNI-PS9-ADS-001 централизира рекламата през CP `uni_container_status` без merchant switch; запазва 2.0.3 failure Thank You / Satrudnik mail и 2.0.2 scheme / Cart / Checkout parity. Phase 0–13 и final audit remediations остават в сила с уточнения presentation cache flow по-долу. Owner acceptance PS9-01…PS9-09: **9/9 PASS**.
 
 Разрешено / в сила:
 
 - всичко от Phase 0–13 + AUD remediations;
 - durable financing от checkout **и** product/cart popup (`OrderOrchestrator` → CP → SmartUCF/Process 2);
-- `HomepageAdvertisingGate` / `HomepageAdvertisingPresenter` + `displayFooter` (index only) през `getCachedOnly()`;
+- `HomepageAdvertisingGate` / `HomepageAdvertisingPresenter` + `displayFooter` (index only) през `getForPresentationWithoutCredentials()`; fresh cache е локален, cache miss/stale може да обнови CP синхронно;
 - `ModuleDataPurger` uninstall (AUD-006);
 - ZIP deployment: `config/environment.php` + `secrets/smartucf-key.php` (без server env);
 - **v2.0.2** canonical scheme ordering, Cart button/popup first-installment parity, `zero_promo` exclusion from standard Cart representative, cross-line `uni_parva` ambiguity, Checkout priority/transitions, red selector;
 - **v2.0.3** definitive CP create failure (`bank_send_failed_cp`, emails, Thank You) including explicit HTTP 403/404/405/410 endpoint rejection; Satrudnik operational mail on `bank_send_failed_cp` / `bank_send_failed_smartucf`;
+- **v2.0.4** legacy local advertising values се игнорират и не се променят при Save; install defaults/uninstall cleanup, CP push, TTL 24h, transient LKG до 6h след expiry и manual refresh са запазени; няма нова migration или payment/financing промяна;
 - documentation: README / INSTALLATION / ARCHITECTURE / SECURITY / RECOVERY / RELEASE / TESTING / CHANGELOG.
 
 Критични инварианти (не регресирай):
@@ -296,7 +297,7 @@ Deleted files трябва да бъдат изрично обяснени.
 - post-order failures остават order-aware (AUD-019);
 - Guest Cart → една authoritative PS order с lines;
 - SmartUCF journal lookup е shop-scoped (AUD-020);
-- FO advertising никога не вика CP синхронно (AUD-022);
+- FO advertising използва общия presentation resolver: fresh coherent cache без CP call; cache miss/stale може да извика CP синхронно с координирания refresh и ограничен transient LKG; не въвеждай отделен advertising refresh policy;
 - не логвай PII / secrets / EGN;
 - не променяй CP без доказана нужда;
 - `CheckoutSchemeIdentity` / `preference_unresolved` остават authoritative за Product→Checkout handoff;

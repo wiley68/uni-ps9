@@ -15,6 +15,7 @@ final class ConfigurationRepository
     public const ENABLED = 'UNIPAYMENT_ENABLED';
     public const UNICID = 'UNIPAYMENT_UNICID';
     public const SECRET = 'UNIPAYMENT_SECRET';
+    // Legacy key retained only for install defaults and uninstall cleanup.
     public const ADVERTISING_ENABLED = 'UNIPAYMENT_ADVERTISING_ENABLED';
     public const DEBUG_ENABLED = 'UNIPAYMENT_DEBUG_ENABLED';
     public const PRODUCT_BUTTON_ACTION = 'UNIPAYMENT_PRODUCT_BUTTON_ACTION';
@@ -83,7 +84,6 @@ final class ConfigurationRepository
         bool $enabled,
         string $unicid,
         ?string $secret,
-        bool $advertisingEnabled = self::DEFAULT_ADVERTISING_ENABLED,
         bool $debugEnabled = self::DEFAULT_DEBUG_ENABLED,
         string $productButtonAction = self::DEFAULT_PRODUCT_BUTTON_ACTION,
         int $buttonTopSpacing = self::DEFAULT_BUTTON_TOP_SPACING,
@@ -91,7 +91,6 @@ final class ConfigurationRepository
     ): bool {
         $result = \Configuration::updateValue(self::ENABLED, $enabled)
             && \Configuration::updateValue(self::UNICID, $unicid)
-            && \Configuration::updateValue(self::ADVERTISING_ENABLED, $advertisingEnabled)
             && \Configuration::updateValue(self::DEBUG_ENABLED, $debugEnabled)
             && \Configuration::updateValue(self::PRODUCT_BUTTON_ACTION, $this->normalizeProductButtonAction($productButtonAction))
             && \Configuration::updateValue(self::BUTTON_TOP_SPACING, $this->normalizeButtonTopSpacing($buttonTopSpacing))
@@ -112,11 +111,6 @@ final class ConfigurationRepository
     public function getUnicid(): string
     {
         return trim((string) \Configuration::get(self::UNICID));
-    }
-
-    public function isAdvertisingEnabled(): bool
-    {
-        return (bool) \Configuration::get(self::ADVERTISING_ENABLED, null, null, null, self::DEFAULT_ADVERTISING_ENABLED);
     }
 
     public function isDebugEnabled(): bool

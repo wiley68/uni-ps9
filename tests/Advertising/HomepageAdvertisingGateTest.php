@@ -9,6 +9,22 @@ if (PHP_SAPI !== 'cli') {
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 use PrestaShop\Module\Unipayment\Advertising\HomepageAdvertisingGate;
+use PrestaShop\Module\Unipayment\Advertising\HomepageAdvertisingPresenter;
+use PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository;
+
+final class Configuration
+{
+    public static array $values = [];
+
+    public static function get(string $key, ?int $idLang = null, ?int $idShopGroup = null, ?int $idShop = null, mixed $default = false): mixed
+    {
+        if ($key === ConfigurationRepository::ADVERTISING_ENABLED) {
+            throw new RuntimeException('Advertising eligibility must never read the legacy local switch.');
+        }
+
+        return self::$values[$key] ?? $default;
+    }
+}
 
 function assertAdvertisingGate(bool $condition, string $message): void
 {
@@ -27,42 +43,58 @@ assertAdvertisingGate(!$gate->allowsPage('order'), 'checkout must not load homep
 assertAdvertisingGate(!$gate->allowsPage('category'), 'category listing must not load homepage advertising');
 
 assertAdvertisingGate(
-    $gate->allowsLocalSettings(true, true, true, 'SHOP-1'),
-    'enabled module + advertising flag + UNICID must pass the local settings gate'
+    $gate->allowsLocalSettings(true, true, 'SHOP-1'),
+    'enabled module + UNICID must pass the local settings gate'
 );
 assertAdvertisingGate(
-    !$gate->allowsLocalSettings(false, true, true, 'SHOP-1'),
+    !$gate->allowsLocalSettings(false, true, 'SHOP-1'),
     'inactive module must not enqueue homepage advertising'
 );
 assertAdvertisingGate(
-    !$gate->allowsLocalSettings(true, false, true, 'SHOP-1'),
+    !$gate->allowsLocalSettings(true, false, 'SHOP-1'),
     'disabled UNIPAYMENT_ENABLED must not enqueue homepage advertising'
 );
 assertAdvertisingGate(
-    !$gate->allowsLocalSettings(true, true, false, 'SHOP-1'),
-    'UNIPAYMENT_ADVERTISING_ENABLED=0 must not enqueue homepage advertising'
-);
-assertAdvertisingGate(
-    !$gate->allowsLocalSettings(true, true, true, ''),
+    !$gate->allowsLocalSettings(true, true, ''),
     'missing UNICID must not enqueue homepage advertising'
 );
 assertAdvertisingGate(
-    !$gate->allowsLocalSettings(true, true, true, '   '),
+    !$gate->allowsLocalSettings(true, true, '   '),
     'whitespace UNICID must not enqueue homepage advertising'
 );
 
 assertAdvertisingGate(
-    $gate->allowsAssets('index', true, true, true, 'SHOP-1'),
+    $gate->allowsAssets('index', true, true, 'SHOP-1'),
     'homepage + local settings must allow asset enqueue'
 );
 assertAdvertisingGate(
-    !$gate->allowsAssets('product', true, true, true, 'SHOP-1'),
+    !$gate->allowsAssets('product', true, true, 'SHOP-1'),
     'valid settings on a non-home page must still skip advertising assets'
 );
 assertAdvertisingGate(
-    !$gate->allowsAssets('index', true, true, false, 'SHOP-1'),
-    'homepage with advertising disabled must skip advertising assets'
+    !$gate->allowsAssets('index', true, false, 'SHOP-1'),
+    'homepage with module disabled must skip advertising assets'
 );
+
+$repository = new ConfigurationRepository();
+$presenter = new HomepageAdvertisingPresenter($gate);
+foreach ([0, 1, null] as $legacyAdvertising) {
+    Configuration::$values = [ConfigurationRepository::ENABLED => 1, ConfigurationRepository::UNICID => 'SHOP-1'];
+    if ($legacyAdvertising !== null) {
+        Configuration::$values[ConfigurationRepository::ADVERTISING_ENABLED] = $legacyAdvertising;
+    }
+    foreach ([0, 1] as $cpAdvertising) {
+        foreach ([false, true] as $isMobile) {
+            $allowed = $gate->allowsAssets('index', true, $repository->isEnabled(), $repository->getUnicid());
+            $payload = $allowed ? $presenter->present(
+                ['uni_status' => 1, 'uni_container_status' => $cpAdvertising, 'uni_picturem' => 'https://cdn.example.test/ad.jpg'],
+                $isMobile,
+                '/modules/unipayment/views/img/product/uni_logo.svg'
+            ) : null;
+            assertAdvertisingGate(($payload !== null) === ($cpAdvertising === 1), 'CP alone controls visibility for legacy 0/1/missing on desktop and mobile');
+        }
+    }
+}
 
 assertAdvertisingGate($gate->allowsShop(['uni_status' => 1, 'uni_container_status' => 1]), 'active CP shop + container must render');
 assertAdvertisingGate($gate->allowsShop(['uni_status' => 'Yes', 'uni_container_status' => '1']), 'Woo yes-flag values must be accepted');

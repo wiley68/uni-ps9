@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes high-level boundaries and the **current accepted implementation** for module **2.0.3**. Phase numbers below are historical delivery milestones; they are all implemented unless marked deferred.
+This document describes high-level boundaries and the **current accepted implementation** for module **2.0.4**. Phase numbers below are historical delivery milestones; they are all implemented unless marked deferred.
 
 ---
 
@@ -112,7 +112,7 @@ financial formulas, EUR eligibility and external contracts are unchanged. No sch
 | Durable order submission    | Lock + attempt + PS order + snapshot + CP create (checkout **and** product/cart popups)         |
 | Post-CP lifecycle           | Process 1 SmartUCF / Process 2 handoff + bank status                                            |
 | Post-order communication    | Financing emails, order_conf, Thank You, BO diagnostics                                         |
-| Homepage advertising        | Cache-only CP promo via `displayFooter` (index only)                                            |
+| Homepage advertising        | Shared CP presentation resolver via `displayFooter` (index only); cache miss/stale may refresh |
 | mTLS private-key passphrase | Deployment-local `secrets/smartucf-key.php` (AUD-021); Git-ignored, included unchanged in deployment ZIP |
 
 ### Shop configuration cache flow
@@ -532,7 +532,7 @@ Accepted residual risk: retry after partial success may duplicate the already-de
 **Homepage advertising:**
 
 ```text
-UNIPAYMENT_ADVERTISING_ENABLED + module enabled + UNICID
+Module active + UNIPAYMENT_ENABLED + non-empty UNICID
 → HomepageAdvertisingGate (php_self=index + uni_status + uni_container_status)
 → ShopConfigurationService::getForPresentationWithoutCredentials()
 → shared per-UNICID lazy resolver (fresh local, coordinated refresh, bounded transient LKG)
@@ -543,11 +543,17 @@ UNIPAYMENT_ADVERTISING_ENABLED + module enabled + UNICID
 | Cache state                         | FO advertising       |
 | ----------------------------------- | -------------------- |
 | Fresh valid snapshot                | May render           |
-| Stale + refresh success             | Current promo may render |
+| Missing/stale + refresh success     | Current promo may render |
 | Stale <=6h + transient failure      | Valid LKG promo may render |
-| Missing / too old / Class B or C    | No advertising block |
+| Refresh failure without eligible LKG / Class B or C | No advertising block |
 
 Empty/invalid promo → render nothing. Failures fail closed (no FO 500). The homepage has no separate refresh policy or browser/AJAX CP fallback.
+
+`getForPresentationWithoutCredentials()` uses the same synchronous resolver as other presentation paths. A cache miss or stale snapshot may acquire the per-UNICID lease and pull CP during the request; fresh coherent data stays local. Transient refresh failure may use a validated snapshot up to 6 hours past its 24-hour TTL. This is existing behavior, not a change introduced by UNI-PS9-ADS-001.
+
+CP `uni_container_status` centrally controls advertising visibility; there is no merchant-side advertising switch. The legacy `UNIPAYMENT_ADVERTISING_ENABLED` value is neither read for rendering/assets nor changed by settings saves. Its install default and uninstall cleanup remain for compatibility. Homepage, module and CP shop eligibility, cache TTL, push and manual refresh behavior are unchanged.
+
+Version 2.0.4 introduces no migration, financial calculation, payment lifecycle or CP/bank protocol change. Owner browser acceptance PS9-01 through PS9-09: **9/9 PASS**.
 
 **Order-state sync (AUD-009):** inbound `orderbankstatus` does **not** map bank status to native PS order state (`ps_order_state_changed: false`). `BankStatusOrderStateMapper` / `SYNC_BANK_REJECTION_STATE` remain **dormant**; rejection whitelist empty until proven CP codes.
 
@@ -622,7 +628,7 @@ The canonical identity is lowercase `https://hostname`; omitted port and explici
 | CP-bound state | Matching origin | Foreign or missing origin |
 | --- | --- | --- |
 | Access token | Existing refresh/expiry rules | Unusable; normal login before authenticated request |
-| Shop snapshot / LKG | Existing 24h TTL and <=6h transient presentation LKG | Neither fresh nor LKG; normal new-CP refresh, no FO advertising remote call |
+| Shop snapshot / LKG | Existing 24h TTL and <=6h transient presentation LKG | Neither fresh nor LKG; shared presentation resolver may synchronously refresh from the new CP, including homepage advertising |
 | SmartUCF credentials | Exact shop pair decrypted and hydrated | Both sides unusable; fresh complete pair required |
 | Certificate pair / metadata | Valid pair + matching actual hashes; transient same-origin fail-open | No lease or fail-open; current CP metadata and bundle must establish provenance, even with equal hashes |
 | Durable attempt / frozen create / CP id | Existing idempotency and success proof | Reconciliation required; no create replay, successful `cp_created` interpretation or new PS order |

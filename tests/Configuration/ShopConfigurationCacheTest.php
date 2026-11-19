@@ -14,7 +14,7 @@ final class Configuration
     /** @var array<string, mixed> */
     public static $values = [];
 
-    public static function updateValue(string $key, mixed $value, bool $html = false, $idShopGroup = null, $idShop = null): bool
+    public static function updateValue(string $key, mixed $value, bool $html = false, ?int $idShopGroup = null, ?int $idShop = null): bool
     {
         unset($html, $idShopGroup, $idShop);
         self::$values[$key] = $value;
@@ -50,7 +50,7 @@ final class PhpEncryption
     }
 
     /** @return string|false */
-    public function decrypt(string $ciphertext)
+    public function decrypt(string $ciphertext): string|false
     {
         $decoded = base64_decode($ciphertext, true);
 
@@ -78,6 +78,7 @@ use PrestaShop\Module\Unipayment\Api\Exception\HttpException;
 use PrestaShop\Module\Unipayment\Api\Exception\InvalidPayloadException;
 use PrestaShop\Module\Unipayment\Api\Exception\MalformedJsonException;
 use PrestaShop\Module\Unipayment\Api\ShopConfigurationProviderInterface;
+use PrestaShop\Module\Unipayment\Advertising\HomepageAdvertisingPresenter;
 use PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository;
 use PrestaShop\Module\Unipayment\Configuration\CredentialChangeSideEffectHandler;
 use PrestaShop\Module\Unipayment\Configuration\Exception\ShopConfigurationSnapshotValidationException;
@@ -193,7 +194,9 @@ $provider = new FakeShopConfigurationProvider();
 $unicid = $configuration->getUnicid();
 $unicidB = '223e4567-e89b-12d3-a456-426614174000';
 
-$provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_snapshot(['id' => 10])];
+$presenter = new HomepageAdvertisingPresenter();
+$logo = '/modules/unipayment/views/img/product/uni_logo.svg';
+$provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_snapshot(['id' => 10, 'uni_container_status' => 1])];
 $initial = $service->get();
 assertPhase3($provider->calls === 1, 'missing cache did not call Control Panel');
 assertPhase3($initial['id'] === 10, 'initial snapshot id');
@@ -204,22 +207,27 @@ assertPhase3(($initial['uni_password'] ?? '') === 'demo-secret-password', 'runti
 
 $hit = $service->get();
 assertPhase3($provider->calls === 1 && ($hit['uni_zaglavie'] ?? '') === ($initial['uni_zaglavie'] ?? ''), 'fresh cache did not avoid a Control Panel request');
+assertPhase3($presenter->present($service->getForPresentationWithoutCredentials(), false, $logo) !== null, 'fresh cached CP ON permits advertising without a local switch');
+assertPhase3($provider->calls === 1, 'fresh advertising presentation must stay local');
 
 $cache->fresh = false;
-$provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_snapshot(['id' => 10, 'uni_zaglavie' => 'v2'])];
+$provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_snapshot(['id' => 10, 'uni_zaglavie' => 'v2', 'uni_container_status' => 0])];
 $expiredRefresh = $service->get();
 assertPhase3($provider->calls === 2 && $expiredRefresh['uni_zaglavie'] === 'v2', 'expired cache was not refreshed');
+assertPhase3($presenter->present($service->getForPresentationWithoutCredentials(), false, $logo) === null, 'CP OFF after stale refresh hides advertising');
 
-$provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_snapshot(['id' => 10, 'uni_zaglavie' => 'v3'])];
+$provider->responses[] = ['success' => true, 'data' => unipayment_valid_shop_snapshot(['id' => 10, 'uni_zaglavie' => 'v3', 'uni_container_status' => 1])];
 $manualRefresh = $service->get(true);
 assertPhase3($provider->calls === 3 && $manualRefresh['uni_zaglavie'] === 'v3', 'forced refresh used cached data');
+assertPhase3($presenter->present($service->getForPresentationWithoutCredentials(), true, $logo) !== null, 'manual refresh to CP ON restores advertising');
 
 // Presentation may use a structurally valid <=6h LKG only after a transient current failure.
 $cache->fresh = false;
 $cache->expiresAt = time() - 3600;
 $provider->responses[] = new ConnectionException('temporary transport failure');
-$lkg = $service->get();
+$lkg = $service->getForPresentationWithoutCredentials();
 assertPhase3(($lkg['uni_zaglavie'] ?? '') === 'v3', 'eligible transient presentation did not use LKG');
+assertPhase3($presenter->present($lkg, false, $logo) !== null, 'eligible transient LKG preserves cached CP advertising decision');
 
 // Submission must revalidate and must never inherit presentation LKG.
 $provider->responses[] = new ConnectionException('temporary transport failure');
@@ -363,6 +371,12 @@ assertPhase3(($cache->rows[$unicid]['consents'][0]['name'] ?? '') === 'C', 'push
 assertPhase3($provider->calls === $callsBeforePush, 'push replacement made an outbound request');
 $hydratedPush = $service->get();
 assertPhase3(($hydratedPush['uni_user'] ?? '') === 'demo-user', 'push path hydrates credentials');
+foreach ([0, 1] as $cpAdvertising) {
+    $service->replaceSnapshot($unicid, unipayment_valid_shop_snapshot(['uni_container_status' => $cpAdvertising]));
+    $advertising = $presenter->present($service->getForPresentationWithoutCredentials(), false, $logo);
+    assertPhase3(($advertising !== null) === ($cpAdvertising === 1), 'pushed CP flag controls advertising on the next presentation');
+}
+assertPhase3($provider->calls === $callsBeforePush, 'push-driven advertising must not pull CP again');
 
 $snapshotA = unipayment_valid_shop_snapshot(['unicid' => $unicid, 'uni_zaglavie' => 'shop-a']);
 $snapshotB = unipayment_valid_shop_snapshot(['unicid' => $unicidB, 'uni_zaglavie' => 'shop-b']);

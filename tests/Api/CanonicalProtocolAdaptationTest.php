@@ -163,6 +163,6 @@ assertCanon(strpos($snapshotRepo, 'cp_status_sync_updated_at') !== false, 'snaps
 
 // --- Version unchanged ---
 $module = (string) file_get_contents($root . '/unipayment.php');
-assertCanon(strpos($module, "version = '2.0.3'") !== false, 'module version remains 2.0.3');
+assertCanon(strpos($module, "version = '2.0.4'") !== false, 'module version remains 2.0.4');
 
 fwrite(STDOUT, "OK (Canonical CP↔module protocol adaptation contracts)\n");

@@ -31,17 +31,6 @@
     </div>
 
     <div class="form-group">
-      <label class="control-label col-lg-3" for="UNIPAYMENT_ADVERTISING_ENABLED_on">{l s='Визуализиране на реклама' d='Modules.Unipayment.Admin'}</label>
-      <div class="col-lg-9">
-        <span class="switch prestashop-switch fixed-width-lg">
-          <input type="radio" name="UNIPAYMENT_ADVERTISING_ENABLED" id="UNIPAYMENT_ADVERTISING_ENABLED_on" value="1"{if $unipayment_advertising_enabled} checked="checked"{/if}><label for="UNIPAYMENT_ADVERTISING_ENABLED_on">{l s='Yes' d='Admin.Global'}</label>
-          <input type="radio" name="UNIPAYMENT_ADVERTISING_ENABLED" id="UNIPAYMENT_ADVERTISING_ENABLED_off" value="0"{if !$unipayment_advertising_enabled} checked="checked"{/if}><label for="UNIPAYMENT_ADVERTISING_ENABLED_off">{l s='No' d='Admin.Global'}</label><a class="slide-button btn"></a>
-        </span>
-        <p class="help-block">{l s='Можете да включите или изключите рекламата на началната страница на магазина.' d='Modules.Unipayment.Admin'}</p>
-      </div>
-    </div>
-
-    <div class="form-group">
       <label class="control-label col-lg-3" for="UNIPAYMENT_DEBUG_ENABLED_on">{l s='Режим отстраняване на грешки' d='Modules.Unipayment.Admin'}</label>
       <div class="col-lg-9">
         <span class="switch prestashop-switch fixed-width-lg">

@@ -2,6 +2,14 @@
 
 Notable notes for the UniPayment PrestaShop **9** development line.
 
+## 2.0.4 — 2026-11-19
+
+- UNI-PS9-ADS-001: remove the merchant advertising switch; CP `uni_container_status` centrally controls homepage advertisement visibility, retaining `uni_status`, module active/enabled, UNICID and homepage eligibility.
+- Legacy `UNIPAYMENT_ADVERTISING_ENABLED` values are ignored in normal operation and preserved on settings saves. Existing install defaults and uninstall cleanup remain unchanged; no migration.
+- CP push, 24-hour cache TTL, coordinated refresh, transient LKG up to 6 hours after expiry and manual refresh are unchanged. Documentation now accurately describes possible synchronous refresh on a cache miss/stale presentation snapshot.
+- Desktop/mobile rendering, advertising assets and links, financial calculations, payment/order lifecycle and CP/SmartUCF protocols remain unchanged by the advertising release.
+- Owner browser acceptance PS9-01 through PS9-09: **9/9 PASS**. Release metadata and current-version assertions advance to 2.0.4; historical fixtures and release notes remain preserved.
+
 ## Unreleased — 2026-11-05
 
 - UNI-CONSENT-001 Phase 4B: Product/Cart/Checkout consent applicability follows trusted raw KOP/month coefficient interest, with PS8 scope fallback and finite epsilon classification. Mandatory and informational behavior stays independent of scope.

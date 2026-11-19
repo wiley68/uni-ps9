@@ -20,12 +20,10 @@ final class HomepageAdvertisingGate
     public function allowsLocalSettings(
         bool $moduleActive,
         bool $moduleEnabled,
-        bool $advertisingEnabled,
         string $unicid
     ): bool {
         return $moduleActive
             && $moduleEnabled
-            && $advertisingEnabled
             && trim($unicid) !== '';
     }
 
@@ -36,11 +34,10 @@ final class HomepageAdvertisingGate
         string $phpSelf,
         bool $moduleActive,
         bool $moduleEnabled,
-        bool $advertisingEnabled,
         string $unicid
     ): bool {
         return $this->allowsPage($phpSelf)
-            && $this->allowsLocalSettings($moduleActive, $moduleEnabled, $advertisingEnabled, $unicid);
+            && $this->allowsLocalSettings($moduleActive, $moduleEnabled, $unicid);
     }
 
     /**

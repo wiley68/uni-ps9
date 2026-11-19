@@ -5,10 +5,10 @@ Native PrestaShop 9 module for **UniCredit financing** (credit calculator, check
 | Item                  | Value                                                                         |
 | --------------------- | ----------------------------------------------------------------------------- |
 | Module technical name | `unipayment`                                                                  |
-| Current version       | `2.0.3`                                                                       |
+| Current version       | `2.0.4`                                                                       |
 | Repository            | `wiley68/uni-ps9`                                                             |
 | Repository root       | Module root (this directory)                                                  |
-| Current state         | **2.0.3** CP/SmartUCF failure Thank You + Satrudnik mail; 2.0.2 scheme parity |
+| Current state         | **2.0.4** centralized CP advertising control; retains 2.0.3 failure UX/mail and 2.0.2 scheme parity |
 
 ## Purpose
 
@@ -38,7 +38,7 @@ No PrestaShop 10 support claim. No production jQuery dependency.
 - Exactly-once durable financing (lock / attempt / snapshot / CP)
 - Financing customer/admin emails + native `order_conf` coordination
 - BO financing diagnostics and UniCredit status grid column
-- Homepage advertising float from **local fresh shop cache only** (no synchronous CP on FO render)
+- Homepage advertising controlled by CP `uni_container_status`, using the shared cached presentation resolver (cache miss/stale data may trigger synchronous CP refresh)
 - Signed inbound CP API (`shopcache`, `orderbankstatus`, `smartucfdebuglog`)
 
 **Public bank status / leasing information contract:** see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) § _Authoritative bank status and leasing information_ (four initial standard bank statuses; internal lifecycle states are not public bank status).
@@ -51,12 +51,14 @@ Sole CP destination: `config/environment.php` (`control_panel_url`), validated a
 
 Shop schemes and promotional fields come from cached `GET /api/v1/shop` snapshots. Homepage advertising uses the shared PRESENTATION resolver: fresh data stays local, stale data triggers coordinated revalidation, and only a structurally valid snapshot no more than 6 hours stale may be used after a transient refresh failure.
 
+UNI-PS9-ADS-001 removes the merchant advertising switch. Legacy local values are ignored and preserved on settings saves; install defaults and uninstall cleanup remain unchanged. CP push, the 24-hour cache TTL, transient fallback and manual refresh are unchanged. No migration or payment/financing behavior change. Owner browser acceptance PS9-01 through PS9-09: **9/9 PASS**.
+
 ## Configuration (BO)
 
 1. Install the module (self-contained ZIP; no SSH / env setup)
 2. Set UNICID + shared secret; enable module
 3. Refresh bank data (shop cache)
-4. Optionally enable advertising
+4. Homepage advertising visibility is controlled centrally by CP (`uni_container_status`)
 5. Verify Process 1 / Process 2 via CP `uni_proces`
 
 See [`docs/INSTALLATION.md`](docs/INSTALLATION.md).

@@ -26,7 +26,7 @@ Themes: Hummingbird 2.0 (primary) and Classic 3.1.1.
 
 ## 2. ZIP packaging (maintainer)
 
-Run `composer package` (or `php bin/build-distribution.php`) from the module root. It creates `dist/ps9_uni_<MODULE_VERSION>.zip` with the full three-component module version (for example, `ps9_uni_2.0.3.zip`), production dependencies in an isolated staging tree and verifies the archive before success. See [RELEASE.md](RELEASE.md) for the manifest/parity checks and build prerequisites.
+Run `composer package` (or `php bin/build-distribution.php`) from the module root. It creates `dist/ps9_uni_<MODULE_VERSION>.zip` with the full three-component module version (for example, `ps9_uni_2.0.4.zip`), production dependencies in an isolated staging tree and verifies the archive before success. See [RELEASE.md](RELEASE.md) for the manifest/parity checks and build prerequisites.
 
 The package copies the current source `config/environment.php` unchanged. Its standard configuration is `control_panel_url = https://uni.avalonbg.com` (API = host + `/api/v1`). Prepare environment-specific CP hosts manually in this file before packaging; the builder performs no configuration substitution or rewriting. It also copies the local, Git-ignored `secrets/smartucf-key.php` unchanged into the ZIP as an explicit deployment-file exception. This file must exist and be readable before building; symlinks are rejected. Certificates/private keys under `keys/` remain excluded and are managed through the established certificate mechanism.
 
@@ -63,7 +63,9 @@ There is **no** `UNIPAYMENT_MTLS_KEY_PASSPHRASE` (or other server env) requireme
 3. BO → Modules → install **UniPayment**.
 4. Configure UNICID, shared secret, enable module.
 5. **Обнови данните от банката** (shop cache refresh).
-6. Optionally enable advertising.
+6. Homepage advertising visibility is controlled centrally by CP (`uni_container_status`); there is no local advertising switch.
+
+In 2.0.4, legacy local advertising values are ignored and preserved during settings saves; install defaults and uninstall cleanup remain unchanged. Advertising uses the shared presentation resolver: fresh coherent cache stays local, a miss/stale snapshot may synchronously refresh CP, and transient failure may use valid LKG up to 6 hours after the 24-hour TTL. CP push and manual refresh are unchanged. No migration or payment/financing change is required by this release.
 
 Install creates **8** module tables, custom order states (AWAITING / FAILED / REJECTED), and registers FO/BO hooks (including `displayFooter` for homepage advertising).
 
@@ -76,8 +78,8 @@ Install creates **8** module tables, custom order states (AWAITING / FAILED / RE
 - [ ] Product calculator + product financing popup (Hummingbird + Classic)
 - [ ] Cart calculator + cart financing popup (logged-in + guest)
 - [ ] Checkout PaymentOption + Process 1 / Process 2
-- [ ] Homepage advertising when enabled + fresh shop cache + CP `uni_container_status`
-- [ ] Homepage still loads when advertising cache is missing (no advertising block)
+- [ ] Homepage advertising with module active/enabled + UNICID + eligible shop cache + CP `uni_status` and `uni_container_status`
+- [ ] Homepage still loads if cache resolution fails; no advertising block without an eligible snapshot (a successful pull after a cache miss may display advertising)
 - [ ] BO order financing block on financing orders only
 
 ---
@@ -99,7 +101,7 @@ Confirm dialog warns that local UniPayment settings and data will be removed.
 ## 6. Development policy
 
 - No upgrade scripts until first production release packaging cycle
-- Current module version metadata: **2.0.3** (do not invent upgrade-\*.php without schema change)
+- Current module version metadata: **2.0.4** (do not invent upgrade-\*.php without schema change)
 - Do not commit secrets, Bearer tokens, private keys, or production `.env`
 - Schema-changing development used uninstall/reinstall where appropriate (no production upgrade path invented yet)
 

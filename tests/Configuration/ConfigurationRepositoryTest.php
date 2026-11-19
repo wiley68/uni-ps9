@@ -54,7 +54,7 @@ final class PhpEncryption
     /**
      * @return string|false
      */
-    public function decrypt(string $ciphertext)
+    public function decrypt(string $ciphertext): string|false
     {
         $decoded = base64_decode($ciphertext, true);
 
@@ -73,7 +73,7 @@ if (!$repository->install() || !$repository->isEnabled()) {
     exit(1);
 }
 if (
-    $repository->isAdvertisingEnabled()
+    Configuration::$values[ConfigurationRepository::ADVERTISING_ENABLED] !== false
     || $repository->isDebugEnabled()
     || $repository->isSyncBankRejectionStateEnabled()
     || $repository->getProductButtonAction() !== ConfigurationRepository::BUTTON_ACTION_ADD_TO_CART
@@ -86,13 +86,12 @@ if (
 }
 
 $plainSecret = 'local-test-value';
-if (!$repository->save(false, '123e4567-e89b-12d3-a456-426614174000', $plainSecret, true, true, ConfigurationRepository::BUTTON_ACTION_BUY, 24, true)) {
+if (!$repository->save(false, '123e4567-e89b-12d3-a456-426614174000', $plainSecret, true, ConfigurationRepository::BUTTON_ACTION_BUY, 24, true)) {
     fwrite(STDERR, "FAIL: configuration was not saved\n");
     exit(1);
 }
 if (
     $repository->isEnabled()
-    || !$repository->isAdvertisingEnabled()
     || !$repository->isDebugEnabled()
     || !$repository->isSyncBankRejectionStateEnabled()
     || $repository->getProductButtonAction() !== ConfigurationRepository::BUTTON_ACTION_BUY
@@ -114,6 +113,26 @@ if ($repository->getSecret() !== $plainSecret || !$repository->hasSecret()) {
 }
 
 $storedSecret = Configuration::$values[ConfigurationRepository::SECRET];
+foreach ([0, 1, null] as $legacyAdvertising) {
+    unset(Configuration::$values[ConfigurationRepository::ADVERTISING_ENABLED]);
+    if ($legacyAdvertising !== null) {
+        Configuration::$values[ConfigurationRepository::ADVERTISING_ENABLED] = $legacyAdvertising;
+    }
+    if (!$repository->save(true, '123e4567-e89b-12d3-a456-426614174000', null, true, ConfigurationRepository::BUTTON_ACTION_BUY, 24, true)
+        || array_key_exists(ConfigurationRepository::ADVERTISING_ENABLED, Configuration::$values) !== ($legacyAdvertising !== null)
+        || (Configuration::$values[ConfigurationRepository::ADVERTISING_ENABLED] ?? null) !== $legacyAdvertising
+        || !$repository->isEnabled()
+        || !$repository->isDebugEnabled()
+        || !$repository->isSyncBankRejectionStateEnabled()
+        || $repository->getProductButtonAction() !== ConfigurationRepository::BUTTON_ACTION_BUY
+        || $repository->getButtonTopSpacing() !== 24
+        || Configuration::$values[ConfigurationRepository::SECRET] !== $storedSecret
+    ) {
+        fwrite(STDERR, "FAIL: settings save changed legacy advertising state or other settings\n");
+        exit(1);
+    }
+}
+
 $repository->save(true, '123e4567-e89b-12d3-a456-426614174000', null);
 if (Configuration::$values[ConfigurationRepository::SECRET] !== $storedSecret) {
     fwrite(STDERR, "FAIL: empty secret input did not preserve the stored value\n");
@@ -124,7 +143,7 @@ if (!$repository->isEnabled()) {
     exit(1);
 }
 
-$repository->save(true, '123e4567-e89b-12d3-a456-426614174000', null, false, false, 'invalid', -10);
+$repository->save(true, '123e4567-e89b-12d3-a456-426614174000', null, false, 'invalid', -10);
 if (
     $repository->getProductButtonAction() !== ConfigurationRepository::BUTTON_ACTION_ADD_TO_CART
     || $repository->getButtonTopSpacing() !== 0
@@ -133,12 +152,13 @@ if (
     exit(1);
 }
 
-$repository->save(true, '123e4567-e89b-12d3-a456-426614174000', null, false, false, ConfigurationRepository::BUTTON_ACTION_BUY, 500);
+$repository->save(true, '123e4567-e89b-12d3-a456-426614174000', null, false, ConfigurationRepository::BUTTON_ACTION_BUY, 500);
 if ($repository->getButtonTopSpacing() !== ConfigurationRepository::MAX_BUTTON_TOP_SPACING) {
     fwrite(STDERR, "FAIL: button spacing upper clamp failed\n");
     exit(1);
 }
 
+Configuration::$values[ConfigurationRepository::ADVERTISING_ENABLED] = 1;
 if (!$repository->uninstall()) {
     fwrite(STDERR, "FAIL: module configuration uninstall returned false\n");
     exit(1);
