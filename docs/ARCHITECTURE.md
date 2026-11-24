@@ -1,6 +1,6 @@
 # UniPayment — Architecture
 
-This document describes high-level boundaries and the **current accepted implementation** for module **2.0.4**. Phase numbers below are historical delivery milestones; they are all implemented unless marked deferred.
+This document describes high-level boundaries and the **current accepted implementation** for module **2.0.5**. Phase numbers below are historical delivery milestones; they are all implemented unless marked deferred.
 
 ---
 
@@ -466,7 +466,7 @@ Do not invent separate technical email statuses. Internal lifecycle/debug inform
 
 ### Customer/business-facing leasing information
 
-Standardized leasing information may appear on agreed surfaces (admin UniCredit panel, Thank You when provided, standard emails, designated reports). Adaptations are allowed only for pre-agreed business cases (for example Process 2 second phone / EGN only where privacy rules permit).
+Standardized leasing information may appear on agreed surfaces (admin UniCredit panel, Thank You when provided, standard emails, designated reports). Process 2 collects first name, last name, address, primary phone and email with the existing mandatory consents. The flow omits EGN and secondary phone from the UI, submissions, customer JSON and presentation. Process 1 retains its empty hidden Checkout inputs and SmartUCF behavior.
 
 **Base field set** (structure is authoritative; values are examples):
 
@@ -511,7 +511,7 @@ PS9 may persist machine ids such as `bank_send_failed_cp`, `bank_send_failed_sma
 | Flow      | Customer financing mail  | Admin financing mail     |
 | --------- | ------------------------ | ------------------------ |
 | Process 1 | No EGN; scheme/amount    | No EGN; operational data |
-| Process 2 | No EGN; confirmation msg | May include EGN + phone2 |
+| Process 2 | Confirmation message and financing rows | Financing rows |
 
 Marker: `financing_snapshot.leasing_email_sent` — combined once-per-attempt.
 `leasing_email_sent = 1` only after **all** required audience `Mail::Send` calls return true (false/throw leave marker unset for retry).

@@ -66,7 +66,7 @@ function environment(mode) {
     }
     const standard = {key:'STD|12',scheme_type:'standard',kop_code:'STD',months:12,filter_id:0,consent_context:contexts(false)};
     const zero = {...standard,key:'ZERO|12',kop_code:'ZERO',consent_context:contexts(true)};
-    const config = {schemes:[standard,zero],offers:{standard:{schemes:[standard,zero],preferred_scheme_key:standard.key}},process2:false};
+    const config = {schemes:[standard,zero],offers:{standard:{schemes:[standard,zero],preferred_scheme_key:standard.key}},process2:true};
     select.value = standard.key;
     root.attrs['data-config'] = root.attrs['data-calculator'] = JSON.stringify(config);
     root.attrs['data-calculate-endpoint'] = root.attrs['data-popup-endpoint'] = root.attrs['data-endpoint'] = '/fake';
@@ -236,7 +236,9 @@ async function flush() { for (let i=0;i<12;i++) await Promise.resolve(); }
         race.resolve(race.requests.at(-1),false); await flush();
         race.click('[data-unipayment-submit]'); race.click('[data-unipayment-submit]'); await flush();
         const apply=race.requests.at(-1);
-        check(apply.options.body.get('popup_action')==='apply',mode+' H1 sends apply');
+        check(apply.options.body.get('popup_action')==='apply',mode+' H1 sends Process 2 apply');
+        check(!apply.options.body.has('egn') && !apply.options.body.has('phone2'),mode+' Process 2 apply excludes obsolete fields');
+        check(apply.options.body.get('phone')==='+359888123',mode+' Process 2 apply retains primary phone');
         const count=race.requests.length;
         // Also force a callback already dequeued before clearTimeout could cancel it.
         obsoleteTimer(); race.flushTimers(); await flush();

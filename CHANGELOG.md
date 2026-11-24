@@ -2,6 +2,13 @@
 
 Notable notes for the UniPayment PrestaShop **9** development line.
 
+## 2.0.5 — 2026-11-24
+
+- Remove EGN and secondary phone from Process 2 Product and Cart popups and Checkout. The form, AJAX and server validation retain the five supported customer fields and mandatory consents. Obsolete scalar and array inputs are ignored.
+- Write SQL NULL to `sensitive_payload` on new financing snapshots and exclude both fields from customer JSON. Existing encrypted snapshots remain available for recovery under the existing retention policy. No migration is required.
+- Omit both fields from customer and merchant mail and Back Office rendering, including for historical orders. Mask the four exact legacy keys in structured diagnostic records, lookups and exports.
+- Preserve Process 1, SmartUCF, and the Control Panel API contract. Manual PS9 installation and browser acceptance are pending.
+
 ## 2.0.4 — 2026-11-19
 
 - UNI-PS9-ADS-001: remove the merchant advertising switch; CP `uni_container_status` centrally controls homepage advertisement visibility, retaining `uni_status`, module active/enabled, UNICID and homepage eligibility.

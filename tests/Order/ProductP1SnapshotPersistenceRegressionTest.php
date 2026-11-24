@@ -30,7 +30,6 @@ use PrestaShop\Module\Unipayment\Order\OrderAttemptStoreInterface;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrationException;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
 use PrestaShop\Module\Unipayment\Order\PrestaShopOrderGatewayInterface;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 
 if (!function_exists('pSQL')) {
     function pSQL(string $string, bool $htmlOK = false): string
@@ -410,7 +409,7 @@ $shop = ['uni_proces' => 0, 'unicid' => 'u'];
 // ---------------------------------------------------------------------------
 $captureDb = new ProductP1CaptureDb();
 $repo = new FinancingSnapshotRepository($captureDb);
-$factory = new FinancingSnapshotFactory(new SensitiveDataCipher());
+$factory = new FinancingSnapshotFactory();
 $snapshot = $factory->create(productP1Request($productName), productP1Order($productName), 'product_popup');
 $repo->save(3, $snapshot);
 
@@ -461,6 +460,19 @@ assertProductP1(is_array($inserted['sensitive_payload'] ?? null)
 assertProductP1(is_array($inserted['cp_status_sync_updated_at'] ?? null)
     && ($inserted['cp_status_sync_updated_at']['value'] ?? '') === 'NULL', 'D: null cp_status_sync_updated_at becomes SQL NULL');
 
+// The same insert path serves Process 2, even if obsolete data reaches the factory.
+$legacyRequest = productP1Request($productName);
+$legacyRequest->customer['egn'] = ['legacy-marker'];
+$legacyRequest->customer['phone2'] = 'legacy-marker';
+$legacyOrder = productP1Order($productName);
+$legacyOrder->customer['egn'] = 'legacy-marker';
+$legacyOrder->customer['phone2'] = 'legacy-marker';
+$repo->save(4, $factory->create($legacyRequest, $legacyOrder, 'cart_popup'));
+$legacyInsert = $captureDb->insertRows[1]['data'];
+assertProductP1($legacyInsert['sensitive_payload'] === ['type' => 'sql', 'value' => 'NULL'], 'legacy input still inserts SQL NULL');
+$cleanCustomer = json_decode($unescapePs($legacyInsert['customer_json']), true, 512, JSON_THROW_ON_ERROR);
+assertProductP1(!array_key_exists('egn', $cleanCustomer) && !array_key_exists('phone2', $cleanCustomer), 'SQL customer JSON omits both obsolete keys');
+
 // ---------------------------------------------------------------------------
 // A. Successful Product Page P1 orchestration: snapshot then createOrder
 // ---------------------------------------------------------------------------
@@ -473,7 +485,7 @@ $aFlow = new OrderOrchestrator(
     $aSnapshots,
     $aOrders,
     $aCp,
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder()
 );
 $aResult = $aFlow->orchestrate(1, 84, productP1Request($productName), $shop, 'product_popup');
@@ -501,7 +513,7 @@ $bFlow = new OrderOrchestrator(
     $bSnapshots,
     $bOrders,
     $bCp,
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder()
 );
 try {
@@ -535,7 +547,7 @@ $cFlow = new OrderOrchestrator(
     $cSnapshots,
     $cOrders,
     $cCp,
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder()
 );
 try {

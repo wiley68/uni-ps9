@@ -26,7 +26,7 @@ Themes: Hummingbird 2.0 (primary) and Classic 3.1.1.
 
 ## 2. ZIP packaging (maintainer)
 
-Run `composer package` (or `php bin/build-distribution.php`) from the module root. It creates `dist/ps9_uni_<MODULE_VERSION>.zip` with the full three-component module version (for example, `ps9_uni_2.0.4.zip`), production dependencies in an isolated staging tree and verifies the archive before success. See [RELEASE.md](RELEASE.md) for the manifest/parity checks and build prerequisites.
+Run `composer package` (or `php bin/build-distribution.php`) from the module root. It creates `dist/ps9_uni_<MODULE_VERSION>.zip` with the full three-component module version (for example, `ps9_uni_2.0.5.zip`), production dependencies in an isolated staging tree and verifies the archive before success. See [RELEASE.md](RELEASE.md) for the manifest/parity checks and build prerequisites.
 
 The package copies the current source `config/environment.php` unchanged. Its standard configuration is `control_panel_url = https://uni.avalonbg.com` (API = host + `/api/v1`). Prepare environment-specific CP hosts manually in this file before packaging; the builder performs no configuration substitution or rewriting. It also copies the local, Git-ignored `secrets/smartucf-key.php` unchanged into the ZIP as an explicit deployment-file exception. This file must exist and be readable before building; symlinks are rejected. Certificates/private keys under `keys/` remain excluded and are managed through the established certificate mechanism.
 
@@ -101,7 +101,7 @@ Confirm dialog warns that local UniPayment settings and data will be removed.
 ## 6. Development policy
 
 - No upgrade scripts until first production release packaging cycle
-- Current module version metadata: **2.0.4** (do not invent upgrade-\*.php without schema change)
+- Current module version metadata: **2.0.5** (do not invent upgrade-\*.php without schema change)
 - Do not commit secrets, Bearer tokens, private keys, or production `.env`
 - Schema-changing development used uninstall/reinstall where appropriate (no production upgrade path invented yet)
 

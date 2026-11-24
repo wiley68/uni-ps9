@@ -6,10 +6,6 @@
         data-consent-context-invalid-message="{l s='Обновете страницата и изберете схема отново.' d='Modules.Unipayment.Shop'}"
         data-consents-required-message="{l s='Моля, приемете всички задължителни съгласия.' d='Modules.Unipayment.Shop'}"
         data-consents-tooltip="{l s='Моля, първо приемете общите условия, за да продължите с поръчката.' d='Modules.Unipayment.Shop'}"
-        data-egn-required-message="{l s='Полето „ЕГН“ е задължително.' d='Modules.Unipayment.Shop'}"
-        data-egn-invalid-message="{l s='Въведете валидно ЕГН (10 цифри, първите 8 — дата YYYYMMDD).' d='Modules.Unipayment.Shop'}"
-        data-phone2-required-message="{l s='Полето „Втори телефон“ е задължително.' d='Modules.Unipayment.Shop'}"
-        data-phone2-invalid-message="{l s='Въведете валиден втори телефонен номер.' d='Modules.Unipayment.Shop'}"
         data-calculate-failed-message="{l s='Неуспешно изчисление. Моля, опитайте отново.' d='Modules.Unipayment.Shop'}"
         data-submitting-message="{l s='Заявката вече се обработва. Моля, изчакайте.' d='Modules.Unipayment.Shop'}">
         <input type="hidden" name="unipayment_checkout_submit" value="1">
@@ -120,30 +116,7 @@
                             </div>
                         </div>
 
-                        {if $unipayment_checkout.process2}
-                            <div class="unipayment-checkout__row">
-                                <div class="unipayment-checkout__label">
-                                    <label for="unipayment-checkout-egn">{l s='ЕГН' d='Modules.Unipayment.Shop'} <span
-                                            class="unipayment-checkout__required" aria-hidden="true">*</span></label>
-                                </div>
-                                <div class="unipayment-checkout__value">
-                                    <input id="unipayment-checkout-egn" class="unipayment-checkout__input" type="text"
-                                        name="unipayment_egn" maxlength="10" pattern="[0-9]{10}" inputmode="numeric"
-                                        autocomplete="off" required aria-required="true" data-unipayment-egn>
-                                </div>
-                            </div>
-                            <div class="unipayment-checkout__row">
-                                <div class="unipayment-checkout__label">
-                                    <label for="unipayment-checkout-phone2">{l s='Втори телефон' d='Modules.Unipayment.Shop'}
-                                        <span class="unipayment-checkout__required" aria-hidden="true">*</span></label>
-                                </div>
-                                <div class="unipayment-checkout__value">
-                                    <input id="unipayment-checkout-phone2" class="unipayment-checkout__input" type="tel"
-                                        name="unipayment_phone2" inputmode="tel" autocomplete="tel" required
-                                        aria-required="true" data-unipayment-phone2>
-                                </div>
-                            </div>
-                        {else}
+                        {if !$unipayment_checkout.process2}
                             <input type="hidden" name="unipayment_egn" value="">
                             <input type="hidden" name="unipayment_phone2" value="">
                         {/if}

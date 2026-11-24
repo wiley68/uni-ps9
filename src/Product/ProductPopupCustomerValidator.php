@@ -16,13 +16,12 @@ namespace PrestaShop\Module\Unipayment\Product;
 final class ProductPopupCustomerValidator
 {
     /**
-     * Validates Step 2 customer fields. When $requireEgn is true (Process 2),
-     * EGN and secondary phone are required, matching Woo Process 2.
+     * Validates the supported Step 2 customer fields.
      *
      * @param array<string, mixed> $input
      * @return array<string, string>
      */
-    public function validate(array $input, bool $requireEgn = false): array
+    public function validate(array $input): array
     {
         $customer = [
             'first_name' => $this->text($input['first_name'] ?? ''),
@@ -56,41 +55,11 @@ final class ProductPopupCustomerValidator
         } elseif (!filter_var($customer['email'], FILTER_VALIDATE_EMAIL)) {
             $errors['email'] = 'Въведете валиден e-mail адрес, например name@example.com.';
         }
-        if ($requireEgn) {
-            $egn = preg_replace('/\D/', '', (string) ($input['egn'] ?? ''));
-            $egn = is_string($egn) ? $egn : '';
-            $phone2 = $this->phone($input['phone2'] ?? '');
-            if ($egn === '') {
-                $errors['egn'] = 'Полето е задължително.';
-            } elseif (!$this->validEgn($egn)) {
-                $errors['egn'] = 'ЕГН трябва да съдържа 10 цифри. Първите 8 трябва да са валидна дата във формат ГГГГММДД.';
-            }
-            if ($phone2 === '') {
-                $errors['phone2'] = 'Полето е задължително.';
-            } elseif (!$this->validPhone($phone2)) {
-                $errors['phone2'] = 'Вторият телефон може да съдържа цифри, интервали, +, -, ( и ).';
-            }
-            if (!isset($errors['egn'])) {
-                $customer['egn'] = $egn;
-            }
-            if (!isset($errors['phone2'])) {
-                $customer['phone2'] = $phone2;
-            }
-        }
         if ($errors !== []) {
             throw new ProductPopupValidationException($errors);
         }
 
         return $customer;
-    }
-
-    public function validEgn(string $egn): bool
-    {
-        if (!preg_match('/^\d{10}$/', $egn)) {
-            return false;
-        }
-
-        return checkdate((int) substr($egn, 4, 2), (int) substr($egn, 6, 2), (int) substr($egn, 0, 4));
     }
 
     public function validPhone(string $phone): bool

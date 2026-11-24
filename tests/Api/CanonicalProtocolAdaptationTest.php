@@ -116,6 +116,9 @@ assertCanon(!isset($p1['status']) && !isset($p1['status_id']), 'P1 create has no
 assertCanon(!isset($p2['status']) && !isset($p2['status_id']), 'P2 create has no status');
 assertCanon(!isset($p1['egn']) && !isset($p1['phone2']), 'P1 create has no EGN/phone2');
 assertCanon(!isset($p2['egn']) && !isset($p2['phone2']), 'P2 create has no EGN/phone2');
+$cleanSnapshot = $snapshot;
+unset($cleanSnapshot['customer_json']['egn'], $cleanSnapshot['customer_json']['phone2']);
+assertCanon($builder->build($cleanSnapshot, ['uni_proces' => 1], $created) === $p2, 'Process 2 create payload is identical without obsolete fields');
 ksort($p1);
 ksort($p2);
 assertCanon($p1 === $p2, 'P1/P2 create schemas are identical for lifecycle fields');
@@ -163,6 +166,6 @@ assertCanon(strpos($snapshotRepo, 'cp_status_sync_updated_at') !== false, 'snaps
 
 // --- Version unchanged ---
 $module = (string) file_get_contents($root . '/unipayment.php');
-assertCanon(strpos($module, "version = '2.0.4'") !== false, 'module version remains 2.0.4');
+assertCanon(strpos($module, "version = '2.0.5'") !== false, 'module version remains 2.0.5');
 
 fwrite(STDOUT, "OK (Canonical CP↔module protocol adaptation contracts)\n");

@@ -5,10 +5,10 @@ Native PrestaShop 9 module for **UniCredit financing** (credit calculator, check
 | Item                  | Value                                                                         |
 | --------------------- | ----------------------------------------------------------------------------- |
 | Module technical name | `unipayment`                                                                  |
-| Current version       | `2.0.4`                                                                       |
+| Current version       | `2.0.5`                                                                       |
 | Repository            | `wiley68/uni-ps9`                                                             |
 | Repository root       | Module root (this directory)                                                  |
-| Current state         | **2.0.4** centralized CP advertising control; retains 2.0.3 failure UX/mail and 2.0.2 scheme parity |
+| Current state         | **2.0.5** removes EGN and secondary phone from Process 2 and preserves the Process 1 and CP contracts |
 
 ## Purpose
 
@@ -34,7 +34,7 @@ No PrestaShop 10 support claim. No production jQuery dependency.
 - Product and cart financing popups with **durable** order completion (PS order → CP → SmartUCF / Process 2)
 - Checkout `PaymentOption` with server-side validation and the same durable lifecycle
 - Process 1: CP order + SmartUCF session + trusted bank redirect
-- Process 2: native confirmation (EGN required; no SmartUCF)
+- Process 2: native confirmation via Control Panel. Customer data is limited to first name, last name, address, primary phone and email. Mandatory consents still apply. Process 1 retains its existing form and SmartUCF behavior.
 - Exactly-once durable financing (lock / attempt / snapshot / CP)
 - Financing customer/admin emails + native `order_conf` coordination
 - BO financing diagnostics and UniCredit status grid column
@@ -66,9 +66,9 @@ See [`docs/INSTALLATION.md`](docs/INSTALLATION.md).
 ## Security overview
 
 - HMAC signed inbound requests + nonce replay store
-- Encrypted tokens/secrets and Process 2 `sensitive_payload`
+- Encrypted tokens and secrets. New financing snapshots store SQL NULL in `sensitive_payload`. Historical encrypted values stay subject to the existing retention policy.
 - SmartUCF diagnostic journal is **shop-scoped** (`id_shop` + order id)
-- Audience-specific mail privacy (no customer EGN)
+- Audience-specific mail privacy (EGN and secondary phone are omitted for every audience)
 - Promo URLs restricted to `http`/`https`; text via `strip_tags`
 - 180-day financing snapshot PII retention
 - mTLS passphrase in `secrets/smartucf-key.php` (ZIP packaging; not Git)

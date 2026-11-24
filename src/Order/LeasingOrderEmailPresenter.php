@@ -9,14 +9,6 @@ use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
 
 final class LeasingOrderEmailPresenter
 {
-    /** @var SensitiveDataCipher */
-    private $cipher;
-
-    public function __construct(?SensitiveDataCipher $cipher = null)
-    {
-        $this->cipher = $cipher ?? new SensitiveDataCipher();
-    }
-
     /**
      * Extra template vars for PrestaShop validateOrder() / order_conf injection (customer audience).
      *
@@ -93,11 +85,6 @@ final class LeasingOrderEmailPresenter
             $statusLabel = $process2 ? 'Изпратен Банка - Процес 2' : 'Изпратен Банка - Процес 1';
         }
 
-        $adminSensitive = [];
-        if ($process2 && $audience === EmailAudience::ADMIN) {
-            $adminSensitive = $this->decryptSensitive($snapshot);
-        }
-
         return $this->buildRows(
             $statusLabel,
             (int) ($snapshot['months'] ?? 0),
@@ -109,8 +96,7 @@ final class LeasingOrderEmailPresenter
             (float) ($snapshot['glp'] ?? 0),
             (float) ($snapshot['gpr'] ?? 0),
             $process2,
-            $audience,
-            $adminSensitive
+            $audience
         );
     }
 
@@ -153,14 +139,6 @@ final class LeasingOrderEmailPresenter
         $process2 = ShopConfigurationFlags::isProcess2($shop);
         $statusLabel = $process2 ? 'Изпратен Банка - Процес 2' : 'Изпратен Банка - Процес 1';
         $calculation = $request->calculation;
-        $adminSensitive = [];
-        if ($process2 && $audience === EmailAudience::ADMIN) {
-            $adminSensitive = [
-                'egn' => (string) ($request->customer['egn'] ?? ''),
-                'phone2' => (string) ($request->customer['phone2'] ?? ''),
-            ];
-        }
-
         return $this->buildRows(
             $statusLabel,
             $calculation->scheme->months,
@@ -172,8 +150,7 @@ final class LeasingOrderEmailPresenter
             $calculation->glp,
             $calculation->gpr,
             $process2,
-            $audience,
-            $adminSensitive
+            $audience
         );
     }
 
@@ -224,8 +201,6 @@ final class LeasingOrderEmailPresenter
     }
 
     /**
-     * @param array<string, string> $adminSensitive
-     *
      * @return array<string, string>
      */
     private function buildRows(
@@ -239,8 +214,7 @@ final class LeasingOrderEmailPresenter
         float $glp,
         float $gpr,
         bool $process2,
-        string $audience,
-        array $adminSensitive
+        string $audience
     ): array {
         if ($statusLabel === '') {
             return [];
@@ -264,51 +238,11 @@ final class LeasingOrderEmailPresenter
         $rows['Обща дължима сума'] = number_format($totalPayable, 2, '.', '');
         $rows['ГЛП / ГПР'] = number_format($glp, 2, '.', '') . '% / ' . number_format($gpr, 2, '.', '') . '%';
 
-        if ($process2 && $audience === EmailAudience::ADMIN) {
-            $egn = trim((string) ($adminSensitive['egn'] ?? ''));
-            if ($egn !== '') {
-                $rows['ЕГН'] = $egn;
-            }
-
-            $phone2 = trim((string) ($adminSensitive['phone2'] ?? ''));
-            if ($phone2 !== '') {
-                $rows['Втори телефон'] = $phone2;
-            }
-        }
-
         if ($process2 && $audience === EmailAudience::CUSTOMER) {
             $rows['Съобщение'] = self::process2ConfirmationMessage();
         }
 
         return $rows;
-    }
-
-    /**
-     * @param array<string, mixed> $snapshot
-     *
-     * @return array<string, string>
-     */
-    private function decryptSensitive(array $snapshot): array
-    {
-        $payload = (string) ($snapshot['sensitive_payload'] ?? '');
-        if ($payload === '') {
-            return [];
-        }
-
-        try {
-            $decrypted = $this->cipher->decrypt($payload);
-        } catch (\Throwable $exception) {
-            return [];
-        }
-
-        if (!is_array($decrypted)) {
-            return [];
-        }
-
-        return [
-            'egn' => (string) ($decrypted['egn'] ?? ''),
-            'phone2' => (string) ($decrypted['phone2'] ?? ''),
-        ];
     }
 
     public static function process2ConfirmationMessage(): string

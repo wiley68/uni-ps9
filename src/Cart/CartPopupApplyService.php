@@ -107,8 +107,7 @@ final class CartPopupApplyService
 
         $calcResult = $this->calculator->calculateScheme($shop, $cartContext->total, $scheme, $firstInstallment);
 
-        $requireEgn = ((int) ($shop['uni_proces'] ?? 0)) === 1;
-        $customerData = $this->customerValidator->validate($posted, $requireEgn);
+        $customerData = $this->customerValidator->validate($posted);
 
         $consentSelection = $this->consents->selection($calcResult);
         $consentSelection = $this->orchestrator->consentSelection(

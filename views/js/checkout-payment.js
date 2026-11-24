@@ -87,25 +87,6 @@
         return root.getAttribute(attr) || fallback;
     }
 
-    function validEgn(value) {
-        var egn = String(value || "").replace(/\D/g, "");
-        if (!/^\d{10}$/.test(egn)) return false;
-        var year = parseInt(egn.slice(0, 4), 10);
-        var month = parseInt(egn.slice(4, 6), 10);
-        var day = parseInt(egn.slice(6, 8), 10);
-        var date = new Date(year, month - 1, day);
-        return (
-            date.getFullYear() === year &&
-            date.getMonth() === month - 1 &&
-            date.getDate() === day
-        );
-    }
-
-    function validPhone(value) {
-        var phone = String(value || "").trim();
-        return phone !== "" && /^[-0-9+() ]+$/.test(phone) && /\d/.test(phone);
-    }
-
     function setDisplay(root, name, display) {
         var primary = root.querySelector(
             '[data-unipayment-display="' + name + '-primary"]',
@@ -128,8 +109,6 @@
         var first = root.querySelector("[data-unipayment-first]");
         var firstRow = root.querySelector("[data-unipayment-first-row]");
         var errorBox = root.querySelector("[data-unipayment-checkout-error]");
-        var egn = root.querySelector("[data-unipayment-egn]");
-        var phone2 = root.querySelector("[data-unipayment-phone2]");
         var calculateTimer = null;
         var calculateRequest = null;
         var calculateSequence = 0;
@@ -350,52 +329,6 @@
             return consents.ready();
         }
 
-        function process2Ok() {
-            if (!config.process2) return true;
-            if (!egn || !phone2) return false;
-            if (!String(egn.value || "").trim()) {
-                showError(
-                    t(
-                        root,
-                        "data-egn-required-message",
-                        "Полето „ЕГН“ е задължително.",
-                    ),
-                );
-                return false;
-            }
-            if (!validEgn(egn.value)) {
-                showError(
-                    t(
-                        root,
-                        "data-egn-invalid-message",
-                        "Въведете валидно ЕГН (10 цифри, първите 8 — дата YYYYMMDD).",
-                    ),
-                );
-                return false;
-            }
-            if (!String(phone2.value || "").trim()) {
-                showError(
-                    t(
-                        root,
-                        "data-phone2-required-message",
-                        "Полето „Втори телефон“ е задължително.",
-                    ),
-                );
-                return false;
-            }
-            if (!validPhone(phone2.value)) {
-                showError(
-                    t(
-                        root,
-                        "data-phone2-invalid-message",
-                        "Въведете валиден втори телефонен номер.",
-                    ),
-                );
-                return false;
-            }
-            return true;
-        }
-
         function validateFormFields() {
             if (disposed || !root.isConnected || calculateTimer !== null || !lastCalculation || !consents.resolved()) {
                 showError(t(root, "data-consent-context-invalid-message", "Изчакайте изчислението или обновете страницата."));
@@ -411,7 +344,6 @@
                 );
                 return false;
             }
-            if (!process2Ok()) return false;
             if (!lastCalculation && !selectedScheme()) {
                 showError(
                     t(
@@ -512,16 +444,6 @@
                 });
             },
         );
-        if (egn) {
-            egn.addEventListener("input", function () {
-                egn.value = egn.value.replace(/\D/g, "").slice(0, 10);
-            });
-        }
-        if (phone2) {
-            phone2.addEventListener("input", function () {
-                phone2.value = phone2.value.replace(/[^0-9+() -]/g, "");
-            });
-        }
 
         function confirmClick(event) {
             var button = event.target.closest("#payment-confirmation button");

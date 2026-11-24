@@ -18,7 +18,7 @@ class Unipayment extends PaymentModule
     {
         $this->name = 'unipayment';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.4';
+        $this->version = '2.0.5';
         $this->author = 'Avalon Ltd';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -600,7 +600,6 @@ class Unipayment extends PaymentModule
             'unipayment_popup_token' => Tools::getToken(false),
             'unipayment_checkout_url' => $this->context->link->getPageLink('order', true),
             'unipayment_offer_types' => ['standard', 'promo'],
-            'unipayment_require_egn' => ((int) ($shop['uni_proces'] ?? 0)) === 1,
         ]);
 
         return $this->display(__FILE__, 'views/templates/hook/product_calculator.tpl');
@@ -670,7 +669,6 @@ class Unipayment extends PaymentModule
             'unipayment_logo_url' => $this->_path . 'views/img/product/uni_logo.svg',
             'unipayment_logo_alternative_url' => $this->_path . 'views/img/product/uni_logo_red.svg',
             'unipayment_offer_types' => ['standard', 'promo'],
-            'unipayment_require_egn' => ((int) ($shop['uni_proces'] ?? 0)) === 1,
         ]);
 
         return $this->display(__FILE__, 'views/templates/hook/cart_calculator.tpl');

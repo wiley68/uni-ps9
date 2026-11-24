@@ -78,22 +78,10 @@ $process2Base = [
     'phone' => '+359888123456',
     'email' => 'ivan@example.test',
 ];
-try {
-    $validator->validate($process2Base, true);
-    assertProductCustomer(false, 'Process 2 payload without EGN and phone2 was accepted');
-} catch (ProductPopupValidationException $exception) {
-    assertProductCustomer(isset($exception->errors()['egn']) && isset($exception->errors()['phone2']), 'Process 2 must require EGN and secondary phone');
+assertProductCustomer($validator->validate($process2Base) === $process2Base, 'Step 2 accepts the five supported fields');
+foreach (['legacy-marker', ['legacy-marker']] as $legacyValue) {
+    $withObsoleteKeys = $process2Base + ['egn' => $legacyValue, 'phone2' => $legacyValue];
+    assertProductCustomer($validator->validate($withObsoleteKeys) === $process2Base, 'obsolete scalar and array keys are ignored');
 }
-
-try {
-    $validator->validate($process2Base + ['egn' => '1990010199', 'phone2' => '---'], true);
-    assertProductCustomer(false, 'invalid Process 2 secondary phone was accepted');
-} catch (ProductPopupValidationException $exception) {
-    assertProductCustomer(isset($exception->errors()['phone2']), 'invalid phone2 error missing');
-}
-
-$process2 = $validator->validate($process2Base + ['egn' => '1990010199', 'phone2' => '+359 2 123 456'], true);
-assertProductCustomer($process2['egn'] === '1990010199' && $process2['phone2'] === '+359 2 123 456', 'valid Process 2 EGN and secondary phone were not kept');
-assertProductCustomer(!isset($valid['egn']) && !isset($valid['phone2']), 'Process 1 must not require EGN or secondary phone');
 
 fwrite(STDOUT, "OK (Product popup Step 2 customer prefill and validation)\n");

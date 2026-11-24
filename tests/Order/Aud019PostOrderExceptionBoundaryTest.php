@@ -50,7 +50,6 @@ use PrestaShop\Module\Unipayment\Order\OrderOrchestrationException;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
 use PrestaShop\Module\Unipayment\Order\PostOrderPopupFailureResponse;
 use PrestaShop\Module\Unipayment\Order\PrestaShopOrderGatewayInterface;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 
 function assertAud019(bool $ok, string $message): void
 {
@@ -298,7 +297,7 @@ $aFlow = new OrderOrchestrator(
     $aSnapshots,
     $aOrders,
     $aCp,
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder()
 );
 try {
@@ -327,7 +326,7 @@ $bFlow = new OrderOrchestrator(
     $bSnapshots,
     $bOrders,
     $bCp,
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder()
 );
 try {
@@ -354,7 +353,7 @@ $cFlow = new OrderOrchestrator(
     $cSnapshots,
     $cOrders,
     $cCp,
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder()
 );
 try {
@@ -378,7 +377,7 @@ $dFlow = new OrderOrchestrator(
     new Aud019Snapshots(),
     $dOrders,
     $dCp,
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder()
 );
 try {
@@ -423,7 +422,7 @@ $jFlow = new OrderOrchestrator(
     new Aud019Snapshots(),
     $jOrders,
     new Aud019Cp(),
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder()
 );
 $preOrderThrown = false;

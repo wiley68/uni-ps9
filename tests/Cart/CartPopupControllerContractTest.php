@@ -31,6 +31,7 @@ assertCartPopupCtrl(strpos($ctrl, 'CartContextFactory') !== false, 'authoritativ
 assertCartPopupCtrl(strpos($ctrl, 'getOrderTotal') === false, 'controller must not trust POST totals; factory owns payable total');
 assertCartPopupCtrl(strpos($ctrl, 'CartPopupApplyService') !== false, 'cart apply uses CartPopupApplyService');
 assertCartPopupCtrl(strpos($ctrl, 'ProductPopupCustomerValidator') !== false, 'reuse customer validator');
+assertCartPopupCtrl(!str_contains($ctrl, "Tools::getValue('egn'") && !str_contains($ctrl, "Tools::getValue('phone2'"), 'obsolete keys are ignored by validate_step2 and apply');
 assertCartPopupCtrl(strpos($ctrl, 'OrderOrchestrator') !== false, 'cart apply creates durable orders');
 assertCartPopupCtrl(
     strpos($ctrl, 'PopupSubmissionPostOrderBinder') !== false

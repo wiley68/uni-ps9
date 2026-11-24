@@ -80,7 +80,7 @@ assertAud006(
     strpos($moduleSrc, 'Настройките и локалните данни на UniPayment ще бъдат изтрити') !== false,
     '24: confirmUninstall configured'
 );
-assertAud006(strpos($moduleSrc, "version = '2.0.4'") !== false, 'version 2.0.4');
+assertAud006(strpos($moduleSrc, "version = '2.0.5'") !== false, 'version 2.0.5');
 assertAud006(
     strpos($moduleSrc, 'AdminConfigurationRequestReader') !== false
         && is_file($root . '/src/Configuration/AdminConfigurationRequestReader.php')

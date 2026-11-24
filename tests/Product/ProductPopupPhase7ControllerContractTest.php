@@ -31,7 +31,7 @@ assertPopupCtrl(strpos($popup, "preselect") !== false, 'preselect action');
 assertPopupCtrl(strpos($popup, "apply") !== false, 'apply action');
 assertPopupCtrl(strpos($popup, 'error(501') === false, 'must not 501 implemented actions');
 assertPopupCtrl(strpos($popup, 'Невалидно действие') !== false, 'unknown action is controlled 400');
-assertPopupCtrl(strpos($popup, 'unset($customer[\'egn\'])') !== false, 'EGN stripped from JSON');
+assertPopupCtrl(!str_contains($popup, "Tools::getValue('egn'") && !str_contains($popup, "Tools::getValue('phone2'"), 'obsolete keys are ignored by validate_step2 and apply');
 assertPopupCtrl(strpos($popup, 'OrderOrchestrator') !== false, 'order orchestration enabled');
 assertPopupCtrl(strpos($popup, 'ControlPanelOrder') !== false, 'CP order creation enabled');
 assertPopupCtrl(strpos($popup, 'SmartUcfSessionCoordinator') !== false, 'SmartUCF outbound enabled');

@@ -84,10 +84,21 @@ expectCheckoutFailure(function () use ($validator, $consentShop, $cart, $base, $
 $withConsent = $validator->validate($consentShop, $cart, 'EUR', $base + ['consent' => [7]], $customer);
 assertCheckout($withConsent->acceptedConsentIds === [7], 'mandatory consent validation failed');
 
-$process2 = calculatorFixture(['uni_proces' => 1]);
-expectCheckoutFailure(function () use ($validator, $process2, $cart, $base, $customer): void { $validator->validate($process2, $cart, 'EUR', $base + ['egn' => 'bad', 'phone2' => 'x'], $customer); }, 'invalid customer field accepted');
-$processRequest = $validator->validate($process2, $cart, 'EUR', $base + ['egn' => '1990010199', 'phone2' => '+359 2 123'], $customer);
-assertCheckout($processRequest->customer['egn'] === '1990010199', 'valid Process 2 customer fields failed');
+$process2 = array_replace($consentShop, ['uni_proces' => 1]);
+$process2Posted = $base + ['consent' => [7]];
+foreach ([[], ['egn' => 'legacy-marker', 'phone2' => ['legacy-marker']]] as $legacyKeys) {
+    $processRequest = $validator->validate($process2, $cart, 'EUR', $process2Posted + $legacyKeys, $customer);
+    assertCheckout($processRequest->customer === $withConsent->customer, 'Process 2 preserves supported customer data');
+    assertCheckout($processRequest->acceptedConsentIds === [7], 'Process 2 preserves accepted consent');
+}
+foreach (['phone', 'email', 'address'] as $requiredField) {
+    expectCheckoutFailure(function () use ($validator, $process2, $cart, $process2Posted, $customer, $requiredField): void {
+        $validator->validate($process2, $cart, 'EUR', $process2Posted, array_replace($customer, [$requiredField => '']));
+    }, 'Process 2 accepted missing ' . $requiredField);
+}
+expectCheckoutFailure(function () use ($validator, $process2, $cart, $base, $customer): void {
+    $validator->validate($process2, $cart, 'EUR', $base, $customer);
+}, 'Process 2 accepted missing mandatory consent');
 
 $lockedShop = calculatorFixture(['uni_typekop' => 1, 'kop' => ['by_schema' => ['filters' => [[
     'id' => 11, 'product_id' => 42, 'category_id' => null, 'uni_meseci' => '24', 'uni_promo' => 0, 'uni_parva' => 1, 'uni_kop' => 'PRODUCT',

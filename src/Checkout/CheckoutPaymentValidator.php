@@ -64,7 +64,7 @@ final class CheckoutPaymentValidator
         } catch (UnavailableSchemeException $exception) {
             throw new CheckoutValidationException('The selected financing scheme cannot be calculated.', 0, $exception);
         }
-        $validatedCustomer = $this->customers->validate($shop, $customer, $posted);
+        $validatedCustomer = $this->customers->validate($customer);
         $consentSelection = $effectiveConsentSelection ?? $this->consents->selection($calculation);
         if (($consentSelection['_consent_snapshot_missing'] ?? false) === true) {
             // Only proven absence permits the validated server calculation; retain order-aware errors.

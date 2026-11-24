@@ -17,7 +17,6 @@ use PrestaShop\Module\Unipayment\Checkout\ConsentResolver;
 use PrestaShop\Module\Unipayment\Checkout\ValidatedPaymentRequest;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrationResult;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 use Validate;
 
 /**
@@ -25,7 +24,7 @@ use Validate;
  *
  * Flow:
  *  1. Re-validate financing scheme availability and recalculate
- *  2. Validate customer data (including EGN when Process 2)
+ *  2. Validate customer data
  *  3. Authenticated customers keep Context identity; anonymous visitors get a fresh guest
  *  4. Build a single-product cart (or reuse cart bound to the popup submission)
  *  5. Persist id_cart on the submission BEFORE OrderOrchestrator (AUD-002A)
@@ -42,8 +41,6 @@ final class ProductPopupApplyService
     private $guestFactory;
     /** @var OrderOrchestrator */
     private $orchestrator;
-    /** @var SensitiveDataCipher */
-    private $cipher;
     /** @var CurrencyGate */
     private $currencyGate;
     /** @var ConsentResolver */
@@ -60,7 +57,6 @@ final class ProductPopupApplyService
         ProductPopupCustomerValidator $customerValidator,
         GuestCustomerFactory $guestFactory,
         OrderOrchestrator $orchestrator,
-        SensitiveDataCipher $cipher,
         ?CurrencyGate $currencyGate = null,
         ?ConsentResolver $consents = null,
         ?PopupCustomerIdentityGate $identityGate = null,
@@ -71,7 +67,6 @@ final class ProductPopupApplyService
         $this->customerValidator = $customerValidator;
         $this->guestFactory = $guestFactory;
         $this->orchestrator = $orchestrator;
-        $this->cipher = $cipher;
         $this->currencyGate = $currencyGate ?? new CurrencyGate();
         $this->consents = $consents ?? new ConsentResolver();
         $this->identityGate = $identityGate ?? new PopupCustomerIdentityGate();
@@ -121,8 +116,7 @@ final class ProductPopupApplyService
 
         $calcResult = $this->calculator->calculateScheme($shop, $product->price, $scheme, $firstInstallment);
 
-        $requireEgn = ((int) ($shop['uni_proces'] ?? 0)) === 1;
-        $customerData = $this->customerValidator->validate($posted, $requireEgn);
+        $customerData = $this->customerValidator->validate($posted);
 
         $consentSelection = $this->consents->selection($calcResult);
         if ($reuseCartId > 0) {

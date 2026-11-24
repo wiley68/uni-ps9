@@ -278,7 +278,11 @@ Distinct from Phase 4 HMAC nonce replay (CP → module). Protects **customer pop
 
 Do not log: raw `popup_submission_token`, EGN, session cookie, secrets, Bearer tokens.
 
-Phase 10 financing snapshot stores EGN/phone2 only in encrypted `sensitive_payload` (`SensitiveDataCipher`); generic `customer_json` excludes EGN. Retention redaction via `FinancingSnapshotRetentionService` (6 months AUD-014 default).
+New financing snapshots store SQL NULL in `sensitive_payload` and exclude EGN and secondary phone from `customer_json`. Historical encrypted payloads remain in place under the existing `FinancingSnapshotRetentionService` policy (180 days by default). Current mail and BO rendering do not decrypt these values, and order recovery uses the existing order identity, financing and CP data.
+
+Optional historical cleanup requires separate authorization. First do a read-only dry-run to count non-null payloads by shop and period without reading their values. After explicit approval of the scope, clear only `sensitive_payload` on the approved rows in bounded batches. Keep order identity, CP, financing, consent and retry fields intact. Verify affected counts, preserved fields and recovery behavior afterward.
+
+Structured diagnostic recording, retrieval and export mask the exact keys `egn`, `phone2`, `unipayment_egn` and `unipayment_phone2` case-insensitively, including on nested historical records.
 
 Phase 11 SmartUCF: do not log EGN, full SmartUCF customer payload, certificate/key material, or Bearer tokens. Safe: order reference, attempt id, SmartUCF state/error class.
 
@@ -289,7 +293,7 @@ REM-PS9-CACHE-001 homepage advertising: FO render uses the credential-free view 
 | Flow      | Customer email                        | Admin email (`PS_SHOP_EMAIL`)             |
 | --------- | ------------------------------------- | ----------------------------------------- |
 | Process 1 | No EGN                                | No EGN                                    |
-| Process 2 | No EGN (confirmation message allowed) | **Full EGN** + second phone (operational) |
+| Process 2 | Financing rows and confirmation message | Financing rows |
 
 - Implementation: `LeasingOrderEmailPresenter` + `LeasingEmailNotifier` via `FinancingOrderMailDispatcher`
 - Marker: `leasing_email_sent` (once per attempt; combined customer+admin)
@@ -298,7 +302,7 @@ REM-PS9-CACHE-001 homepage advertising: FO render uses the credential-free view 
 - Retry after failure may duplicate a previously successful audience (accepted residual risk; no schema change)
 - Mail logs: order reference + audience class + exception class only — never body/EGN/SMTP credentials
 - Standard emails must use the **canonical public bank status** (four initial labels, or later raw SmartUCF text). No separate technical email statuses. See [`ARCHITECTURE.md`](ARCHITECTURE.md) bank-status contract.
-- Thank-you page uses **customer** audience leasing rows (no EGN); bank status on confirmation is public-facing only
+- Thank-you page uses **customer** audience leasing rows without EGN or secondary phone; bank status on confirmation is public-facing only
 - BO UniCredit / leasing panel shows the same customer/business-facing leasing field set + public bank status; SmartUCF journal / `smartucfdebuglog` remain the diagnostic channel (never raw request/response or secrets in the leasing table)
 
 ### Data retention (module-owned)

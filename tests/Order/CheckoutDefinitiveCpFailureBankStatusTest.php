@@ -31,7 +31,6 @@ use PrestaShop\Module\Unipayment\Order\OrderAttemptStoreInterface;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrationException;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
 use PrestaShop\Module\Unipayment\Order\PrestaShopOrderGatewayInterface;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 
 if (!defined('_NEW_COOKIE_KEY_')) {
     define('_NEW_COOKIE_KEY_', 'checkout-cp-fail-status-key');
@@ -302,7 +301,7 @@ foreach (
         new CheckoutCpStatusSnapshots(),
         new CheckoutCpStatusOrders($created),
         new CheckoutCpStatusCp(),
-        new FinancingSnapshotFactory(new SensitiveDataCipher()),
+        new FinancingSnapshotFactory(),
         new ControlPanelOrderPayloadBuilder(),
         $bank,
         $mail
@@ -357,7 +356,7 @@ foreach ([false, true] as $process2) {
 }
 
 // Panel: Process 2 shop + persisted CP failure must not show Process 2 success.
-$panelPresenter = new LeasingOrderEmailPresenter(new SensitiveDataCipher());
+$panelPresenter = new LeasingOrderEmailPresenter();
 $panelRows = $panelPresenter->rowsFromSnapshot(
     [
         'months' => 12,

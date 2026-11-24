@@ -53,8 +53,9 @@ assertPhase12(
     'presenter must distinguish customer/admin audiences'
 );
 assertPhase12(
-    (bool) preg_match('/process2 && \$audience === EmailAudience::ADMIN[\s\S]*ЕГН/s', $presenter),
-    'Process 2 admin may include EGN'
+    !str_contains($presenter, 'ЕГН') && !str_contains($presenter, 'Втори телефон')
+        && !str_contains($presenter, 'sensitive_payload'),
+    'shared presenter must omit both removed fields from request and historical snapshot output'
 );
 assertPhase12(
     strpos($details, 'customerRowsFromSnapshot') !== false

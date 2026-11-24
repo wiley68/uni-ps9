@@ -18,7 +18,6 @@ use PrestaShop\Module\Unipayment\Order\OrderAttemptStoreInterface;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
 use PrestaShop\Module\Unipayment\Order\FinancingSnapshotFactory;
 use PrestaShop\Module\Unipayment\Order\ControlPanelOrderPayloadBuilder;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 use PrestaShop\Module\Unipayment\Calculator\Calculator;
 use PrestaShop\Module\Unipayment\Calculator\ProductContext;
 
@@ -34,7 +33,7 @@ $zeroCalc = $calc->calculateScheme($scopeShop,1050,$calc->availableSchemes($scop
 $nonzeroCalc = $calc->calculateScheme($scopeShop,1050,$calc->availableSchemes($scopeShop,$product,'standard')[0]);
 $a = new MemoryAttempts(); $s = new MemorySnapshots(); $o = new FakeOrders($created); $c = new FakeCp();
 $c->queue[] = ['data'=>['id'=>901]];
-$flow = new OrderOrchestrator($a,$s,$o,$c,new FinancingSnapshotFactory(new SensitiveDataCipher()),new ControlPanelOrderPayloadBuilder());
+$flow = new OrderOrchestrator($a,$s,$o,$c,new FinancingSnapshotFactory(),new ControlPanelOrderPayloadBuilder());
 function retryRequest(CalculationResult $calculation, array $ids): ValidatedPaymentRequest {
     return new ValidatedPaymentRequest($calculation,[], $ids, hash('sha256','same cart'), [], $ids);
 }
@@ -69,7 +68,7 @@ $racing = new class($a) implements OrderAttemptStoreInterface {
     public function update(int $id,array $changes): array { return $this->inner->update($id,$changes); }
     public function attachOrderIfReserved(int $id, int $order, string $reference): array { return $this->inner->attachOrderIfReserved($id, $order, $reference); }
 };
-$raceFlow = new OrderOrchestrator($racing,$s,$o,$c,new FinancingSnapshotFactory(new SensitiveDataCipher()),new ControlPanelOrderPayloadBuilder());
+$raceFlow = new OrderOrchestrator($racing,$s,$o,$c,new FinancingSnapshotFactory(),new ControlPanelOrderPayloadBuilder());
 try {
     $raceFlow->orchestrate(1,91,retryRequest($nonzeroCalc,[1,3]),$scopeShop);
     assertOrder(false,'concurrent saved A bypassed final consent validation');
@@ -96,7 +95,7 @@ $changingSnapshots = new class($s->rows[1], (new ConsentResolver())->selection($
     public function save(int $id,array $snapshot): void { throw new RuntimeException('Unexpected snapshot write'); }
     public function update(int $id,array $changes): void { throw new RuntimeException('Unexpected snapshot update'); }
 };
-$changedFlow = new OrderOrchestrator($a,$changingSnapshots,$o,$c,new FinancingSnapshotFactory(new SensitiveDataCipher()),new ControlPanelOrderPayloadBuilder());
+$changedFlow = new OrderOrchestrator($a,$changingSnapshots,$o,$c,new FinancingSnapshotFactory(),new ControlPanelOrderPayloadBuilder());
 try {
     $changedFlow->orchestrate(1,91,retryRequest($zeroCalc,[1,2]),$scopeShop);
     assertOrder(false,'final recovery snapshot bypassed consent validation');

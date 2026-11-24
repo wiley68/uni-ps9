@@ -115,7 +115,14 @@ require_once dirname(__DIR__, 2) . '/src/Security/FixedClock.php';
 require_once dirname(__DIR__, 2) . '/src/Order/FinancingSnapshotRepository.php';
 require_once dirname(__DIR__, 2) . '/src/Order/FinancingSnapshotRetentionService.php';
 
+use PrestaShop\Module\Unipayment\Configuration\ConfigurationRepository;
+use PrestaShop\Module\Unipayment\Configuration\ControlPanelOrigin;
+use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationCache;
+use PrestaShop\Module\Unipayment\Order\BankStatus;
 use PrestaShop\Module\Unipayment\Order\EmailAudience;
+use PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository;
+use PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository;
+use PrestaShop\Module\Unipayment\Order\OrderLeasingDetailsPresenter;
 use PrestaShop\Module\Unipayment\Order\FinancingSnapshotRetentionService;
 use PrestaShop\Module\Unipayment\Order\FinancingSnapshotStoreInterface;
 use PrestaShop\Module\Unipayment\Order\LeasingEmailNotifier;
@@ -131,12 +138,13 @@ function assertAud014(bool $ok, string $message): void
     }
 }
 
-function assertNoEgnInOutput(array $rows, string $text, string $html, string $egn = '9001011234'): void
+function assertNoRemovedFieldsInOutput(array $rows, string $text, string $html, string $egn = '9001011234'): void
 {
-    assertAud014(!isset($rows['ЕГН']), 'EGN row must be absent');
-    assertAud014(strpos($text, $egn) === false, 'EGN must not appear in text body');
-    assertAud014(strpos($html, $egn) === false, 'EGN must not appear in HTML body');
-    assertAud014(stripos($text, 'ЕГН') === false && stripos($html, 'ЕГН') === false, 'EGN label must be absent');
+    foreach ([$egn, '0888123456', 'ЕГН', 'Втори телефон'] as $forbidden) {
+        assertAud014(stripos($text, $forbidden) === false, 'removed field must be absent from text');
+        assertAud014(stripos($html, $forbidden) === false, 'removed field must be absent from HTML');
+    }
+    assertAud014(!array_intersect(['ЕГН', 'Втори телефон'], array_keys($rows)), 'removed rows must be absent');
 }
 
 /** @return array<string, mixed> */
@@ -158,7 +166,7 @@ function aud014Process2Snapshot(SensitiveDataCipher $cipher, string $egn = '9001
     ];
 }
 
-$presenter = new LeasingOrderEmailPresenter(new SensitiveDataCipher(new PhpEncryption('aud014-test-key')));
+$presenter = new LeasingOrderEmailPresenter();
 $cipher = new SensitiveDataCipher(new PhpEncryption('aud014-test-key'));
 $process1Shop = ['uni_proces' => 0];
 $process2Shop = ['uni_proces' => 1];
@@ -172,7 +180,7 @@ foreach ([EmailAudience::CUSTOMER, EmailAudience::ADMIN] as $audience) {
     $rows = $presenter->rowsFromSnapshot($snapshotP1, $process1Shop, $audience);
     $text = $presenter->renderText($rows);
     $html = $presenter->renderHtml($rows);
-    assertNoEgnInOutput($rows, $text, $html);
+    assertNoRemovedFieldsInOutput($rows, $text, $html);
 }
 
 // Test C — Process 2 customer no EGN
@@ -180,18 +188,16 @@ $customerRows = $presenter->customerRowsFromSnapshot($snapshotP2, $process2Shop)
 $customerText = $presenter->renderText($customerRows);
 $customerHtml = $presenter->renderHtml($customerRows);
 $customerVars = $presenter->mailExtraVarsFromSnapshot($snapshotP2, $process2Shop);
-assertNoEgnInOutput($customerRows, $customerText, $customerHtml);
+assertNoRemovedFieldsInOutput($customerRows, $customerText, $customerHtml);
 assertAud014(strpos($customerText, LeasingOrderEmailPresenter::process2ConfirmationMessage()) !== false, 'C: customer Process 2 message retained');
 assertAud014(strpos((string) ($customerVars['{unipayment_leasing_txt}'] ?? ''), '9001011234') === false, 'C: mail vars must not contain EGN');
 
-// Test D — Process 2 admin includes full EGN
+// Test D — Process 2 admin output also omits both historical fields.
 $adminRows = $presenter->adminRowsFromSnapshot($snapshotP2, $process2Shop);
 $adminText = $presenter->renderText($adminRows);
-assertAud014(($adminRows['ЕГН'] ?? '') === '9001011234', 'D: admin rows must include EGN');
-assertAud014(strpos($adminText, '9001011234') !== false, 'D: admin text must include EGN');
-
-// Test E — independent customer/admin bodies
-assertAud014($customerText !== $adminText, 'E: customer and admin bodies must differ when EGN is admin-only');
+assertNoRemovedFieldsInOutput($adminRows, $adminText, $presenter->renderHtml($adminRows));
+assertAud014($adminRows['КОП'] === 'KOP1' && $adminRows['Сума на заема'] === '1000.00', 'admin keeps financial rows');
+assertAud014($customerText !== $adminText, 'customer and admin bodies retain their audience-specific content');
 
 final class Aud014MemorySnapshots implements FinancingSnapshotStoreInterface
 {
@@ -223,7 +229,9 @@ $dupSnapshot = aud014Process2Snapshot($cipher);
 $dupSnapshot['customer_json'] = ['email' => 'same@example.com'];
 (new LeasingEmailNotifier($snapshotsF, $presenter))->notify($dupSnapshot, 7, $process2Shop);
 assertAud014(count(Mail::$sent) === 1, 'F: duplicate recipient must receive one email');
-assertAud014(strpos((string) Mail::$sent[0]['message'], '9001011234') !== false, 'F: duplicate recipient gets admin content');
+$duplicateText = (string) Mail::$sent[0]['message'];
+assertAud014(strpos($duplicateText, 'KOP1') !== false && strpos($duplicateText, LeasingOrderEmailPresenter::process2ConfirmationMessage()) === false, 'F: duplicate recipient gets admin financial content');
+assertNoRemovedFieldsInOutput([], $duplicateText, $duplicateText);
 Configuration::$values['PS_SHOP_EMAIL'] = 'admin@example.com';
 
 // Test G — no EGN in logs (static contract)
@@ -245,6 +253,47 @@ if (!function_exists('pSQL')) {
         return str_replace("'", "\\'", $string);
     }
 }
+
+final class Db
+{
+    public function __construct(private array $historicalSnapshot) {}
+
+    public function getRow(string $sql): array|false
+    {
+        if (str_contains($sql, 'unipayment_financing_snapshot')) {
+            return $this->historicalSnapshot;
+        }
+        if (str_contains($sql, 'unipayment_shop_cache')) {
+            return ['shop_data' => json_encode(['uni_proces' => 1, 'cp_origin' => ControlPanelOrigin::current()], JSON_THROW_ON_ERROR)];
+        }
+        if (str_contains($sql, 'unipayment_order_bank_status')) {
+            return BankStatus::successfulSend(true);
+        }
+
+        return false;
+    }
+}
+
+$boSnapshot = array_replace($snapshotP2, [
+    'customer_json' => json_encode($snapshotP2['customer_json'], JSON_THROW_ON_ERROR),
+    'address_json' => '{}',
+    'lines_json' => '[]',
+    'consents_json' => '[]',
+]);
+$boDb = new Db($boSnapshot);
+Configuration::$values[ConfigurationRepository::UNICID] = 'synthetic-shop';
+$boCache = new ShopConfigurationCache($boDb);
+assertAud014(($boCache->getFresh('synthetic-shop')['uni_proces'] ?? 0) === 1, 'BO fixture resolves current Process 2 configuration');
+$boRows = (new OrderLeasingDetailsPresenter(
+    new FinancingSnapshotRepository($boDb),
+    new OrderBankStatusRepository($boDb),
+    $presenter,
+    new ConfigurationRepository(),
+    $boCache
+))->rowsForOrder(70);
+assertNoRemovedFieldsInOutput($boRows, $presenter->renderText($boRows), $presenter->renderHtml($boRows));
+assertAud014($boRows['КОП'] === 'KOP1' && $boRows['Статус към банката'] === BankStatus::LABEL_SENT_PROCESS2, 'BO keeps financial rows and persisted status');
+unset(Configuration::$values[ConfigurationRepository::UNICID]);
 
 final class Aud014RetentionFakeDb
 {
@@ -425,7 +474,7 @@ assertAud014($serviceP->maybeRun() === 0, 'P: cleanup failure returns zero witho
 
 $orchestratorSrc = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Order/OrderOrchestrator.php');
 assertAud014(strpos($orchestratorSrc, 'FinancingSnapshotRetentionService') !== false, 'retention triggered after snapshot save');
-assertAud014(strpos((string) file_get_contents(dirname(__DIR__, 2) . '/unipayment.php'), "version = '2.0.4'") !== false, 'version is 2.0.4');
+assertAud014(strpos((string) file_get_contents(dirname(__DIR__, 2) . '/unipayment.php'), "version = '2.0.5'") !== false, 'version is 2.0.5');
 
 $redactedSnapshot = aud014Process2Snapshot($cipher);
 $redactedSnapshot['customer_json'] = [];

@@ -40,4 +40,47 @@ assertPaymentOption(strpos($validate, 'PostControlPanelLifecycleService') !== fa
 assertPaymentOption(strpos($validate, 'SmartUcfSessionCoordinator') !== false, 'Phase 11 SmartUCF coordinator');
 assertPaymentOption(strpos($validate, 'CheckoutPaymentValidator') !== false, 'revalidates before order creation');
 
+foreach (['unipayment_egn', 'unipayment_phone2'] as $legacyField) {
+    assertPaymentOption(substr_count($tpl, 'name="' . $legacyField . '"') === 1, 'one legacy input per field');
+    assertPaymentOption(str_contains($tpl, '<input type="hidden" name="' . $legacyField . '" value="">'), 'legacy input remains empty and hidden');
+    assertPaymentOption(!str_contains($validate, $legacyField), 'obsolete POST key is never read');
+}
+assertPaymentOption((bool) preg_match('/\{if !\$unipayment_checkout\.process2\}\s*<input[^>]+unipayment_egn[^>]+>\s*<input[^>]+unipayment_phone2[^>]+>\s*\{\/if\}/', $tpl), 'both legacy inputs are confined to Process 1');
+
+class ModuleFrontController {}
+
+final class Tools
+{
+    public static array $posted = [];
+
+    public static function getValue(string $key, mixed $default = false): mixed
+    {
+        return self::$posted[$key] ?? $default;
+    }
+}
+
+require $root . '/controllers/front/validatecheckout.php';
+$controller = new UnipaymentValidateCheckoutModuleFrontController();
+$postedSelection = new ReflectionMethod($controller, 'postedSelection');
+$expected = [
+    'scheme_key' => '12:0',
+    'kop_code' => 'STD',
+    'first_installment' => '100',
+    'cart_snapshot' => 'synthetic-signature',
+    'consent' => [7],
+];
+Tools::$posted = [
+    'unipayment_scheme_key' => '12:0',
+    'unipayment_kop_code' => 'STD',
+    'unipayment_first_installment' => '100',
+    'unipayment_cart_snapshot' => 'synthetic-signature',
+    'unipayment_consent' => [7],
+];
+assertPaymentOption($postedSelection->invoke($controller) === $expected, 'checkout maps all supported POST fields');
+foreach (['legacy-marker', ['legacy-marker']] as $legacyValue) {
+    Tools::$posted['unipayment_egn'] = $legacyValue;
+    Tools::$posted['unipayment_phone2'] = $legacyValue;
+    assertPaymentOption($postedSelection->invoke($controller) === $expected, 'scalar and array legacy POST keys are ignored');
+}
+
 fwrite(STDOUT, "OK (Phase 11 PaymentOption + post-CP lifecycle contract)\n");

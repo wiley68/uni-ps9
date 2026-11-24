@@ -23,8 +23,6 @@
         data-invalid-address-message="{l s='Адресът може да съдържа букви, цифри, интервали и стандартни знаци. Не използвайте символи като <, >, =, +, @, {, }, _, $, %, !, ?.' d='Modules.Unipayment.Shop'}"
         data-invalid-phone-message="{l s='Телефонът може да съдържа цифри, интервали, +, -, ( и ).' d='Modules.Unipayment.Shop'}"
         data-invalid-email-message="{l s='Въведете валиден e-mail адрес, например name@example.com.' d='Modules.Unipayment.Shop'}"
-        data-invalid-egn-message="{l s='ЕГН трябва да съдържа 10 цифри. Първите 8 трябва да са валидна дата във формат ГГГГММДД.' d='Modules.Unipayment.Shop'}"
-        data-invalid-phone2-message="{l s='Вторият телефон може да съдържа цифри, интервали, +, -, ( и ).' d='Modules.Unipayment.Shop'}"
         data-calculate-failed-message="{l s='Неуспешно изчисление. Моля, опитайте отново.' d='Modules.Unipayment.Shop'}"
         data-add-to-cart-failed-message="{l s='Не може да се добави в количката.' d='Modules.Unipayment.Shop'}"
         data-customer-form-missing-message="{l s='Формата за лични данни не се зареди. Моля, презаредете страницата.' d='Modules.Unipayment.Shop'}"
@@ -233,32 +231,6 @@
                                     <span class="unipayment-product-calculator__field-error"
                                         data-unipayment-field-error="email" role="alert"></span>
                                 </div>
-                                {if $unipayment_require_egn}
-                                    <div class="unipayment-product-calculator__customer-field">
-                                        <label class="unipayment-product-calculator__customer-label"
-                                            for="unipayment-egn-{$unipayment_calculator.product_id|intval}">{l s='ЕГН' d='Modules.Unipayment.Shop'}
-                                            <span class="unipayment-product-calculator__required"
-                                                aria-hidden="true">*</span></label>
-                                        <input class="unipayment-product-calculator__customer-input"
-                                            id="unipayment-egn-{$unipayment_calculator.product_id|intval}" name="egn"
-                                            type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" value="" required
-                                            aria-required="true">
-                                        <span class="unipayment-product-calculator__field-error"
-                                            data-unipayment-field-error="egn" role="alert"></span>
-                                    </div>
-                                    <div class="unipayment-product-calculator__customer-field">
-                                        <label class="unipayment-product-calculator__customer-label"
-                                            for="unipayment-phone2-{$unipayment_calculator.product_id|intval}">{l s='Втори телефон' d='Modules.Unipayment.Shop'}
-                                            <span class="unipayment-product-calculator__required"
-                                                aria-hidden="true">*</span></label>
-                                        <input class="unipayment-product-calculator__customer-input"
-                                            id="unipayment-phone2-{$unipayment_calculator.product_id|intval}" name="phone2"
-                                            type="tel" value="" required aria-required="true" autocomplete="tel"
-                                            inputmode="tel">
-                                        <span class="unipayment-product-calculator__field-error"
-                                            data-unipayment-field-error="phone2" role="alert"></span>
-                                    </div>
-                                {/if}
                                 <span class="unipayment-product-calculator__field-error" data-unipayment-submit-error
                                     role="alert"></span>
                             </div>

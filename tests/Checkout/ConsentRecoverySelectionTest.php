@@ -42,7 +42,7 @@ function recoveryFlow(CreatedOrder $order, string $fingerprint, ?array $snapshot
         public function update(int $id, array $changes): array { return $this->inner->update($id, $changes); }
         public function attachOrderIfReserved(int $id, int $order, string $reference): array { return $this->inner->attachOrderIfReserved($id, $order, $reference); }
     } : $attempts;
-    $flow = new OrderOrchestrator($store, $snapshots, $orders, $cp, new FinancingSnapshotFactory(new SensitiveDataCipher()), new ControlPanelOrderPayloadBuilder());
+    $flow = new OrderOrchestrator($store, $snapshots, $orders, $cp, new FinancingSnapshotFactory(), new ControlPanelOrderPayloadBuilder());
     return [$flow, $attempts, $snapshots, $orders, $cp];
 }
 function recoveryNoWork(MemoryAttempts $attempts, MemorySnapshots $snapshots, FakeOrders $orders, FakeCp $cp, array $before): void
@@ -86,7 +86,7 @@ recoveryCheck(count($cp->calls) === 1 && $orders->created === 0 && $frozen === [
 // Persisted zero-interest A always wins over the submitted, valid nonzero B.
 $zeroScheme = $calculator->availableSchemes($shop, $product, 'promo')[0];
 $zero = $calculator->calculateScheme($shop, 1050, $zeroScheme);
-$savedA = (new FinancingSnapshotFactory(new SensitiveDataCipher()))->create(new ValidatedPaymentRequest($zero, [], [1, 2], $fingerprint), $created);
+$savedA = (new FinancingSnapshotFactory())->create(new ValidatedPaymentRequest($zero, [], [1, 2], $fingerprint), $created);
 [$flow, $attempts, $snapshots, $orders, $cp] = recoveryFlow($created, $fingerprint, $savedA);
 $selection = $flow->consentSelection(1, 91, $fingerprint, []) ?: null;
 $requestA = $validator->validate($shop, $cart, 'EUR', array_replace($posted, ['consent' => [1, 2]]), $customer, $selection);

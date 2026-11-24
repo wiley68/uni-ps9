@@ -158,6 +158,13 @@ Destructive Aud006 DB purge test **SKIPs** in the safe suite.
 | Uninstall                                       | `tests/Uninstall/*`                             |
 | Remediation / infrastructure                    | `tests/Remediation/*`, `tests/Infrastructure/*` |
 
+Process 2 acceptance uses synthetic customer data. Verify Product and Cart Step 2 and apply,
+plus native Checkout, with first name, last name, address, primary phone, email and the mandatory
+consents. Verify legacy scalar and array keys are ignored, new snapshots store SQL NULL in
+`sensitive_payload`, and historical ciphertext still allows order replay without disclosure.
+Check Process 1 retains its two empty hidden Checkout inputs and existing SmartUCF lifecycle.
+Check structured diagnostics mask all four legacy keys on record, read and export.
+
 The PHP baseline scanner prunes vendor, tests and dist before recursion, so protected build artifacts cannot cause unrelated source-lint failures.
 
 Do not hard-code a permanent test file count here — it changes with each remediation. Prefer `composer test` output as the source of truth.
@@ -171,7 +178,7 @@ Do not hard-code a permanent test file count here — it changes with each remed
 | Checkout    | PaymentOption; Process 1 / Process 2; double-click stays post-order (AUD-019)                                                    |
 | Advertising | Fresh cache is local; stale refreshes; transient <=6h may show valid LKG; Class B/C and too-old hide safely                       |
 | Packaging   | Byte parity for source `config/environment.php` and Git-ignored `secrets/smartucf-key.php`; fresh production autoload; manifest/source parity; no other credentials/PEMs/runtime data in ZIP |
-| Privacy     | Process 1/2 mail audiences; no customer EGN; public bank status only on emails/Thank You (see ARCHITECTURE bank-status contract) |
+| Privacy     | Process 1/2 mail audiences and BO omit EGN and secondary phone, including for historical snapshots; public bank status only on emails/Thank You (see ARCHITECTURE bank-status contract) |
 
 Historical phase STOP gates (7–13) are **completed** delivery milestones; they are not the current release gate.
 

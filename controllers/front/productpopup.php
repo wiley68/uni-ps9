@@ -24,7 +24,6 @@ use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecyclePopupMapper;
 use PrestaShop\Module\Unipayment\Order\PostControlPanelLifecycleService;
 use PrestaShop\Module\Unipayment\Order\PostOrderPopupFailureResponse;
 use PrestaShop\Module\Unipayment\Order\PopupSubmissionPostOrderBinder;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 use PrestaShop\Module\Unipayment\Product\GuestCustomerFactory;
 use PrestaShop\Module\Unipayment\Product\PopupSubmissionBindingFactory;
 use PrestaShop\Module\Unipayment\Product\PopupSubmissionRepository;
@@ -115,17 +114,13 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             }
 
             if ($action === 'validate_step2') {
-                $requireEgn = ((int) ($shop['uni_proces'] ?? 0)) === 1;
                 $customer = (new ProductPopupCustomerValidator())->validate([
                     'first_name' => Tools::getValue('first_name', ''),
                     'last_name' => Tools::getValue('last_name', ''),
                     'address' => Tools::getValue('address', ''),
                     'phone' => Tools::getValue('phone', ''),
                     'email' => Tools::getValue('email', ''),
-                    'egn' => Tools::getValue('egn', ''),
-                    'phone2' => Tools::getValue('phone2', ''),
-                ], $requireEgn);
-                unset($customer['egn']);
+                ]);
 
                 return [
                     'success' => true,
@@ -243,8 +238,6 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             'address' => Tools::getValue('address', ''),
             'phone' => Tools::getValue('phone', ''),
             'email' => Tools::getValue('email', ''),
-            'egn' => Tools::getValue('egn', ''),
-            'phone2' => Tools::getValue('phone2', ''),
             'consent' => Tools::getValue('unipayment_consent', []),
         ];
 
@@ -282,7 +275,7 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             new FinancingSnapshotRepository(),
             new NativePrestaShopOrderGateway($module, $this->context),
             $cpClient,
-            new FinancingSnapshotFactory(new SensitiveDataCipher()),
+            new FinancingSnapshotFactory(),
             new ControlPanelOrderPayloadBuilder(),
             new PrestaShop\Module\Unipayment\Order\OrderBankStatusRepository()
         );
@@ -291,7 +284,6 @@ final class UnipaymentProductPopupModuleFrontController extends ModuleFrontContr
             new ProductPopupCustomerValidator(),
             new GuestCustomerFactory(),
             $orchestrator,
-            new SensitiveDataCipher(),
             null,
             null,
             null,

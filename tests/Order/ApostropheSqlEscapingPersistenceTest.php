@@ -26,7 +26,6 @@ use PrestaShop\Module\Unipayment\Order\FinancingSnapshotFactory;
 use PrestaShop\Module\Unipayment\Order\FinancingSnapshotRepository;
 use PrestaShop\Module\Unipayment\Order\OrderAttemptRepository;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 
 if (!defined('_DB_PREFIX_')) {
     define('_DB_PREFIX_', 'ps_');
@@ -339,7 +338,7 @@ $order = new CreatedOrder(
 // ---------------------------------------------------------------------------
 $db = new ApostropheQuotingDb();
 $snapshots = new FinancingSnapshotRepository($db);
-$factory = new FinancingSnapshotFactory(new SensitiveDataCipher());
+$factory = new FinancingSnapshotFactory();
 $snapshot = $factory->create($request, $order, 'product_popup');
 $snapshots->save(42, $snapshot);
 

@@ -8,15 +8,17 @@ Release and packaging checklist for UniPayment PrestaShop **9**.
 
 | Item           | Value                                      |
 | -------------- | ------------------------------------------ |
-| Module version | **2.0.4** (`unipayment.php`, `config.xml`, `config_bg.xml`) |
-| Project status | **Centralized CP advertisement control (UNI-PS9-ADS-001)** |
+| Module version | **2.0.5** (`unipayment.php`, `config.xml`, `config_bg.xml`) |
+| Project status | **Local installer preparation (UNI-PS9-PROCESS2-FIELDS-001)** |
 | Release notes  | [`../CHANGELOG.md`](../CHANGELOG.md)       |
 
 `2.0.2` remains the scheme presentation / Cart / Checkout parity line. `2.0.3` adds definitive CP-failure classification/Thank You/emails and Satrudnik operational notification mail.
 
 `2.0.4` (2026-11-19) removes the merchant advertising switch. CP `uni_container_status` controls visibility, with the existing homepage/module/UNICID/`uni_status` checks. Legacy local advertising values are ignored and preserved on settings saves; install defaults and uninstall cleanup remain unchanged. No migration or payment/financing change. CP push, TTL 86400 seconds, transient LKG up to 21600 seconds after expiry and manual refresh are unchanged. The shared presentation resolver may synchronously pull CP on a cache miss/stale snapshot; fresh coherent snapshots stay local.
 
-Owner browser acceptance PS9-01 through PS9-09: **9/9 PASS**. The release installer is local and access-restricted; do not upload it to GitHub Releases or a public artifact store.
+`2.0.5` removes EGN and secondary phone from Process 2 Product, Cart and Checkout forms, submissions and validators. It retains the five supported customer fields and mandatory consents. New snapshots store SQL NULL in `sensitive_payload`. Historical ciphertext stays under existing retention and is omitted from current mail and Back Office output. Structured diagnostic records mask the four exact legacy keys. Process 1 and the CP API contract are unchanged. No migration is required.
+
+The PS9-01 through PS9-09 browser acceptance (9/9 PASS) applies to 2.0.4. Manual PS9 installation and browser acceptance for 2.0.5 are pending. The 2.0.5 installer is for local, access-restricted operator use.
 
 Do **not** create or push a Git tag automatically from agent workflows — tagging is an explicit operator step.
 
@@ -24,7 +26,7 @@ Do **not** create or push a Git tag automatically from agent workflows — taggi
 
 ## 2. Version policy
 
-- Module version is **`2.0.4`** for this release
+- Module version is **`2.0.5`** for this release
 - Version metadata must stay consistent in `unipayment.php`, `config.xml`, `config_bg.xml`, new financing snapshots and diagnostic exports; never rewrite historical snapshots or frozen payloads
 - **No** historical upgrade scripts for development-only iterations
 - After first production package, future schema changes use `upgrade/upgrade-x.y.z.php`
@@ -35,14 +37,9 @@ Do **not** create or push a Git tag automatically from agent workflows — taggi
 
 ### Quality
 
-- [x] Module version is **2.0.4**
-- [x] Version in `unipayment.php`, both XML metadata files, snapshot factory and diagnostic journal
-- [x] `composer validate --no-check-publish`
-- [x] Safe suite on PHP 8.1–8.5 executed; PHP 8.1–8.4 each 146 PASS / 6 SKIP / 1 PARTIAL / 0 FAIL; PHP 8.5 145 PASS / 6 SKIP / 1 PARTIAL / 1 environment FAIL (missing cURL; zip/SimpleXML also absent)
-- [x] `git diff --check` clean
-- [ ] Manual browser smoke (product/cart/checkout; CP failure Thank You; SmartUCF failure; Satrudnik mail when configured)
-- [x] Advertising owner acceptance PS9-01 through PS9-09: 9/9 PASS
-- [x] Provisional ZIP passed repeatability, source/deployment parity, nine packaged inbound cases and ten archive rejection cases under PHP 8.4; regenerate and verify the final archive after publication
+- Synchronize the version in PHP, both XML metadata files, new financing snapshots and diagnostic exports.
+- Verify the local ZIP against the working tree using the official verifier. The manifest records the actual source HEAD and dirty state.
+- [ ] Manual browser acceptance on PS9 Classic and Hummingbird, including Product, Cart, Checkout, Back Office and Process 1 regression.
 
 ### Reproducible distribution command
 
@@ -55,7 +52,7 @@ composer package
 
 Requires CLI PHP 8.1–8.5 with zip/SimpleXML, Composer and Git, plus the local deployment file `secrets/smartucf-key.php`. The command uses current contents of tracked runtime files and non-ignored untracked runtime files selected by the existing runtime-path policy, and explicitly includes this Git-ignored deployment file. New runtime classes can therefore be reviewed and packaged without staging. Tests, documentation, temporary files and other paths outside that policy remain excluded. Never add `secrets/smartucf-key.php` to Git. The build never installs dependencies into the working module.
 
-Output naming is exactly `dist/ps9_uni_<MODULE_VERSION>.zip`, preserving all three version components (for example, `ps9_uni_2.0.4.zip`). The version comes from the single literal `$this->version` assignment in `unipayment.php`; an absent, dynamic or ambiguous declaration fails the build. The ZIP contains the top-level `unipayment/` directory, and its filename version is checked against both packaged PHP and XML metadata.
+Output naming is exactly `dist/ps9_uni_<MODULE_VERSION>.zip`, preserving all three version components (for example, `ps9_uni_2.0.5.zip`). The version comes from the single literal `$this->version` assignment in `unipayment.php`; an absent, dynamic or ambiguous declaration fails the build. The ZIP contains the top-level `unipayment/` directory, and its filename version is checked against both packaged PHP and XML metadata.
 
 The builder creates a private temporary staging tree under ignored `dist/`, copies runtime paths selected by the build policy, and runs:
 
@@ -72,7 +69,7 @@ Before reporting success, the builder reopens the ZIP and checks required runtim
 Standalone verification against the current source:
 
 ```bash
-php bin/verify-distribution.php dist/ps9_uni_2.0.4.zip
+php bin/verify-distribution.php dist/ps9_uni_2.0.5.zip
 php tests/Infrastructure/DistributionPackageTest.php
 ```
 
@@ -98,5 +95,5 @@ Uninstall removes module-owned data only. Historical PS orders remain. Reinstall
 
 1. Confirm this commit is the intended release HEAD
 2. Confirm safe suite + manual smoke
-3. Create annotated local tag only when explicitly approved: `git tag -a v2.0.4 -m "UNI-PS9 v2.0.4 - Centralized advertisement banner control"`
-4. Push the tag only when approved; verify the remote tag peels to the exact release commit. For this release, keep `ps9_uni_2.0.4.zip` local and protected; do not create a GitHub Release.
+3. Create an annotated local tag only with explicit operator approval.
+4. Push the tag only with explicit operator approval and verify that it resolves to the exact release commit. RELEASE-PREP-01 authorizes local installer preparation only.

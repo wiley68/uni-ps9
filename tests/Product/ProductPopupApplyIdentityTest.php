@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Phase 7 apply identity: consents, EGN stripped from result, Process 2 required fields.
+ * Popup apply identity, consent and Process 2 customer allowlist.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -26,9 +26,27 @@ final class Customer
 {
     public int $id = 0;
 
+    public function __construct(int $id = 0)
+    {
+        $this->id = $id;
+    }
+
+    public function getAddresses(int $idLang): array
+    {
+        return [];
+    }
+
     public function isLogged(): bool
     {
         return $this->id > 0;
+    }
+}
+
+final class Validate
+{
+    public static function isLoadedObject(object $object): bool
+    {
+        return $object->id > 0;
     }
 }
 
@@ -81,16 +99,15 @@ try {
 }
 
 $process2Shop = array_merge($shop, ['uni_proces' => 1]);
-try {
-    $service->accept($process2Shop, $posted, $context);
-    assertApplyId(false, 'Process 2 without EGN must fail');
-} catch (ProductPopupValidationException $exception) {
-    assertApplyId(isset($exception->errors()['egn']), 'Process 2 requires EGN');
+$expectedCustomer = array_diff_key($posted, ['consent' => true]);
+foreach ([false, true] as $loggedIn) {
+    $context->customer = new Customer();
+    $context->customer->id = $loggedIn ? 7 : 0;
+    foreach ([[], ['egn' => 'legacy-marker', 'phone2' => ['legacy-marker']]] as $legacyKeys) {
+        $process2 = $service->accept($process2Shop, $posted + $legacyKeys, $context);
+        assertApplyId($process2['customer'] === $expectedCustomer, 'Process 2 returns only supported customer fields');
+        assertApplyId($process2['identity']['is_logged'] === $loggedIn, 'Process 2 preserves authenticated or guest identity');
+    }
 }
-
-$process2Posted = array_merge($posted, ['egn' => '1990010199', 'phone2' => '0888000000']);
-$process2 = $service->accept($process2Shop, $process2Posted, $context);
-assertApplyId(!isset($process2['customer']['egn']), 'EGN stripped from Process 2 response');
-assertApplyId(($process2['customer']['phone2'] ?? '') === '0888000000', 'phone2 kept after validation');
 
 fwrite(STDOUT, "OK (product popup apply identity)\n");

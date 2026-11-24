@@ -8,7 +8,6 @@ use Cart;
 use Context;
 use PrestaShop\Module\Unipayment\Checkout\CheckoutValidationException;
 use PrestaShop\Module\Unipayment\Checkout\ConsentResolver;
-use PrestaShop\Module\Unipayment\Configuration\ShopConfigurationFlags;
 
 /**
  * Phase 7 apply identity: validate customer/consents and resolve logged-in/guest context.
@@ -50,8 +49,7 @@ final class ProductPopupApplyIdentityService
      */
     public function accept(array $shop, array $posted, Context $context): array
     {
-        $requireEgn = ShopConfigurationFlags::isProcess2($shop);
-        $customerData = $this->customerValidator->validate($posted, $requireEgn);
+        $customerData = $this->customerValidator->validate($posted);
 
         try {
             $this->consents->validate($shop, $posted['consent'] ?? []);
@@ -90,8 +88,6 @@ final class ProductPopupApplyIdentityService
                 ]);
             }
         }
-
-        unset($customerData['egn']);
 
         return [
             'customer' => $customerData,

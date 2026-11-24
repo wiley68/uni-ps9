@@ -49,7 +49,6 @@ use PrestaShop\Module\Unipayment\Order\OrderAttemptStoreInterface;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrationException;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
 use PrestaShop\Module\Unipayment\Order\PrestaShopOrderGatewayInterface;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 
 function assertEmptyLines(bool $ok, string $message): void
 {
@@ -212,7 +211,7 @@ $orchestrator = new OrderOrchestrator(
     new EmptyLinesSnapshots(),
     new EmptyLinesOrders(),
     $cp,
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder()
 );
 

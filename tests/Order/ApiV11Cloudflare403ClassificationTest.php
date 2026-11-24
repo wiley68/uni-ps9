@@ -33,7 +33,6 @@ use PrestaShop\Module\Unipayment\Order\OrderOrchestrationException;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
 use PrestaShop\Module\Unipayment\Order\PostOrderPopupFailureResponse;
 use PrestaShop\Module\Unipayment\Order\PrestaShopOrderGatewayInterface;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 
 if (!defined('_NEW_COOKIE_KEY_')) {
     define('_NEW_COOKIE_KEY_', 'api-v11-classify-test-key');
@@ -333,7 +332,7 @@ foreach (
         $snapshots,
         $orders,
         $cp,
-        new FinancingSnapshotFactory(new SensitiveDataCipher()),
+        new FinancingSnapshotFactory(),
         new ControlPanelOrderPayloadBuilder(),
         $bank,
         $mail
@@ -391,7 +390,7 @@ foreach (
         $snapshots,
         $orders,
         $cp,
-        new FinancingSnapshotFactory(new SensitiveDataCipher()),
+        new FinancingSnapshotFactory(),
         new ControlPanelOrderPayloadBuilder(),
         $bank,
         $mail

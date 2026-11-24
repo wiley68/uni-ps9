@@ -580,23 +580,6 @@
             return address === "" || /^[^!<>?=+@{}_$%]*$/u.test(address);
         }
 
-        function validEgn(value) {
-            var egn = String(value || "").replace(/\D/g, "");
-            if (!/^\d{10}$/.test(egn)) {
-                return false;
-            }
-            var year = parseInt(egn.slice(0, 4), 10);
-            var month = parseInt(egn.slice(4, 6), 10);
-            var day = parseInt(egn.slice(6, 8), 10);
-            var date = new Date(year, month - 1, day);
-
-            return (
-                date.getFullYear() === year &&
-                date.getMonth() === month - 1 &&
-                date.getDate() === day
-            );
-        }
-
         function consentCheckboxes() {
             return root.querySelectorAll("[data-unipayment-consent-checkbox]");
         }
@@ -674,34 +657,6 @@
                     "data-invalid-email-message",
                     "Въведете валиден e-mail адрес, например name@example.com.",
                 );
-            var egnField = customerField("egn");
-            if (egnField) {
-                var egn = egnField.value.trim();
-                if (!nonEmpty(egn))
-                    errors.egn = t(
-                        "data-required-field-message",
-                        "Полето е задължително.",
-                    );
-                else if (!validEgn(egn))
-                    errors.egn = t(
-                        "data-invalid-egn-message",
-                        "ЕГН трябва да съдържа 10 цифри. Първите 8 трябва да са валидна дата във формат ГГГГММДД.",
-                    );
-            }
-            var phone2Field = customerField("phone2");
-            if (phone2Field) {
-                var phone2 = phone2Field.value.trim();
-                if (!nonEmpty(phone2))
-                    errors.phone2 = t(
-                        "data-required-field-message",
-                        "Полето е задължително.",
-                    );
-                else if (!validPhone(phone2))
-                    errors.phone2 = t(
-                        "data-invalid-phone2-message",
-                        "Вторият телефон може да съдържа цифри, интервали, +, -, ( и ).",
-                    );
-            }
             return errors;
         }
 
@@ -713,8 +668,6 @@
                 "phone",
                 "email",
             ];
-            if (customerField("egn")) fields.push("egn");
-            if (customerField("phone2")) fields.push("phone2");
             var firstInvalid = null;
             fields.forEach(function (name) {
                 var el = fieldError(name);
@@ -1290,11 +1243,6 @@
                     ].forEach(function (name) {
                         payload.set(name, customerField(name).value.trim());
                     });
-                    var egnField = customerField("egn");
-                    if (egnField) payload.set("egn", egnField.value.trim());
-                    var phone2Field = customerField("phone2");
-                    if (phone2Field)
-                        payload.set("phone2", phone2Field.value.trim());
                     appendAcceptedConsents(payload);
                     applyInFlight = true;
                     return fetch(endpoint, {
@@ -1329,9 +1277,7 @@
                                     body.errors.last_name ||
                                     body.errors.address ||
                                     body.errors.phone ||
-                                    body.errors.email ||
-                                    body.errors.egn ||
-                                    body.errors.phone2)
+                                    body.errors.email)
                             ) {
                                 submitError.textContent = body.errors.consents
                                     ? body.errors.consents
@@ -1558,11 +1504,7 @@
         });
         if (customerForm) {
             customerForm.addEventListener("input", function (event) {
-                if (
-                    event.target &&
-                    (event.target.name === "phone" ||
-                        event.target.name === "phone2")
-                )
+                if (event.target && event.target.name === "phone")
                     event.target.value = event.target.value.replace(
                         /[^0-9+() -]/g,
                         "",

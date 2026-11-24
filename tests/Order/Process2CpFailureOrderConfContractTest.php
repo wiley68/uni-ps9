@@ -43,7 +43,6 @@ use PrestaShop\Module\Unipayment\Calculator\FirstInstallmentState;
 use PrestaShop\Module\Unipayment\Checkout\ValidatedPaymentRequest;
 use PrestaShop\Module\Unipayment\Order\BankStatus;
 use PrestaShop\Module\Unipayment\Order\LeasingOrderEmailPresenter;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 
 function assertProcess2OrderConf(bool $condition, string $message): void
 {
@@ -76,7 +75,7 @@ $request = new ValidatedPaymentRequest(
     'fingerprint'
 );
 
-$presenter = new LeasingOrderEmailPresenter(new SensitiveDataCipher(new \PhpEncryption(_NEW_COOKIE_KEY_)));
+$presenter = new LeasingOrderEmailPresenter();
 $process2Shop = ['uni_proces' => 1];
 $prematureVars = $presenter->mailExtraVarsFromRequest($request, $process2Shop);
 $prematureHtml = (string) ($prematureVars['{unipayment_leasing_html}'] ?? '');

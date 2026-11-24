@@ -32,7 +32,6 @@ use PrestaShop\Module\Unipayment\Order\OrderOrchestrationException;
 use PrestaShop\Module\Unipayment\Order\OrderOrchestrator;
 use PrestaShop\Module\Unipayment\Order\PostOrderPopupFailureResponse;
 use PrestaShop\Module\Unipayment\Order\PrestaShopOrderGatewayInterface;
-use PrestaShop\Module\Unipayment\Order\SensitiveDataCipher;
 
 if (!defined('_NEW_COOKIE_KEY_')) {
     define('_NEW_COOKIE_KEY_', 'cp-fail-email-test-key');
@@ -358,7 +357,7 @@ $flow = new OrderOrchestrator(
     $snapshots,
     $orders,
     $cp,
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder(),
     $bank,
     $mail
@@ -409,7 +408,7 @@ $flowU = new OrderOrchestrator(
     $snapshotsU,
     $ordersU,
     $cpU,
-    new FinancingSnapshotFactory(new SensitiveDataCipher()),
+    new FinancingSnapshotFactory(),
     new ControlPanelOrderPayloadBuilder(),
     $bankU,
     $mailU

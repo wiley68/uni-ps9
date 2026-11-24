@@ -123,6 +123,25 @@ $latest = $journal->findLatestByOrderIdAndShop('ORDER-1', 1);
 assertJournal(is_array($latest), 'findLatestByOrderIdAndShop returns entry');
 assertJournal($journal->findLatestByOrderIdAndShop('ORDER-1', 2) === null, 'other shop must not see journal row');
 
+$removedFields = [
+    'egn' => 'legacy-egn-marker',
+    'Phone2' => 'legacy-phone-marker',
+    'unipayment_egn' => 'legacy-checkout-egn-marker',
+    'unipayment_phone2' => 'legacy-checkout-phone-marker',
+];
+$masked = array_fill_keys(array_keys($removedFields), '[REDACTED]');
+assertJournal($journal->record(1, 2, 'ORDER-2', 200, ['nested' => $removedFields], $removedFields), 'structured diagnostics persisted');
+assertJournal($store->entries[1]['request']['nested'] === $masked && $store->entries[1]['response'] === $masked, 'all four keys masked before storage');
+$store->entries[1]['request'] = ['nested' => $removedFields];
+$store->entries[1]['response'] = $removedFields;
+$historical = $journal->findLatestByOrderIdAndShop('ORDER-2', 1);
+assertJournal($historical['request']['nested'] === $masked && $historical['response'] === $masked, 'historical structured diagnostic masks all four keys on read');
+$export = json_encode($journal->buildExport(), JSON_THROW_ON_ERROR);
+foreach ($removedFields as $marker) {
+    assertJournal(!str_contains($export, $marker), 'historical structured diagnostic masks obsolete field on export');
+}
+assertJournal($store->entries[1]['response'] === $removedFields, 'read and export preserve historical storage');
+
 $cutoff = PrestaShop\Module\Unipayment\SmartUcf\SmartUcfDebugLogRepository::retentionCutoff(
     new DateTimeImmutable('2026-08-18 12:00:00', new DateTimeZone('UTC'))
 );

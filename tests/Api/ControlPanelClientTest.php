@@ -207,8 +207,9 @@ $client->updateOrderStatus('100', 'sent', 'cp_sent');
 assertPhase2($transport->requests[$requestCountBefore401]['method'] === 'PATCH', 'status method mismatch');
 assertPhase2($transport->requests[$requestCountBefore401 + 1]['url'] === (new \PrestaShop\Module\Unipayment\Configuration\ModuleDeploymentEnvironment())->controlPanelApiBaseUrl() . '/auth/login', '401 did not trigger re-login');
 assertPhase2($transport->requests[$requestCountBefore401 + 2]['headers']['Authorization'] === 'Bearer token-three', '401 retry did not use new token');
-assertPhase2($transport->requests[$requestCountBefore401 + 2]['payload']['status_id'] === 'cp_sent', 'status_id contract mismatch');
-assertPhase2($transport->requests[$requestCountBefore401 + 2]['payload']['status'] === 'sent', 'status contract mismatch');
+$expectedStatusPayload = ['order_id' => '100', 'status_id' => 'cp_sent', 'status' => 'sent'];
+assertPhase2($transport->requests[$requestCountBefore401]['payload'] === $expectedStatusPayload, 'exact initial PATCH payload');
+assertPhase2($transport->requests[$requestCountBefore401 + 2]['payload'] === $expectedStatusPayload, 'exact PATCH payload preserved on retry');
 assertPhase2(count($transport->requests) === $requestCountBefore401 + 3, '401 recovery must retry only once');
 
 $transport->responses[] = jsonResponse(401, [
