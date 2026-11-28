@@ -134,11 +134,6 @@ final class DistributionPackage
         }
         $version = self::resolveVersion($this->read($this->sourceRoot . '/unipayment.php'));
         $sha = trim($this->run(['git', 'rev-parse', 'HEAD'], $this->sourceRoot));
-        $epoch = getenv('SOURCE_DATE_EPOCH');
-        $epoch = $epoch === false ? trim($this->run(['git', 'show', '-s', '--format=%ct', 'HEAD'], $this->sourceRoot)) : $epoch;
-        if (!ctype_digit($epoch) || (int) $epoch < 315532800 || (int) $epoch > 4354819198) {
-            throw new RuntimeException('SOURCE_DATE_EPOCH must be within the ZIP timestamp range (1980–2107).');
-        }
         $dist = $this->sourceRoot . '/dist';
         if (is_link($dist)) {
             throw new RuntimeException('dist must not be a symlink.');
@@ -191,36 +186,54 @@ final class DistributionPackage
             foreach ($files as $relative => $absolute) {
                 $hashes[$relative] = hash_file('sha256', $absolute);
             }
+            $epoch = intdiv(time(), 2) * 2;
+            if ($epoch < 315532800 || $epoch > 4354819198) {
+                throw new RuntimeException('Build time must be within the ZIP timestamp range (1980–2107).');
+            }
             $manifest = [
                 'module' => 'unipayment', 'version' => $version, 'source_git_sha' => $sha,
                 'source_dirty' => trim($this->run(['git', 'status', '--porcelain', '--untracked-files=normal'], $this->sourceRoot)) !== '',
-                'source_date_epoch' => (int) $epoch, 'files' => $hashes,
+                'source_date_epoch' => $epoch, 'files' => $hashes,
             ];
             $this->write($module . '/' . self::MANIFEST, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");
             $files = $this->treeFiles($module);
             $zip = new ZipArchive();
-            if ($zip->open($temporaryZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-                throw new RuntimeException('Could not create ZIP.');
+            // libzip encodes DOS timestamps in the process timezone.
+            $previousTimezone = getenv('TZ');
+            if (!putenv('TZ=UTC')) {
+                throw new RuntimeException('Could not set UTC for ZIP writing.');
             }
-            // ZIP stores local timestamps; UTC makes builds independent of the host time zone.
-            $previousTimezone = date_default_timezone_get();
-            date_default_timezone_set('UTC');
+            $zipOpen = false;
             try {
+                if ($zip->open($temporaryZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                    throw new RuntimeException('Could not create ZIP.');
+                }
+                $zipOpen = true;
                 foreach ($files as $relative => $absolute) {
                     $name = 'unipayment/' . $relative;
                     if (!$zip->addFile($absolute, $name)
-                        || !$zip->setMtimeName($name, (int) $epoch)
+                        || !$zip->setMtimeName($name, $epoch)
                         || !$zip->setExternalAttributesName($name, ZipArchive::OPSYS_UNIX, 0100644 << 16)
                         || !$zip->setCompressionName($name, ZipArchive::CM_DEFLATE, 9)
                     ) {
                         throw new RuntimeException('ZIP entry could not be written: ' . $relative);
                     }
                 }
+                $zipOpen = false;
                 if (!$zip->close()) {
                     throw new RuntimeException('ZIP could not be finalized.');
                 }
             } finally {
-                date_default_timezone_set($previousTimezone);
+                try {
+                    if ($zipOpen) {
+                        @$zip->close();
+                    }
+                } finally {
+                    unset($zip);
+                    if (!putenv($previousTimezone === false ? 'TZ' : 'TZ=' . $previousTimezone)) {
+                        throw new RuntimeException('Could not restore the process timezone.');
+                    }
+                }
             }
             $count = $this->verify($temporaryZip);
             if (is_link($zipPath) || !rename($temporaryZip, $zipPath)) {

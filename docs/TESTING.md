@@ -147,7 +147,7 @@ Destructive Aud006 DB purge test **SKIPs** in the safe suite.
 | Configuration / shared cache lifecycle / LKG     | `tests/Configuration/*`                         |
 | Inbound API / CP client                         | `tests/Api/*`                                   |
 | Header type safety / private error diagnostics   | `tests/Api/InboundHeaderHardeningTest.php`        |
-| Production ZIP / runtime parity / repeatability   | `tests/Infrastructure/DistributionPackageTest.php` |
+| Production ZIP / runtime parity / UTC timestamps | `tests/Infrastructure/DistributionPackageTest.php` |
 | Security / tokens / AUD-021 secrets             | `tests/Security/*`                              |
 | Product FO / popup                              | `tests/Product/*`, `tests/Frontend/Product*`    |
 | Cart FO / popup / twin-order contracts          | `tests/Cart/*`, `tests/Frontend/Cart*`          |
@@ -182,7 +182,11 @@ Do not hard-code a permanent test file count here — it changes with each remed
 
 Historical phase STOP gates (7–13) are **completed** delivery milestones; they are not the current release gate.
 
-`InboundHeaderHardeningTest` runs all three inbound controllers in isolated CLI processes with typed PrestaShop doubles: unsigned POST, malformed SERVER keys/values, GET, header fallback and unexpected-error logging. `DistributionPackageTest` requires the local `secrets/smartucf-key.php` deployment file without printing or executing it. It builds twice, checks byte repeatability/source immutability and unchanged environment/passphrase files, rejects missing/symlinked deployment sources, executes nine cases from the extracted production ZIP and rejects ten corrupted/development archives. Negative cases include missing passphrase files and rewritten environment/passphrase files with recomputed manifests. These tests do not bootstrap the live shop or contact CP. Run the native HTTP smoke on both PS 9.1.x and 9.2.x under PHP 8.4 before deployment; CLI doubles do not certify the remote Apache/FPM lifecycle.
+`InboundHeaderHardeningTest` runs all three inbound controllers in isolated CLI processes with typed PrestaShop doubles: unsigned POST, malformed SERVER keys/values, GET, header fallback and unexpected-error logging. Run the native HTTP smoke on both PS 9.1.x and 9.2.x under PHP 8.4 before deployment; CLI doubles do not certify the remote Apache/FPM lifecycle.
+
+`UNIPAYMENT_TEST_SUITE=safe php tests/Infrastructure/DistributionPackageTest.php` runs the static version and path contracts and reports the ZIP checks as skipped. The standalone full test uses a private disposable checkout, synthetic deployment files and `umask 077`. It requires Git, Composer, PHP zip/zlib/SimpleXML and Info-ZIP `unzip`. For offline runs, invoke Composer through a wrapper on `PATH` that enforces `COMPOSER_DISABLE_NETWORK=1` after the builder filters inherited Composer variables. Keep Composer home and cache private and run with plugins and scripts disabled. The test also runs with inherited `UNZIP=-DD UNZIPOPT=-DD` to verify that extraction subprocesses discard those settings.
+
+The full test checks every raw local and central DOS timestamp against the current, even-second UTC manifest epoch. It checks SHA-256 and CRC independently, builds changed PHP bytes in distinct DOS intervals, verifies extracted and placed mtimes, and checks exact timezone restoration and previous ZIP preservation on failures. It also verifies source vendor preservation, generated production autoload, source and deployment parity, historical verifier compatibility, nine packaged inbound cases and ten invalid archive cases. See [RELEASE.md](RELEASE.md) for release permissions, archive retention, placement and OPcache checks.
 
 ## Authoritative manual-test contract
 

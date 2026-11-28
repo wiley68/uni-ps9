@@ -41,7 +41,7 @@ Do **not** create or push a Git tag automatically from agent workflows — taggi
 - Verify the local ZIP against the working tree using the official verifier. The manifest records the actual source HEAD and dirty state.
 - [ ] Manual browser acceptance on PS9 Classic and Hummingbird, including Product, Cart, Checkout, Back Office and Process 1 regression.
 
-### Reproducible distribution command
+### Distribution command
 
 From the module root, run:
 
@@ -73,9 +73,13 @@ php bin/verify-distribution.php dist/ps9_uni_2.0.5.zip
 php tests/Infrastructure/DistributionPackageTest.php
 ```
 
-The command prints ZIP path, file count, byte size and source Git SHA; any build/verification failure exits non-zero. Entries are sorted with normalized permissions and timestamps. By default the timestamp is the source HEAD commit time; `SOURCE_DATE_EPOCH` can override it. Identical source, toolchain and epoch produce identical ZIP bytes. The SHA identifies HEAD; `source_dirty=true` records a build containing uncommitted changes. For a release, build again after the intended source commit.
+The command prints ZIP path, file count, byte size and source Git SHA. Build or verification failures exit non-zero. Entries are sorted with normalized permissions. Every entry, including generated files and the manifest itself, receives one current UTC timestamp captured just before manifest generation and rounded down to an even second for ZIP DOS precision. The manifest's `source_date_epoch` stores that same Unix epoch. Git commit time, source file mtimes and inherited `SOURCE_DATE_EPOCH` have no effect. The builder sets process `TZ=UTC` for the full ZIP write and restores its exact prior state, including unset and empty values. The PHP default timezone is preserved.
 
-Do not commit generated ZIPs, `dist/` contents or `secrets/smartucf-key.php`. The archive includes the deployment passphrase and must be handled as a deployment artifact. The builder writes the existing Apache deny-all protection into `dist/.htaccess`; HTTP access requires Apache to honor it. This command creates a local artifact only; tagging and publishing remain explicit operator actions.
+Builds in different two-second intervals have different ZIP timestamp fields and manifest bytes, so the archive SHA-256 can change with identical source. Builds in the same interval can share a timestamp. Retain the exact tested installer for delivery and record its SHA-256. The manifest's Git SHA identifies HEAD and `source_dirty=true` records uncommitted changes. For a release, build again after the intended source commit.
+
+ZIP DOS timestamps have no timezone label. Extraction tools may interpret the stored UTC clock time in the destination timezone. File placement into `modules/unipayment/` may preserve the extracted mtime or assign a new one, depending on the tool and copy method. After placement, verify the installed PHP bytes and filesystem mtimes at the final module path. Web PHP OPcache revalidates according to the serving PHP process configuration. When `opcache.validate_timestamps` is enabled, `opcache.revalidate_freq` controls the check interval. When timestamp validation is disabled, use the deployment's OPcache invalidation or restart procedure. ZIP timestamps alone cannot establish file replacement or opcode refresh.
+
+Do not commit generated ZIPs, `dist/` contents or `secrets/smartucf-key.php`. Run release packaging under `umask 077` and verify the resulting installer has mode `0600`. The archive includes the deployment passphrase and requires access-restricted handling. The builder writes the existing Apache deny-all protection into `dist/.htaccess`; HTTP access requires Apache to honor it. This command creates a local artifact only; tagging and publishing remain explicit operator actions.
 
 For UNI-PS9-ADS-003, first build and verify a provisional archive before Git publication. Run packaging with a restrictive umask (077), then regenerate the final archive from the exact published release commit. Verify the final manifest SHA equals that commit and `source_dirty=false`, the ZIP has mode 0600 and is Git-ignored. Keep `config/environment.php` unchanged and unstaged; the Git-ignored deployment secret must also remain unstaged. Record the final path, byte size, SHA-256, archive file count and verified manifest entry count without displaying deployment-file contents. Building and tests must not invoke live shop lifecycle hooks, modify shop DB/configuration or clear caches.
 
